@@ -9,7 +9,5 @@ int main() {
     const char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    platform_create_window();
-
-
+    platform_main();
 }
