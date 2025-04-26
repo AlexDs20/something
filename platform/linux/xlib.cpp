@@ -78,19 +78,27 @@ int platform_main() {
     XStoreName(display, window, title);
     XMapWindow(display, window);
 
-    set_fullscreen(display, window, true);
+    // set_fullscreen(display, window, true);
+    Atom wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(display, window, &wm_delete_window, 1);
 
-    bool running = true;
+    bool running = 1;
     while(running){
         XEvent event;
         while(XPending(display)>0) {
             XNextEvent(display, &event);
             switch (event.type) {
-                case (Expose): {
+                case Expose: {
                 } break;
-                case (DestroyNotify): {
+                case DestroyNotify: {
                     if (event.xdestroywindow.window == window) {
-                        running = False;
+                        running = 0;
+                    }
+                } break;
+                case ClientMessage: {
+                    if (event.xclient.data.l[0] == wm_delete_window) {
+                        XDestroyWindow(display, window);
+                        running = 1;
                     }
                 } break;
             }
