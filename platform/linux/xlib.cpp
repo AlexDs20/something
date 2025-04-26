@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
+
 int set_fullscreen(Display* display, Window window, bool fullscreen) {
     // https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html#id-1.6.8
     //  Info about the format towards the end of the section
@@ -48,13 +50,13 @@ int platform_main() {
     int screen = DefaultScreen(display);
     int root = DefaultRootWindow(display);
 
-    XWindowAttributes wa;
-    XGetWindowAttributes(display, root, &wa);
+    Visual* visual = DefaultVisual(display, screen);
+    int depth = DefaultDepth(display, screen);
 
     // https://tronche.com/gui/x/xlib/window/attributes/
     unsigned long valuemask = CWBackPixel | CWEventMask;
     XSetWindowAttributes swa;
-    swa.background_pixel = 0xFFFFFF;
+    swa.background_pixel = 0xFFFFFFFF;
 
     // https://tronche.com/gui/x/xlib/events/mask.html
     // https://tronche.com/gui/x/xlib/events/processing-overview.html#ExposureMask
@@ -64,9 +66,9 @@ int platform_main() {
             x, y,
             w, h,
             0,
-            wa.depth,
+            depth,
             InputOutput,
-            wa.visual,
+            visual,
             valuemask,
             &swa
             );
@@ -78,17 +80,30 @@ int platform_main() {
     XStoreName(display, window, title);
     XMapWindow(display, window);
 
+    // Buffer image
+    char pixel_bytes = 4;
+    int buffer_size = w * h * pixel_bytes;
+    int* buffer = (int*)malloc(buffer_size);
+
+    XImage* xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, 32, 0);
+    xim->byte_order = LSBFirst;
+    xim->bitmap_bit_order = LSBFirst;
+    GC gc = DefaultGC(display, screen);
+    XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
+
     // set_fullscreen(display, window, true);
     Atom wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(display, window, &wm_delete_window, 1);
 
     bool running = 1;
+    bool first = 1;
     while(running){
         XEvent event;
         while(XPending(display)>0) {
             XNextEvent(display, &event);
             switch (event.type) {
                 case Expose: {
+                    XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
                 } break;
                 case DestroyNotify: {
                     if (event.xdestroywindow.window == window) {
@@ -103,6 +118,26 @@ int platform_main() {
                 } break;
             }
         }
+
+        // Write over the buffer
+        if (first) {
+            first = !first;
+            for (int i=0; i<w*h; ++i) {
+                int* p = buffer + i;
+                if (i % w < w / 3) {
+                    *p = 0;
+                } else if (i%w>= w/3 && i%w < 2*w/3) {
+                    *p = 0x00FFFF00;
+                } else {
+                    *p = 0x00FF0000;
+                }
+            }
+        }
+
+        // Draw the buffer
+        XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
     }
+
+    free(buffer);
     return(0);
 }
