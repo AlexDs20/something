@@ -31,40 +31,12 @@ typedef struct Platform {
     Pointer pointer;
 } Platform;
 
-int platform_initialize(Platform* p) {
-    // https://tronche.com/gui/x/xlib/
-    // https://www.x.org/releases/X11R7.7/doc/man/man3/
-    // https://x.org/releases/current/doc/libX11/libX11/libX11.html
-    // https://www.x.org/releases/X11R7.7/doc/xproto/x11protocol.html
-    // https://magcius.github.io/xplain/article/x-basics.html
-    // https://hereket.com/posts/from-scratch-x11-windowing/
-
-    // Open a pection to the X server
-    p->display = XOpenDisplay(NULL);
-    if (!p->display) {
-        fprintf(stderr, "Cannot open display\n");
-        return(1);
-    }
-
-    p->screen = DefaultScreen(p->display);
-
-    if (0) {
-        int n_items;
-        long v_infomask = 0;
-        XVisualInfo xvi = {};
-        XVisualInfo* xvp = XGetVisualInfo(p->display, v_infomask, &xvi, &n_items);
-        for (int i=0; i<n_items; i++) {
-            printf("Visual %d: (depth,r,g,b): (%d,0x%lx,0x%lx,0x%lx)\n", i, xvp[i].depth, xvp[i].red_mask, xvp[i].green_mask, xvp[i].blue_mask);
-        }
-    }
-
-    return (0);
-}
-
-int platform_kill(Platform* p) {
-    XCloseDisplay(p->display);
-    return(0);
-}
+// https://tronche.com/gui/x/xlib/
+// https://www.x.org/releases/X11R7.7/doc/man/man3/
+// https://x.org/releases/current/doc/libX11/libX11/libX11.html
+// https://www.x.org/releases/X11R7.7/doc/xproto/x11protocol.html
+// https://magcius.github.io/xplain/article/x-basics.html
+// https://hereket.com/posts/from-scratch-x11-windowing/
 
 int platform_create_window(Platform* p, char* window_title, int w, int h, int x, int y, unsigned long background_color) {
     p->window = XCreateSimpleWindow(p->display, RootWindow(p->display, p->screen),
@@ -117,18 +89,6 @@ int platform_handle_pointer_button(Platform* p, XEvent* event, int down) {
 
     p->pointer.x = event->xbutton.x;
     p->pointer.y = event->xbutton.y;
-    return(0);
-}
-
-int platform_handle_pointer_position(Platform* p, XEvent* event) {
-    p->pointer.x = event->xmotion.x;
-    p->pointer.y = event->xmotion.y;
-    return(0);
-}
-
-int platform_handle_resize(Platform* p, XEvent* event) {
-    printf("Resize to: (%d,%d)\n", event->xresizerequest.width, event->xresizerequest.height);
-
     return(0);
 }
 
@@ -188,22 +148,72 @@ int platform_events(Platform* p) {
     return(0);
 }
 
-int platform_draw(Platform* p, void* data) {
-    XClearWindow(p->display, p->window);
+int platform_main() {
+    int x=0, y=0;
+    int w=1024, h=768;
+    char* title = "Handmade something";
+
+    Display* display = XOpenDisplay(0);
+    if (!display) {
+        printf("Failed opening display!\n");
+        return(1);
+    }
+
+    int screen = DefaultScreen(display);
+    int root = DefaultRootWindow(display);
+
+    XWindowAttributes wa;
+    XGetWindowAttributes(display, root, &wa);
+
+    // https://tronche.com/gui/x/xlib/window/attributes/
+    unsigned long valuemask = CWBackPixel | CWEventMask;
+    XSetWindowAttributes swa;
+    swa.background_pixel = 0xFFFFFF;
+
+    // https://tronche.com/gui/x/xlib/events/mask.html
+    // https://tronche.com/gui/x/xlib/events/processing-overview.html#ExposureMask
+    swa.event_mask = ExposureMask | StructureNotifyMask;
+
+    Window window = XCreateWindow(display, root,
+            x, y,
+            w, h,
+            0,
+            wa.depth,
+            InputOutput,
+            wa.visual,
+            valuemask,
+            &swa
+            );
+
+    XMapWindow(display, window);
+    XStoreName(display, window, title);
+
+
+
+    bool running = true;
+    while(running){
+        XEvent event;
+        while(XPending(display)>0) {
+            XNextEvent(display, &event);
+            switch (event.type) {
+                case (Expose): {
+                    printf("Expose\n");
+                } break;
+                case (DestroyNotify): {
+                    if (event.xdestroywindow.window == window) {
+                        running = False;
+                    }
+                } break;
+            }
+        }
+    }
     return(0);
 }
 
-void redraw_pixmap(Display* display, Window window, GC gc, XImage* xim, Pixmap** pixmap, int w, int h) {
-    XClearWindow(display, window);
-    XPutImage(display, **pixmap, gc, xim, 0, 0, 0, 0, w, h);
-    XCopyArea(display, **pixmap, window, gc, 0, 0, w, h, 0, 0);
-}
+int platform_main_old() {
+    int x=0, y=0;
+    int w=1024, h=768;
 
-void resize_buffers(Pixmap** pixmap, XImage** xim, int w, int h) {
-    return;
-}
-
-int platform_main() {
     Display* display = XOpenDisplay(NULL);
     if (!display) {
         fprintf(stderr, "Cannot open display\n");
@@ -211,23 +221,19 @@ int platform_main() {
     }
     int screen = DefaultScreen(display);
 
-    int x=0, y=0;
-    int w=1024, h=768;
     int max_w = DisplayWidth(display, screen);
     int max_h = DisplayHeight(display, screen);
-    unsigned long background_color = 0x00FFFF;
+    unsigned long background_color = 0xBBBBBB;
+
     Window window = XCreateSimpleWindow(display, RootWindow(display, screen),
                                  x, y,
                                  w, h,
                                  1,
-                                 0xFF0000,
+                                 0x000000,
                                  background_color);
 
     XSelectInput(display, window,
-            ExposureMask | ResizeRedirectMask // |
-            // KeyPressMask | KeyReleaseMask |
-            // ButtonPressMask | ButtonReleaseMask |
-            // PointerMotionMask
+            ExposureMask | ResizeRedirectMask
             );
 
     XStoreName(display, window, "SOMETHING!");
@@ -239,21 +245,32 @@ int platform_main() {
 
     GC gc = DefaultGC(display, screen);
 
-    Pixmap pixmap = XCreatePixmap(display, window, w, h, wa.depth);
-    unsigned int* data = (unsigned int*)malloc(w*h*4);
+    //==============================
+    // User side
+    char* data = (char*)malloc(w*h*4);
 
     for (int i = 0; i < (w*h); i++) {
         int row = (int)i/w;
         int res = i - row * w;
         if (res < (int)w/3) {
-            data[i] = 0;
+            data[i*4] = 0x00;
         } else if ((int)w/3 <= res  && res < (int)2*w/3) {
-            data[i] = 0xFFFFFF00;
+            data[i*4+0] = 0x00;
+            data[i*4+1] = 0xFF;
+            data[i*4+2] = 0xFF;
+            data[i*4+3] = 0x00;
         } else {
-            data[i] = 0xFFFF0000;
+            data[i*4+0] = 0x00;
+            data[i*4+1] = 0x00;
+            data[i*4+2] = 0xFF;
+            data[i*4+3] = 0x00;
         }
     }
-
+    //==============================
+    printf("Pixmap depth: %d\n", wa.depth);
+    // Make the pixmap max size of my screen so don't have to allocate even on window resize
+    Pixmap pixmap = XCreatePixmap(display, window, max_w, max_h, wa.depth);
+    // Pixmap pixmap = XCreatePixmap(display, window, w, h, wa.depth);
     int offset = 0;
     XImage* xim = XCreateImage(display, wa.visual, wa.depth, ZPixmap, offset, (char *)data, w, h, 32, w*4);
     XPutImage(display, pixmap, gc, xim, 0, 0, 0, 0, w, h);
@@ -270,16 +287,21 @@ int platform_main() {
                 case Expose: {
                     printf("EXPOSE EVENT\n");
                     // Add method on how to redraw => nearest, interp, stretch
-                    redraw_pixmap(display, window, gc, xim, &pixptr, w, h);
-                    // XClearWindow(display, window);
-                    // XPutImage(display, pixmap, gc, xim, 0, 0, 0, 0, w, h);
-                    // XCopyArea(display, pixmap, window, gc, 0, 0, w, h, 0, 0);
+                    {
+                        XClearWindow(display, window);
+                        XPutImage(display, pixmap, gc, xim, 0, 0, 0, 0, w, h);
+                        XCopyArea(display, pixmap, window, gc, 0, 0, w, h, 0, 0);
+                    }
                 } break;
                 case ResizeRequest: {
                     int new_w = event.xresizerequest.width;
                     int new_h = event.xresizerequest.height;
-                    resize_buffers(&pixptr, &xim, new_w, new_h);
-                    redraw_pixmap(display, window, gc, xim, &pixptr, w, h);
+                    printf("Resize to: (%d,%d)\n", new_w, new_h);
+                    {
+                        XClearWindow(display, window);
+                        XPutImage(display, pixmap, gc, xim, 0, 0, 0, 0, new_w, new_h);
+                        XCopyArea(display, pixmap, window, gc, 0, 0, new_w, new_h, 0, 0);
+                    }
                 } break;
             }
         }
