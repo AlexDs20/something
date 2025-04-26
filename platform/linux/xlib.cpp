@@ -82,8 +82,7 @@ int platform_main() {
 
     // Buffer image
     char pixel_bytes = 4;
-    int buffer_size = w * h * pixel_bytes;
-    int* buffer = (int*)malloc(buffer_size);
+    int* buffer = (int*)malloc(w*h*pixel_bytes);
 
     XImage* xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, 32, 0);
     xim->byte_order = LSBFirst;
@@ -110,27 +109,35 @@ int platform_main() {
                         running = 0;
                     }
                 } break;
+                case ConfigureNotify: {
+                    int new_w = event.xconfigure.width;
+                    int new_h = event.xconfigure.height;
+                    if (new_w != w || new_h != h) {
+                        w = new_w;
+                        h = new_h;
+
+                        XDestroyImage(xim);
+                        buffer = (int*) malloc(w*h*pixel_bytes);
+                        xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, 32, 0);
+                    }
+                } break;
                 case ClientMessage: {
                     if (event.xclient.data.l[0] == wm_delete_window) {
-                        XDestroyWindow(display, window);
-                        running = 1;
+                        running = 0;
                     }
                 } break;
             }
         }
 
         // Write over the buffer
-        if (first) {
-            first = !first;
-            for (int i=0; i<w*h; ++i) {
-                int* p = buffer + i;
-                if (i % w < w / 3) {
-                    *p = 0;
-                } else if (i%w>= w/3 && i%w < 2*w/3) {
-                    *p = 0x00FFFF00;
-                } else {
-                    *p = 0x00FF0000;
-                }
+        for (int i=0; i<w*h; ++i) {
+            int* p = buffer + i;
+            if (i % w < w / 3) {
+                *p = 0;
+            } else if (i%w>= w/3 && i%w < 2*w/3) {
+                *p = 0x00FFFF00;
+            } else {
+                *p = 0x00FF0000;
             }
         }
 
@@ -138,6 +145,9 @@ int platform_main() {
         XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
     }
 
+    XDestroyWindow(display, window);
+    xim->data = 0;
+    XFree(xim);
     free(buffer);
     return(0);
 }
