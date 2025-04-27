@@ -125,11 +125,14 @@ int platform_main() {
                     if (new_w != w || new_h != h) {
                         w = new_w;
                         h = new_h;
+                        printf("Window size: (%d,%d) = %.3f MB\n", w, h, (float)(w*h*pixel_bytes/1024.0f/1024.0f));
 
                         // set the data to null so that the DestroyImage doesn't free the buffer
-                        // TODO(alex): If resize > max size => realloc buffer
                         xim->data = 0;
                         XDestroyImage(xim);
+                        if (w*h>max_w*max_h) {
+                            buffer = (int*)malloc(w*h*pixel_bytes);
+                        }
                         xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, bitmap_pad, w*4);
                     }
                 } break;
