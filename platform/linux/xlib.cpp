@@ -36,6 +36,36 @@ int set_fullscreen(Display* display, Window window, bool fullscreen) {
     return(0);
 }
 
+int toggle_fullscreen(Display* display, Window window) {
+    // https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html#id-1.6.8
+    //  Info about the format towards the end of the section
+    XClientMessageEvent ev;
+    Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
+    Atom fullscreen_atom = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
+
+    if (wm_state == None) {
+        return(1);
+    }
+
+    ev.type = ClientMessage;
+    ev.format = 32;
+    ev.window = window;
+    ev.message_type = wm_state;
+    ev.data.l[0] = 2;                       // _NET_WM_STATE_REMOVE 0   _NET_WM_STATE_ADD 1   _NET_WM_STATE_TOGGLE 2
+    ev.data.l[1] = fullscreen_atom;
+    ev.data.l[2] = 0;
+    ev.data.l[3] = 1;                       // normal applications 1   pagers and other clients 2
+
+    // Send the event
+    int success = XSendEvent(display, DefaultRootWindow(display), False, SubstructureNotifyMask | SubstructureRedirectMask, (XEvent*)&ev);
+    if (!success) {
+        printf("Failed sending the toggle fullscreen event!\n");
+        return(1);
+    }
+
+    return(0);
+}
+
 int platform_main() {
     int x=0, y=0;
     int w=1024, h=768;
@@ -61,7 +91,7 @@ int platform_main() {
 
     // https://tronche.com/gui/x/xlib/events/mask.html
     // https://tronche.com/gui/x/xlib/events/processing-overview.html#ExposureMask
-    swa.event_mask = ExposureMask | StructureNotifyMask;
+    swa.event_mask = ExposureMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask;
 
     int border_width=0;
     Window window = XCreateWindow(display, root,
@@ -99,7 +129,6 @@ int platform_main() {
     XSetWMProtocols(display, window, &wm_delete_window, 1);
 
     bool running = 1;
-    bool first = 1;
     while(running){
         XEvent event;
         while(XPending(display)>0) {
@@ -112,6 +141,15 @@ int platform_main() {
                     if (event.xdestroywindow.window == window) {
                         running = 0;
                     }
+                } break;
+                case KeyPress: {
+                    printf("Key pressed!\n");
+                    if (event.xkey.keycode == XKeysymToKeycode(display, XK_f)) {
+                        toggle_fullscreen(display, window);
+                    }
+                } break;
+                case KeyRelease: {
+                    printf("Key released!\n");
                 } break;
                 case ConfigureNotify: {
                     // Go through all the ConfigureNotify events in the queue (they get removed from the queue)

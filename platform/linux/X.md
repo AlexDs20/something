@@ -22,4 +22,3 @@
     - Map it on the screen: *XMapWindow*
 - To set attribute of a window:
     - *XSetWindowAttributes* and bit map in later calls to *XCreateWindow* and *XChangeWindowAttributes*
-
