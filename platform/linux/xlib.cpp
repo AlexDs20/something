@@ -80,17 +80,16 @@ int platform_main() {
     XMapWindow(display, window);
 
     XWindowAttributes wa;
-    XGetWindowAttributes(display, DefaultRootWindow(display), &wa);
+    XGetWindowAttributes(display, root, &wa);
     int max_w = wa.width;
     int max_h = wa.height;
 
     // Buffer image
     char pixel_bytes = 4;
     int* buffer = (int*)malloc(max_w*max_h*pixel_bytes);
-    printf("MAX SIZE: (%d,%d)\n", max_w, max_h);
     int offset = 0;
     int bitmap_pad = 32;
-    int bytes_per_line = max_w*4;
+    int bytes_per_line = w*4;
     XImage* xim = XCreateImage(display, visual, depth, ZPixmap, offset, (char*)buffer, w, h, bitmap_pad, bytes_per_line);
     GC gc = DefaultGC(display, screen);
     XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
@@ -121,10 +120,10 @@ int platform_main() {
                         w = new_w;
                         h = new_h;
 
+                        // set the data to null so that the DestroyImage doesn't free the buffer
                         xim->data = 0;
                         XDestroyImage(xim);
-                        // buffer = (int*) malloc(w*h*pixel_bytes);
-                        xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, bitmap_pad, max_w*4);
+                        xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, bitmap_pad, w*4);
                     }
                 } break;
                 case ClientMessage: {
@@ -136,11 +135,11 @@ int platform_main() {
         }
 
         // Write over the buffer
-        for (int i=0; i<max_w*h; ++i) {
+        for (int i=0; i<w*h; ++i) {
             int* p = buffer + i;
-            if (i % max_w < w / 3) {
+            if (i % w < w / 3) {
                 *p = 0;
-            } else if (i%max_w>= w/3 && i%max_w < 2*w/3) {
+            } else if (i%w>= w/3 && i%w < 2*w/3) {
                 *p = 0x00FFFF00;
             } else {
                 *p = 0x00FF0000;
