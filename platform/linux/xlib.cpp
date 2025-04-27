@@ -114,6 +114,12 @@ int platform_main() {
                     }
                 } break;
                 case ConfigureNotify: {
+                    // Go through all the ConfigureNotify events in the queue (they get removed from the queue)
+                    // end we process the last event that was in the queue
+                    XEvent next_event;
+                    while (XCheckTypedEvent(display, ConfigureNotify, &next_event)) {
+                        event = next_event;
+                    }
                     int new_w = event.xconfigure.width;
                     int new_h = event.xconfigure.height;
                     if (new_w != w || new_h != h) {
@@ -121,6 +127,7 @@ int platform_main() {
                         h = new_h;
 
                         // set the data to null so that the DestroyImage doesn't free the buffer
+                        // TODO(alex): If resize > max size => realloc buffer
                         xim->data = 0;
                         XDestroyImage(xim);
                         xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, bitmap_pad, w*4);
