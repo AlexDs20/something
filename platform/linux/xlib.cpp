@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <X11/extensions/XShm.h>
+
 // https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
 
 int set_fullscreen(Display* display, Window window, bool fullscreen) {

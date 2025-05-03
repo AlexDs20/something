@@ -8,7 +8,7 @@ LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I."
 ENTRYPOINT="main.cpp"
-SRC="./platform/*.cpp"
+SRC="./*/*.cpp"
 CXX=clang++
 
 function echo () {
