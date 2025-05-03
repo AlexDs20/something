@@ -1,22 +1,31 @@
 #ifndef _ALLOCATORS_H
 #define _ALLOCATORS_H
 
-#define DEFAULT_STACK_SIZE 1024
-#define DEFAULT_STACK_ALIGN 32
-#define ALIGN(v) ((v)+(DEFAULT_STACK_ALIGN-1) & (~(DEFAULT_STACK_ALIGN-1)))
+#include "utils/defines.h"
+
+#define DEFAULT_ALIGN 32
+#define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
 
 typedef struct {
-    unsigned char* buffer;
-    unsigned long capacity;
-    unsigned long top;
+    uint8* buffer;
+    uint64 capacity;
+    uint64 top;
 } Arena;
 
-Arena* arena_allocator_create(unsigned long capacity);
-void* arena_allocator_alloc(Arena* arena, unsigned long size);
-void arena_allocator_pop(Arena* arena, unsigned long size);
-void* arena_allocator_copy(Arena* dest, Arena* src);
-void arena_allocator_free(Arena* arena);
-void arena_allocator_reset(Arena* arena);
-unsigned long arena_allocator_remaining(Arena* arena);
+typedef struct {
+
+} Stack;
+
+typedef struct {
+
+} Pool;
+
+Arena* arena_alloc_create(uint64 capacity);
+void* arena_alloc_alloc(Arena* arena, uint64 size);
+void arena_alloc_pop(Arena* arena, uint64 size);
+void* arena_alloc_copy(Arena* dest, Arena* src);
+void arena_alloc_free(Arena* arena);
+void arena_alloc_reset(Arena* arena);
+uint64 arena_alloc_remaining(Arena* arena);
 
 #endif  // _ALLOCATORS_H
