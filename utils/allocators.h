@@ -28,4 +28,20 @@ void arena_alloc_free(Arena* arena);
 void arena_alloc_reset(Arena* arena);
 uint64 arena_alloc_remaining(Arena* arena);
 
+
+//==============================
+// Vector
+
+typedef struct {
+    uint8* buffer;
+    uint64 capacity;
+    uint64 top;
+    uint64 element_size;
+} Vector;
+
+Vector* vector_alloc_create(uint64 n, uint64 size);
+void* vector_alloc_push(Vector* vector, void* data);
+void vector_alloc_pop(Vector* vector);
+void vector_alloc_free(Vector* vector);
+
 #endif  // _ALLOCATORS_H

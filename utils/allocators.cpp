@@ -15,7 +15,7 @@ Arena* arena_alloc_create(unsigned long capacity) {
         return(0);
     }
     arena->capacity = capacity;
-    arena->buffer = (unsigned char*)malloc(arena->capacity);
+    arena->buffer = (uint8*)malloc(arena->capacity);
     if (!arena->buffer) {
         return(0);
     }
@@ -38,12 +38,10 @@ void* arena_alloc_alloc(Arena* arena, unsigned long size) {
     }
 
     void* allocation = arena->buffer + arena->top;
-    // memset(allocation, 0, aligned_size);
+    memset(allocation, 0, aligned_size);
     arena->top += aligned_size;
     return allocation;
 }
-
-// void* arena_alloc_push(Arena* arena, void* src, unsigned long size);
 
 void arena_alloc_pop(Arena* arena, unsigned long size) {
     if(!arena || size > arena->top) {
@@ -102,5 +100,86 @@ void arena_alloc_reset(Arena* arena) {
 
 //==============================
 // Vector
+Vector* vector_alloc_create(uint64 n, uint64 size) {
+    Vector* vector = (Vector*)malloc(sizeof(Vector));
+    if (!vector) {
+        printf("Could not allocate memory for the vector structure.\n");
+        return(0);
+    }
+
+    vector->buffer = (uint8*)malloc(n*size);
+    if(!vector->buffer) {
+        printf("Could not allocate memory for the vector buffer");
+        free(vector);
+        return(0);
+    }
+    vector->capacity = n*size;
+    vector->top = 0;
+    vector->element_size = size;
+    return vector;
+}
+
+void* vector_alloc_push(Vector* vector, void* data) {
+    if (!vector) {
+        return(0);
+    }
+    if (vector->top+vector->element_size > vector->capacity) {
+        uint8* new_buffer = (uint8*)malloc(2*vector->capacity);
+        if (!new_buffer) {
+            printf("Could not expand memory buffer\n");
+            return(0);
+        }
+        memcpy(new_buffer, vector->buffer, vector->top);
+        free(vector->buffer);
+        vector->capacity *= 2;
+        vector->buffer = new_buffer;
+    }
+    void* allocated = memcpy((void*)(vector->buffer + vector->top), data, vector->element_size);
+    vector->top += vector->element_size;
+    return allocated;
+}
+
+void vector_alloc_pop(Vector* vector) {
+    if (vector) {
+        if (vector->buffer && vector->top>=vector->element_size) {
+            vector->top -= vector->element_size;
+            memset((void*)(vector->buffer + vector->top), 0, vector->element_size);
+        }
+    }
+}
+
+void vector_alloc_free(Vector* vector) {
+    if (vector) {
+        if (vector->buffer) {
+            free(vector->buffer);
+        }
+        free(vector);
+    }
+}
+
+/*
+uint64 vector_alloc_size(Vector* vector) {
+    if (vector) {
+        return vector->top / vector->element_size;
+    }
+    return(0);
+}
+
+void* vector_alloc_get(Vector* vector, uint64 index) {
+    if (index*vector->element_size < vector->top) {
+        return vector->buffer + index*vector->element_size;
+    }
+    return(0);
+}
+
+void* vector_alloc_set(Vector* vector, uint64 index, void* data) {
+    if (index<vector->top) {
+        memcpy((void*)(vector->buffer + index*vector->element_size), data, vector->element_size);
+        return vector->buffer + index*vector->element_size;
+    }
+    return(0);
+}
+*/
+
 
 //==============================

@@ -29,11 +29,11 @@ typedef struct {
 } Material;
 
 typedef struct {
-    Arena* vertices;
-    Arena* tex_coords;
-    Arena* normals;
-    Arena* faces;
-    Arena* mat;
+    Vector* vertices;
+    Vector* tex_coords;
+    Vector* normals;
+    Vector* faces;
+    Vector* mat;
 } Model;
 
 Arena* read_file(char* file_path, bool trim) {
@@ -98,8 +98,16 @@ Arena* read_file(char* file_path, bool trim) {
     return arena;
 }
 
-void print(Vertex v) {
-    printf("Vertex: (%f,%f,%f)\n", v.x, v.y, v.z);
+void print(Vertex* v) {
+    printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
+}
+
+void print(Normal* n) {
+    printf("Normal: (%f,%f,%f)\n", n->x, n->y, n->z);
+}
+
+void print(TexCoord* t) {
+    printf("TexCoord: (%f,%f,%f)\n", t->u, t->v, t->w);
 }
 
 Model* parse_obj_content(Arena* file) {
@@ -130,10 +138,10 @@ Model* parse_obj_content(Arena* file) {
     uint64 size_line = 0;
 
     // TODO(alex): Make it so that it rescales instead of overflowing.
-    Arena* vertices     = arena_alloc_create(70000*3*sizeof(Vertex));
-    Arena* tex_coords   = arena_alloc_create(70000*2*sizeof(TexCoord));
-    Arena* normals      = arena_alloc_create(70000*3*sizeof(Normal));
-    Arena* faces        = arena_alloc_create(70000*3*sizeof(Face));
+    Vector* vertices     = vector_alloc_create(1000, sizeof(Vertex));
+    Vector* tex_coords   = vector_alloc_create(1000, sizeof(TexCoord));
+    Vector* normals      = vector_alloc_create(1000, sizeof(Normal));
+    Vector* faces        = vector_alloc_create(1000, sizeof(Face));
 
     uint32 line_buffer_length = 128;
     char* line_buffer = (char*)malloc(line_buffer_length);
@@ -159,25 +167,30 @@ Model* parse_obj_content(Arena* file) {
                     char second = line_buffer[1];
                     if (second == ' ') {
                         // process vertex
-                        Vertex* v = (Vertex*)arena_alloc_alloc(vertices, sizeof(Vertex));
-                        sscanf(line_buffer, "v %f %f %f\n", &v->x, &v->y, &v->z);
+                        Vertex v = {};
+                        sscanf(line_buffer, "v %f %f %f\n", &v.x, &v.y, &v.z);
+                        vector_alloc_push(vertices, (void*)&v);
                     } else if (second == 'n') {
                         // process normal
-                        Normal* n = (Normal*)arena_alloc_alloc(normals, sizeof(Normal));
-                        sscanf(line_buffer, "vn %f %f %f\n", &n->x, &n->y, &n->z);
+                        Normal n = {};
+                        sscanf(line_buffer, "vn %f %f %f\n", &n.x, &n.y, &n.z);
+                        vector_alloc_push(normals, (void*)&n);
+
                     } else if (second == 't') {
                         // process texture
-                        TexCoord* t = (TexCoord*)arena_alloc_alloc(tex_coords, sizeof(TexCoord));
-                        sscanf(line_buffer, "vt %f %f\n", &t->u, &t->v);
+                        TexCoord t = {};
+                        sscanf(line_buffer, "vt %f %f\n", &t.u, &t.v);
+                        vector_alloc_push(tex_coords, (void*)&t);
                     } else if (second == 'p') {
                         // process vertex parameter
                     }
                 } else if (first == 'f') {
-                    Face* f = (Face*)arena_alloc_alloc(faces, sizeof(Face));
+                    Face f = {};
                     sscanf(line_buffer, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
-                            &f->v[0], &f->vt[0], &f->vn[0],
-                            &f->v[1], &f->vt[1], &f->vn[1],
-                            &f->v[2], &f->vt[2], &f->vn[2]);
+                            &f.v[0], &f.vt[0], &f.vn[0],
+                            &f.v[1], &f.vt[1], &f.vn[1],
+                            &f.v[2], &f.vt[2], &f.vn[2]);
+                    vector_alloc_push(faces, (void*)&f);
                 } else if (first == 'o') {                                          // Object
                     // process object
                     // if (++tmp_o_count>1) break;
@@ -214,10 +227,23 @@ void read_model_file(char* file_path) {
     Arena* arena = read_file(file_path, true);
     Model* model = parse_obj_content(arena);
 
+    printf("VERTICES:\n");
+    for (int i=0; i<10; i++) {
+        print((Vertex*)(model->vertices->buffer+i*sizeof(Vertex)));
+    }
+    printf("Textures:\n");
+    for (int i=0; i<10; i++) {
+        print((TexCoord*)(model->tex_coords->buffer+i*sizeof(TexCoord)));
+    }
+    printf("Normals:\n");
+    for (int i=0; i<10; i++) {
+        print((Normal*)(model->normals->buffer+i*sizeof(Normal)));
+    }
+
     arena_alloc_free(arena);
-    arena_alloc_free(model->tex_coords);
-    arena_alloc_free(model->vertices);
-    arena_alloc_free(model->faces);
-    arena_alloc_free(model->normals);
+    vector_alloc_free(model->tex_coords);
+    vector_alloc_free(model->vertices);
+    vector_alloc_free(model->faces);
+    vector_alloc_free(model->normals);
     free(model);
 }
