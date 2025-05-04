@@ -13,5 +13,5 @@ int main() {
     char* file_path = "assets/backpack/backpack.obj";
     read_model_file(file_path);
 
-    platform_main();
+    // platform_main();
 }

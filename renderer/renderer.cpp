@@ -216,6 +216,10 @@ Model* parse_obj_content(Arena* file) {
     free(line_buffer);
 
     Model* model = (Model*)malloc(sizeof(Model));
+    // vector_alloc_trim(vertices);
+    // vector_alloc_trim(faces);
+    // vector_alloc_trim(normals);
+    // vector_alloc_trim(tex_coords);
     model->vertices = vertices;
     model->faces = faces;
     model->normals = normals;
@@ -225,25 +229,13 @@ Model* parse_obj_content(Arena* file) {
 
 void read_model_file(char* file_path) {
     Arena* arena = read_file(file_path, true);
+
     Model* model = parse_obj_content(arena);
-
-    printf("VERTICES:\n");
-    for (int i=0; i<10; i++) {
-        print((Vertex*)(model->vertices->buffer+i*sizeof(Vertex)));
-    }
-    printf("Textures:\n");
-    for (int i=0; i<10; i++) {
-        print((TexCoord*)(model->tex_coords->buffer+i*sizeof(TexCoord)));
-    }
-    printf("Normals:\n");
-    for (int i=0; i<10; i++) {
-        print((Normal*)(model->normals->buffer+i*sizeof(Normal)));
-    }
-
-    arena_alloc_free(arena);
     vector_alloc_free(model->tex_coords);
     vector_alloc_free(model->vertices);
     vector_alloc_free(model->faces);
     vector_alloc_free(model->normals);
     free(model);
+
+    arena_alloc_free(arena);
 }

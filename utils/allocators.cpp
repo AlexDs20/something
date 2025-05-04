@@ -157,6 +157,18 @@ void vector_alloc_free(Vector* vector) {
     }
 }
 
+void vector_alloc_trim(Vector* vector) {
+    if (vector->top == vector->capacity) {
+        return;
+    }
+    uint8* new_buffer = (uint8*)malloc(vector->top);
+    memcpy((void*)new_buffer, (void*)vector->buffer, vector->top);
+    free(vector->buffer);
+    vector->buffer = new_buffer;
+    vector->capacity = vector->top;
+}
+
+
 /*
 uint64 vector_alloc_size(Vector* vector) {
     if (vector) {
