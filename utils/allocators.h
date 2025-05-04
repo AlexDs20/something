@@ -3,7 +3,7 @@
 
 #include "utils/defines.h"
 
-#define DEFAULT_ALIGN 32
+#define DEFAULT_ALIGN 4
 #define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
 
 typedef struct {
