@@ -169,8 +169,7 @@ void vector_alloc_trim(Vector* vector) {
 }
 
 
-/*
-uint64 vector_alloc_size(Vector* vector) {
+uint64 vector_alloc_count(Vector* vector) {
     if (vector) {
         return vector->top / vector->element_size;
     }
@@ -184,6 +183,7 @@ void* vector_alloc_get(Vector* vector, uint64 index) {
     return(0);
 }
 
+/*
 void* vector_alloc_set(Vector* vector, uint64 index, void* data) {
     if (index<vector->top) {
         memcpy((void*)(vector->buffer + index*vector->element_size), data, vector->element_size);

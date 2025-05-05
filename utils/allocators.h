@@ -44,5 +44,7 @@ void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);
 void vector_alloc_free(Vector* vector);
 void vector_alloc_trim(Vector* vector);
+uint64 vector_alloc_count(Vector* vector);
+void* vector_alloc_get(Vector* vector, uint64 index);
 
 #endif  // _ALLOCATORS_H

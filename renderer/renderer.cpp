@@ -3,38 +3,27 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "utils/defines.h"
-#include "utils/allocators.h"
+#include "renderer/renderer.h"
 
-typedef struct {
-    float x, y, z;
-} Vertex;
+void print(Vertex* v) {
+    printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
+}
 
-typedef struct {
-    float u, v, w;
-} TexCoord;
+void print(Normal* n) {
+    printf("Normal: (%f,%f,%f)\n", n->x, n->y, n->z);
+}
 
-typedef struct {
-    float x, y, z;
-} Normal;
+void print(TexCoord* t) {
+    printf("TexCoord: (%f,%f,%f)\n", t->u, t->v, t->w);
+}
 
-typedef struct {
-    int v[3];
-    int vt[3];
-    int vn[3];
-} Face;
-
-typedef struct {
-
-} Material;
-
-typedef struct {
-    Vector* vertices;
-    Vector* tex_coords;
-    Vector* normals;
-    Vector* faces;
-    Vector* mat;
-} Model;
+void print(Face* f) {
+    printf("Face: vertex: (%d,%d,%d)  texture: (%d,%d,%d)  normal: (%d,%d,%d)\n",
+            f->v[0], f->v[1], f->v[2],
+            f->vt[0], f->vt[1], f->vt[2],
+            f->vn[0], f->vn[1], f->vn[2]
+            );
+}
 
 Arena* read_file(char* file_path, bool trim) {
     Arena* arena = arena_alloc_create(4*1024);
@@ -96,18 +85,6 @@ Arena* read_file(char* file_path, bool trim) {
         arena = arena2;
     }
     return arena;
-}
-
-void print(Vertex* v) {
-    printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
-}
-
-void print(Normal* n) {
-    printf("Normal: (%f,%f,%f)\n", n->x, n->y, n->z);
-}
-
-void print(TexCoord* t) {
-    printf("TexCoord: (%f,%f,%f)\n", t->u, t->v, t->w);
 }
 
 Model* parse_obj_content(Arena* file) {
@@ -227,15 +204,17 @@ Model* parse_obj_content(Arena* file) {
     return model;
 }
 
-void read_model_file(char* file_path) {
-    Arena* arena = read_file(file_path, true);
-
-    Model* model = parse_obj_content(arena);
+void free_model(Model* model) {
     vector_alloc_free(model->tex_coords);
     vector_alloc_free(model->vertices);
     vector_alloc_free(model->faces);
     vector_alloc_free(model->normals);
     free(model);
+}
 
+Model* read_model_file(char* file_path) {
+    Arena* arena = read_file(file_path, true);
+    Model* model = parse_obj_content(arena);
     arena_alloc_free(arena);
+    return model;
 }
