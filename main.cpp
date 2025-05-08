@@ -26,7 +26,14 @@ void draw_line(Vector* framebuffer, uint32 w, Vertex* a, Vertex* b) {
         tmp.x += step_size_x;
         tmp.y += step_size_y;
 
-        uint8* pixel = (uint8*)framebuffer->buffer + (uint32)(tmp.y*w) + (uint32)tmp.x;
+        if (tmp.x<0 || tmp.y<0) {
+            continue;
+        }
+
+        // uint8* pixel = vector_alloc_get(framebuffer, (uint32)(tmp.y*w) + (uint32)tmp.x);
+        uint32* pixel = (uint32*)vector_alloc_get(framebuffer, 0);
+        printf("pixel value before = %d\n", pixel);
+        printf("pixel address: %p", pixel);
         *pixel = 0xFFFFFF;
         // printf("x0: %.3f \t x: %.3f \t x1: %.3f\n", a->x, tmp.x, b->x);
         // printf("y0: %.3f \t y: %.3f \t y1: %.3f\n", a->y, tmp.y, b->y);
@@ -45,24 +52,19 @@ int main() {
     uint16 w = 1024;
     uint16 h = 768;
 
-    Vector* framebuffer = vector_alloc_create(w*h, sizeof(uint8));
+    Vector* framebuffer = vector_alloc_create(w*h, sizeof(uint32));
 
     uint8 running = 1;
     while (running) {
 
         for (int i=0; i<vector_alloc_count(model->faces); ++i) {
             Face* f = (Face*)vector_alloc_get(model->faces, i);
-            Vertex v[3] = {
-                *((Vertex*)model->vertices->buffer + f->v[0]+1),
-                *((Vertex*)model->vertices->buffer + f->v[1]+1),
-                *((Vertex*)model->vertices->buffer + f->v[2]+1)
-            };
 
             // Only use the x y components atm
             // Can work with perspective and camera later
-            Vertex a = v[0];
-            Vertex b = v[1];
-            Vertex c = v[2];
+            Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
+            Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
+            Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
 
             // Scale to center of the screen
             a.x = a.x * 0.5f * w;
@@ -76,13 +78,11 @@ int main() {
             draw_line(framebuffer, w, &b, &c);
             draw_line(framebuffer, w, &c, &a);
         }
-
+        break;
     }
 
 
     free_model(model);
-
-
     vector_alloc_free(framebuffer);
 
     // platform_main();

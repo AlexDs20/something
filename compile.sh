@@ -2,7 +2,7 @@
 
 BIN="./build/main"
 
-FLAGS="-g -Wall"
+FLAGS="-g -ggdb -pg -O0 -Wall -fsanitize=address"
 DEFINES=
 LINKS="-lc"
 LINKSDIR=

@@ -109,7 +109,7 @@ Vector* vector_alloc_create(uint64 n, uint64 size) {
 
     vector->buffer = (uint8*)malloc(n*size);
     if(!vector->buffer) {
-        printf("Could not allocate memory for the vector buffer");
+        printf("Could not allocate memory for the vector buffer.\n");
         free(vector);
         return(0);
     }
