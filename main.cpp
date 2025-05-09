@@ -20,7 +20,7 @@ int main() {
     const uint32 w = 1024;
     const uint32 h = 768;
 
-    const uint32 bg_color = 0x00FF0000;
+    const uint32 bg_color = 0x777777;
 
     Win win = platform_init_win(w, h, msg);
 
@@ -28,7 +28,10 @@ int main() {
     while (running) {
         running = platform_handle_events(&win);
 
-        memset(win.buffer, bg_color, win.w*win.h*sizeof(uint32));
+        for (int i=0; i<win.h*win.w; i++) {
+            uint32* pixel = (uint32*)win.buffer + i;
+            *pixel = bg_color;
+        }
         draw_model_wireframe(model, win.w, win.h, win.buffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
