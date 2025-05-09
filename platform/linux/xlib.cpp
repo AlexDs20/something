@@ -9,6 +9,8 @@
 #include <sys/shm.h>
 #include <X11/extensions/XShm.h>
 
+#include "platform/window.h"
+
 // https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
 
 int set_fullscreen(Display* display, Window window, bool fullscreen) {
@@ -71,24 +73,7 @@ int toggle_fullscreen(Display* display, Window window) {
     return(0);
 }
 
-typedef struct {
-    int w;
-    int h;
-    Display* display;
-    Visual* visual;
-    int depth;
-    Window window;
-    int max_w;
-    int max_h;
-    char pixel_bytes;
-    int* buffer;
-    int bitmap_pad;
-    XImage* xim;
-    GC gc;
-    Atom wm_delete_window;
-} Win;
-
-Win platform_init_win(int w, int h, char* title) {
+Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     Win win = {};
     win.w = w;
     win.h = h;
@@ -143,7 +128,7 @@ Win platform_init_win(int w, int h, char* title) {
 
     // Buffer image
     win.pixel_bytes = 4;
-    win.buffer = (int*)malloc(win.max_w*win.max_h*win.pixel_bytes);
+    win.buffer = (unsigned int*)malloc(win.max_w*win.max_h*win.pixel_bytes);
 
     int offset = 0;
     win.bitmap_pad = 32;
@@ -202,7 +187,7 @@ bool platform_handle_events(Win* win) {
                     XDestroyImage(win->xim);
                     if (win->w*win->h>win->max_w*win->max_h) {
                         free(win->buffer);
-                        win->buffer = (int*)malloc(win->w*win->h*win->pixel_bytes);
+                        win->buffer = (unsigned int*)malloc(win->w*win->h*win->pixel_bytes);
                     }
                     win->xim = XCreateImage(win->display, win->visual, win->depth, ZPixmap, 0, (char*)win->buffer, win->w, win->h, win->bitmap_pad, win->w*4);
                 }
@@ -231,7 +216,7 @@ int platform_main() {
 
         // Write over the buffer
         for (int i=0; i<win.w*win.h; ++i) {
-            int* p = win.buffer + i;
+            unsigned int* p = win.buffer + i;
             if (i % win.w < win.w / 3) {
                 *p = 0;
             // } else if (i%win.w>= win.w/3 && i%win.w < 2*win.w/3) {

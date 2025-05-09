@@ -244,7 +244,7 @@ void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
 
         uint32 linear = (uint32)(tmp.y)*w + (uint32)tmp.x;
         uint32* pixel = framebuffer + linear;
-        *pixel = 0xFFFFFF;
+        *pixel = 0xFFA500;
     }
 }
 
@@ -259,12 +259,12 @@ void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer)
             Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
 
             // Scale to center of the screen
-            a.x = a.x * 0.5f * w;
-            a.y = a.y * 0.5f * h;
-            b.x = b.x * 0.5f * w;
-            b.y = b.y * 0.5f * h;
-            c.x = c.x * 0.5f * w;
-            c.y = c.y * 0.5f * h;
+            a.x = (a.x * 0.2f + 0.5f) * w;
+            a.y = (a.y * 0.2f + 0.5f) * h;
+            b.x = (b.x * 0.2f + 0.5f) * w;
+            b.y = (b.y * 0.2f + 0.5f) * h;
+            c.x = (c.x * 0.2f + 0.5f) * w;
+            c.y = (c.y * 0.2f + 0.5f) * h;
 
             draw_line(framebuffer, w, h, &a, &b);
             draw_line(framebuffer, w, h, &b, &c);
