@@ -43,4 +43,6 @@ typedef struct {
 Model* read_model_file(char* filepath);
 void free_model(Model* model);
 
+void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer);
+
 #endif

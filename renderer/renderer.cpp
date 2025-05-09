@@ -218,3 +218,56 @@ Model* read_model_file(char* file_path) {
     arena_alloc_free(arena);
     return model;
 }
+
+static float
+f32abs(float a) {
+    return a>0?a:-a;
+}
+
+void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
+    float dx = b->x-a->x;
+    float dy = b->y-a->y;
+
+    uint32 steps = f32abs(dx)>f32abs(dy) ? f32abs(dx) : f32abs(dy);
+
+    float step_size_x = dx/steps;
+    float step_size_y = dy/steps;
+
+    Vertex tmp = *a;
+    for (uint32 s=0; s<steps; s++) {
+        tmp.x += step_size_x;
+        tmp.y += step_size_y;
+
+        if (tmp.x<0 || tmp.y<0 || tmp.x>=w || tmp.y>=h) {
+            continue;
+        }
+
+        uint32 linear = (uint32)(tmp.y)*w + (uint32)tmp.x;
+        uint32* pixel = framebuffer + linear;
+        *pixel = 0xFFFFFF;
+    }
+}
+
+void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer) {
+        for (int i=0; i<vector_alloc_count(model->faces); ++i) {
+            Face* f = (Face*)vector_alloc_get(model->faces, i);
+
+            // Only use the x y components atm
+            // Can work with perspective and camera later
+            Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
+            Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
+            Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+
+            // Scale to center of the screen
+            a.x = a.x * 0.5f * w;
+            a.y = a.y * 0.5f * h;
+            b.x = b.x * 0.5f * w;
+            b.y = b.y * 0.5f * h;
+            c.x = c.x * 0.5f * w;
+            c.y = c.y * 0.5f * h;
+
+            draw_line(framebuffer, w, h, &a, &b);
+            draw_line(framebuffer, w, h, &b, &c);
+            draw_line(framebuffer, w, h, &c, &a);
+        }
+}
