@@ -3,6 +3,7 @@
 #include <X11/Xutil.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -70,22 +71,40 @@ int toggle_fullscreen(Display* display, Window window) {
     return(0);
 }
 
-int platform_main() {
-    int x=0, y=0;
-    int w=1024, h=768;
-    char* title = "Handmade something";
+typedef struct {
+    int w;
+    int h;
+    Display* display;
+    Visual* visual;
+    int depth;
+    Window window;
+    int max_w;
+    int max_h;
+    char pixel_bytes;
+    int* buffer;
+    int bitmap_pad;
+    XImage* xim;
+    GC gc;
+    Atom wm_delete_window;
+} Win;
 
-    Display* display = XOpenDisplay(0);
-    if (!display) {
+Win platform_init_win(int w, int h, char* title) {
+    Win win = {};
+    win.w = w;
+    win.h = h;
+
+    win.display = XOpenDisplay(0);
+    if (!win.display) {
         printf("Failed opening display!\n");
-        return(1);
+        win = {};
+        return(win);
     }
 
-    int screen = DefaultScreen(display);
-    int root = DefaultRootWindow(display);
+    int screen = DefaultScreen(win.display);
+    int root = DefaultRootWindow(win.display);
 
-    Visual* visual = DefaultVisual(display, screen);
-    int depth = DefaultDepth(display, screen);
+    win.visual = DefaultVisual(win.display, screen);
+    win.depth = DefaultDepth(win.display, screen);
 
     // https://tronche.com/gui/x/xlib/window/attributes/
     unsigned long valuemask = CWBackPixel | CWEventMask | CWBitGravity;
@@ -98,113 +117,137 @@ int platform_main() {
     swa.event_mask = ExposureMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask;
 
     int border_width=0;
-    Window window = XCreateWindow(display, root,
+    int x=0, y=0;
+    win.window = XCreateWindow(win.display, root,
             x, y,
-            w, h,
+            win.w, win.h,
             border_width,
-            depth, InputOutput,
-            visual, valuemask, &swa
+            win.depth, InputOutput,
+            win.visual, valuemask, &swa
             );
-    if (!window) {
+
+    if (!win.window) {
         printf("Failed creating a window!\n");
-        return(1);
+        XCloseDisplay(win.display);
+        win = {};
+        return(win);
     }
 
-    XStoreName(display, window, title);
-    XMapWindow(display, window);
+    XStoreName(win.display, win.window, title);
+    XMapWindow(win.display, win.window);
 
     XWindowAttributes wa;
-    XGetWindowAttributes(display, root, &wa);
-    int max_w = wa.width;
-    int max_h = wa.height;
+    XGetWindowAttributes(win.display, root, &wa);
+    win.max_w = wa.width;
+    win.max_h = wa.height;
 
     // Buffer image
-    char pixel_bytes = 4;
-    int* buffer = (int*)malloc(max_w*max_h*pixel_bytes);
+    win.pixel_bytes = 4;
+    win.buffer = (int*)malloc(win.max_w*win.max_h*win.pixel_bytes);
+
     int offset = 0;
-    int bitmap_pad = 32;
+    win.bitmap_pad = 32;
     int bytes_per_line = w*4;
-    XImage* xim = XCreateImage(display, visual, depth, ZPixmap, offset, (char*)buffer, w, h, bitmap_pad, bytes_per_line);
-    GC gc = DefaultGC(display, screen);
-    XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
+    win.xim = XCreateImage(win.display, win.visual, win.depth, ZPixmap, offset, (char*)win.buffer, win.w, win.h, win.bitmap_pad, bytes_per_line);
+
+    win.gc = DefaultGC(win.display, screen);
+    XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
 
     // set_fullscreen(display, window, true);
-    Atom wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
-    XSetWMProtocols(display, window, &wm_delete_window, 1);
+    win.wm_delete_window = XInternAtom(win.display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(win.display, win.window, &win.wm_delete_window, 1);
+
+    return(win);
+}
+
+bool platform_handle_events(Win* win) {
+    int running = 1;
+    XEvent event;
+    while(XPending(win->display)>0) {
+        XNextEvent(win->display, &event);
+        switch (event.type) {
+            case Expose: {
+                XPutImage(win->display, win->window, win->gc, win->xim, 0, 0, 0, 0, win->w, win->h);
+            } break;
+            case DestroyNotify: {
+                if (event.xdestroywindow.window == win->window) {
+                    running = 0;
+                }
+            } break;
+            case KeyPress: {
+                printf("Key pressed!\n");
+                if (event.xkey.keycode == XKeysymToKeycode(win->display, XK_f)) {
+                    toggle_fullscreen(win->display, win->window);
+                }
+            } break;
+            case KeyRelease: {
+                printf("Key released!\n");
+            } break;
+            case ConfigureNotify: {
+                // Go through all the ConfigureNotify events in the queue (they get removed from the queue)
+                // end we process the last event that was in the queue
+                XEvent next_event;
+                while (XCheckTypedEvent(win->display, ConfigureNotify, &next_event)) {
+                    event = next_event;
+                }
+                int new_w = event.xconfigure.width;
+                int new_h = event.xconfigure.height;
+                if (new_w != win->w || new_h != win->h) {
+                    win->w = new_w;
+                    win->h = new_h;
+                    printf("Window size: (%d,%d) = %.3f MB\n", win->w, win->h, (float)(win->w*win->h*win->pixel_bytes/1024.0f/1024.0f));
+
+                    // set the data to null so that the DestroyImage doesn't free the buffer
+                    win->xim->data = 0;
+                    XDestroyImage(win->xim);
+                    if (win->w*win->h>win->max_w*win->max_h) {
+                        free(win->buffer);
+                        win->buffer = (int*)malloc(win->w*win->h*win->pixel_bytes);
+                    }
+                    win->xim = XCreateImage(win->display, win->visual, win->depth, ZPixmap, 0, (char*)win->buffer, win->w, win->h, win->bitmap_pad, win->w*4);
+                }
+            } break;
+            case ClientMessage: {
+                if (event.xclient.data.l[0] == win->wm_delete_window) {
+                    running = 0;
+                }
+            } break;
+        }
+    }   // end of while XPending
+    return(running);
+}
+
+int platform_main() {
+    int w=1024, h=768;
+    char* title = "Handmade something";
+
+    Win win = platform_init_win(w, h, title);
 
     bool running = 1;
     while(running){
-        XEvent event;
-        while(XPending(display)>0) {
-            XNextEvent(display, &event);
-            switch (event.type) {
-                case Expose: {
-                    XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
-                } break;
-                case DestroyNotify: {
-                    if (event.xdestroywindow.window == window) {
-                        running = 0;
-                    }
-                } break;
-                case KeyPress: {
-                    printf("Key pressed!\n");
-                    if (event.xkey.keycode == XKeysymToKeycode(display, XK_f)) {
-                        toggle_fullscreen(display, window);
-                    }
-                } break;
-                case KeyRelease: {
-                    printf("Key released!\n");
-                } break;
-                case ConfigureNotify: {
-                    // Go through all the ConfigureNotify events in the queue (they get removed from the queue)
-                    // end we process the last event that was in the queue
-                    XEvent next_event;
-                    while (XCheckTypedEvent(display, ConfigureNotify, &next_event)) {
-                        event = next_event;
-                    }
-                    int new_w = event.xconfigure.width;
-                    int new_h = event.xconfigure.height;
-                    if (new_w != w || new_h != h) {
-                        w = new_w;
-                        h = new_h;
-                        printf("Window size: (%d,%d) = %.3f MB\n", w, h, (float)(w*h*pixel_bytes/1024.0f/1024.0f));
 
-                        // set the data to null so that the DestroyImage doesn't free the buffer
-                        xim->data = 0;
-                        XDestroyImage(xim);
-                        if (w*h>max_w*max_h) {
-                            buffer = (int*)malloc(w*h*pixel_bytes);
-                        }
-                        xim = XCreateImage(display, visual, depth, ZPixmap, 0, (char*)buffer, w, h, bitmap_pad, w*4);
-                    }
-                } break;
-                case ClientMessage: {
-                    if (event.xclient.data.l[0] == wm_delete_window) {
-                        running = 0;
-                    }
-                } break;
-            }
-        }
+        running = platform_handle_events(&win);
+
 
         // Write over the buffer
-        for (int i=0; i<w*h; ++i) {
-            int* p = buffer + i;
-            if (i % w < w / 3) {
+        for (int i=0; i<win.w*win.h; ++i) {
+            int* p = win.buffer + i;
+            if (i % win.w < win.w / 3) {
                 *p = 0;
-            } else if (i%w>= w/3 && i%w < 2*w/3) {
-                *p = 0x00FFFF00;
+            // } else if (i%win.w>= win.w/3 && i%win.w < 2*win.w/3) {
+            //     *p = 0x00FFFF00;
             } else {
                 *p = 0x00FF0000;
             }
         }
 
         // Draw the buffer
-        XPutImage(display, window, gc, xim, 0, 0, 0, 0, w, h);
+        XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
     }
 
-    XDestroyWindow(display, window);
-    xim->data = 0;
-    XFree(xim);
-    free(buffer);
+    XDestroyWindow(win.display, win.window);
+    win.xim->data = 0;
+    XFree(win.xim);
+    free(win.buffer);
     return(0);
 }
