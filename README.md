@@ -31,6 +31,11 @@ X11 info:
 - casey [imgui](https://caseymuratori.com/blog_0001)
 - Sean barret [game dev mag sept. 2005 page 34](https://ubm-twvideo01.s3.amazonaws.com/o1/vault/GD_Mag_Archives/GDM_September_2005.pdf)
 - Sean barret game dev mag sample code [link](https://silverspaceship.com/inner/imgui/)
+- [nakst ui tuto](https://nakst.gitlab.io/tutorial/ui-part-1.html)
+- [youtube clay](https://www.youtube.com/watch?v=DYWTw19_8r4)
+- [vui](https://github.com/heroseh/vui/tree/main)
 - Look at [microui](https://github.com/rxi/microui)
-- (nakst ui tuto)[https://nakst.gitlab.io/tutorial/ui-part-1.html]
-- (youtube clay)[https://www.youtube.com/watch?v=DYWTw19_8r4]
+
+# Allocators
+- [ ] [general arena](https://muit.xyz/posts/memory-implementing-a-general-arena/)
+- [ ]

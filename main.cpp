@@ -35,6 +35,7 @@ int main() {
         draw_model_wireframe(model, win.w, win.h, win.buffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
+        break;
     }
 
     free_model(model);

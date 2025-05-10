@@ -221,7 +221,13 @@ Model* read_model_file(char* file_path) {
 
 static float
 f32abs(float a) {
-    return a>0?a:-a;
+    union {
+        float f;
+        uint32 i;
+    } u;
+    u.f = a;
+    u.i &= 0x7fffffff;
+    return u.f;
 }
 
 void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
@@ -242,11 +248,47 @@ void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
             continue;
         }
 
-        uint32 linear = (uint32)(tmp.y)*w + (uint32)tmp.x;
+        // h - y so that top left is 0, 0
+        uint32 linear = (uint32)(h-tmp.y)*w + (uint32)tmp.x;
         uint32* pixel = framebuffer + linear;
         *pixel = 0xFFA500;
     }
 }
+
+/*
+ // Supposedly fast from https://haqr.eu/tinyrenderer/bresenham/
+ // Need to compare perfs
+#include <algorithm>
+#include <cmath>
+void line(uint32* framebuffer, uint32 w, uint32 h, int ax, int ay, int bx, int by) {
+    bool steep = std::abs(ax-bx) < std::abs(ay-by);
+    if (steep) { // if the line is steep, we transpose the image
+        std::swap(ax, ay);
+        std::swap(bx, by);
+    }
+    if (ax>bx) { // make it left−to−right
+        std::swap(ax, bx);
+        std::swap(ay, by);
+    }
+    int y = ay;
+    int ierror = 0;
+    for (int x=ax; x<=bx; x++) {
+        if (steep) { // if transposed, de−transpose
+            uint32 linear = x*w + y;
+            uint32* pixel = framebuffer + linear;
+            *pixel = 0xFFA500;
+        } else {
+            uint32 linear = y*w + x;
+            uint32* pixel = framebuffer + linear;
+            *pixel = 0xFFA500;
+        }
+        ierror += 2 * std::abs(by-ay);
+        y += (by > ay ? 1 : -1) * (ierror > bx - ax);
+        ierror -= 2 * (bx-ax)   * (ierror > bx - ax);
+    }
+}
+*/
+
 
 void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer) {
         for (int i=0; i<vector_alloc_count(model->faces); ++i) {
@@ -269,5 +311,9 @@ void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer)
             draw_line(framebuffer, w, h, &a, &b);
             draw_line(framebuffer, w, h, &b, &c);
             draw_line(framebuffer, w, h, &c, &a);
+
+            // line(framebuffer, w, h, a.x, a.y, b.x, b.y );
+            // line(framebuffer, w, h, b.x, b.y, c.x, c.y );
+            // line(framebuffer, w, h, c.x, c.y, a.x, a.y );
         }
 }
