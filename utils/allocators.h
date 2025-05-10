@@ -6,6 +6,9 @@
 #define DEFAULT_ALIGN 4
 #define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
 
+void allocator_main();
+
+/*
 typedef struct {
     uint8* buffer;
     uint64 capacity;
@@ -46,5 +49,6 @@ void vector_alloc_free(Vector* vector);
 void vector_alloc_trim(Vector* vector);
 uint64 vector_alloc_count(Vector* vector);
 void* vector_alloc_get(Vector* vector, uint64 index);
+*/
 
 #endif  // _ALLOCATORS_H

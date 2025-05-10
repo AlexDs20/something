@@ -3,9 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if 0
 #include "platform/window.h"
 #include "renderer/renderer.h"
 #include "utils/defines.h"
+#endif
+#include "utils/allocators.h"
 
 
 int main() {
@@ -14,6 +17,9 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
+    allocator_main();
+
+#if 0
     char* file_path = "assets/backpack/backpack.obj";
     Model* model = read_model_file(file_path);
 
@@ -40,6 +46,7 @@ int main() {
 
     free_model(model);
     free(win.buffer);
+#endif
 
     char done_msg[] = "Done doing something!\n";
     syscall(1, STDOUT_FILENO, done_msg, sizeof(done_msg)-1);
