@@ -6,13 +6,10 @@
 #define DEFAULT_ALIGN 4
 #define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
 
-void allocator_main();
-
-/*
 typedef struct {
-    uint8* buffer;
-    uint64 capacity;
-    uint64 top;
+    u8* buffer;
+    u64 capacity;
+    u64 top;
 } Arena;
 
 typedef struct {
@@ -23,32 +20,31 @@ typedef struct {
 
 } Pool;
 
-Arena* arena_alloc_create(uint64 capacity);
-void* arena_alloc_alloc(Arena* arena, uint64 size);
-void arena_alloc_pop(Arena* arena, uint64 size);
+Arena* arena_alloc_create(u64 capacity);
+void* arena_alloc_alloc(Arena* arena, u64 size);
+void arena_alloc_pop(Arena* arena, u64 size);
 void* arena_alloc_copy(Arena* dest, Arena* src);
 void arena_alloc_free(Arena* arena);
 void arena_alloc_reset(Arena* arena);
-uint64 arena_alloc_remaining(Arena* arena);
+u64 arena_alloc_remaining(Arena* arena);
 
 
 //==============================
 // Vector
 
 typedef struct {
-    uint8* buffer;
-    uint64 capacity;
-    uint64 top;
-    uint64 element_size;
+    u8* buffer;
+    u64 capacity;
+    u64 top;
+    u64 element_size;
 } Vector;
 
-Vector* vector_alloc_create(uint64 n, uint64 size);
+Vector* vector_alloc_create(u64 n, u64 size);
 void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);
 void vector_alloc_free(Vector* vector);
 void vector_alloc_trim(Vector* vector);
-uint64 vector_alloc_count(Vector* vector);
-void* vector_alloc_get(Vector* vector, uint64 index);
-*/
+u64 vector_alloc_count(Vector* vector);
+void* vector_alloc_get(Vector* vector, u64 index);
 
 #endif  // _ALLOCATORS_H

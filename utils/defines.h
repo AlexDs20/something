@@ -13,22 +13,9 @@
 #define internal_function static
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#define kB (1024)               // KiB
-#define MB (1024*1024)          // MiB
-#define GB (1024*1024*1024)     // GiB
-
-#define int8  char
-#define int16 short
-#define int32 int
-#define int64 long
-
-#define uint8  unsigned char
-#define uint16 unsigned short
-#define uint32 unsigned int
-#define uint64 unsigned long
-
-#define float32 float
-#define float64 double
+#define KiB (1024)               // KiB
+#define MiB (1024*1024)          // MiB
+#define GiB (1024*1024*1024)     // GiB
 
 typedef char unsigned u8;
 typedef short unsigned u16;

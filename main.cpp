@@ -3,13 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if 0
 #include "platform/window.h"
 #include "renderer/renderer.h"
 #include "utils/defines.h"
-#endif
-#include "utils/allocators.h"
-
+#include "utils/io.h"
 
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
@@ -17,31 +14,31 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    allocator_main();
+    main_io();
 
 #if 0
-    char* file_path = "assets/backpack/backpack.obj";
+    char file_path[] = "assets/backpack/backpack.obj";
     Model* model = read_model_file(file_path);
 
-    const uint32 w = 1024;
-    const uint32 h = 768;
+    const u32 w = 1024;
+    const u32 h = 768;
 
-    const uint32 bg_color = 0x777777;
+    const u32 bg_color = 0x777777;
 
     Win win = platform_init_win(w, h, msg);
 
-    uint32 running = 1;
+    u32 running = 1;
     while (running) {
         running = platform_handle_events(&win);
 
         for (int i=0; i<win.h*win.w; i++) {
-            uint32* pixel = (uint32*)win.buffer + i;
+            u32* pixel = (u32*)win.buffer + i;
             *pixel = bg_color;
         }
         draw_model_wireframe(model, win.w, win.h, win.buffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
-        break;
+        usleep(16);
     }
 
     free_model(model);

@@ -40,8 +40,8 @@ Arena* read_file(char* file_path, bool trim) {
         return(0);
     }
 
-    uint64 chunk_size = 4*1024;
-    uint64 bytes_read;
+    u64 chunk_size = 4*1024;
+    u64 bytes_read;
     do {
         // Allocate more if needed
         if (arena_alloc_remaining(arena) < chunk_size) {
@@ -110,9 +110,9 @@ Model* parse_obj_content(Arena* file) {
 
         Using fgets()? and sscanf()?
     */
-    uint64 start_line = 0;
-    uint64 end_line = 0;
-    uint64 size_line = 0;
+    u64 start_line = 0;
+    u64 end_line = 0;
+    u64 size_line = 0;
 
     // TODO(alex): Make it so that it rescales instead of overflowing.
     Vector* vertices     = vector_alloc_create(1000, sizeof(Vertex));
@@ -120,9 +120,9 @@ Model* parse_obj_content(Arena* file) {
     Vector* normals      = vector_alloc_create(1000, sizeof(Normal));
     Vector* faces        = vector_alloc_create(1000, sizeof(Face));
 
-    uint32 line_buffer_length = 128;
+    u32 line_buffer_length = 128;
     char* line_buffer = (char*)malloc(line_buffer_length);
-    for (uint64 i=0; i<file->top; i++) {
+    for (u64 i=0; i<file->top; i++) {
         if (file->buffer[i] == '\n' || (i==file->top-1)) {
             // Get current line
             end_line = i;
@@ -223,24 +223,24 @@ static float
 f32abs(float a) {
     union {
         float f;
-        uint32 i;
+        u32 i;
     } u;
     u.f = a;
     u.i &= 0x7fffffff;
     return u.f;
 }
 
-void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
+void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
 
-    uint32 steps = f32abs(dx)>f32abs(dy) ? f32abs(dx) : f32abs(dy);
+    u32 steps = f32abs(dx)>f32abs(dy) ? f32abs(dx) : f32abs(dy);
 
     float step_size_x = dx/steps;
     float step_size_y = dy/steps;
 
     Vertex tmp = *a;
-    for (uint32 s=0; s<steps; s++) {
+    for (u32 s=0; s<steps; s++) {
         tmp.x += step_size_x;
         tmp.y += step_size_y;
 
@@ -249,8 +249,8 @@ void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
         }
 
         // h - y so that top left is 0, 0
-        uint32 linear = (uint32)(h-tmp.y)*w + (uint32)tmp.x;
-        uint32* pixel = framebuffer + linear;
+        u32 linear = (u32)(h-tmp.y)*w + (u32)tmp.x;
+        u32* pixel = framebuffer + linear;
         *pixel = 0xFFA500;
     }
 }
@@ -260,7 +260,7 @@ void draw_line(uint32* framebuffer, uint32 w, uint32 h, Vertex* a, Vertex* b) {
  // Need to compare perfs
 #include <algorithm>
 #include <cmath>
-void line(uint32* framebuffer, uint32 w, uint32 h, int ax, int ay, int bx, int by) {
+void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
     bool steep = std::abs(ax-bx) < std::abs(ay-by);
     if (steep) { // if the line is steep, we transpose the image
         std::swap(ax, ay);
@@ -274,12 +274,12 @@ void line(uint32* framebuffer, uint32 w, uint32 h, int ax, int ay, int bx, int b
     int ierror = 0;
     for (int x=ax; x<=bx; x++) {
         if (steep) { // if transposed, de−transpose
-            uint32 linear = x*w + y;
-            uint32* pixel = framebuffer + linear;
+            u32 linear = x*w + y;
+            u32* pixel = framebuffer + linear;
             *pixel = 0xFFA500;
         } else {
-            uint32 linear = y*w + x;
-            uint32* pixel = framebuffer + linear;
+            u32 linear = y*w + x;
+            u32* pixel = framebuffer + linear;
             *pixel = 0xFFA500;
         }
         ierror += 2 * std::abs(by-ay);
@@ -290,7 +290,7 @@ void line(uint32* framebuffer, uint32 w, uint32 h, int ax, int ay, int bx, int b
 */
 
 
-void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer) {
+void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer) {
         for (int i=0; i<vector_alloc_count(model->faces); ++i) {
             Face* f = (Face*)vector_alloc_get(model->faces, i);
 

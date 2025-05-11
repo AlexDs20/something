@@ -2,7 +2,7 @@
 #define _RENDERER_H
 
 #include "utils/defines.h"
-#include "utils/allocators.h"
+#include "memory/allocators.h"
 
 typedef struct {
     float x, y, z;
@@ -43,6 +43,6 @@ typedef struct {
 Model* read_model_file(char* filepath);
 void free_model(Model* model);
 
-void draw_model_wireframe(Model* model, uint32 w, uint32 h, uint32* framebuffer);
+void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
 
 #endif

@@ -2,13 +2,13 @@
 
 BIN="./build/main"
 
-FLAGS="-g -ggdb -pg -O0 -Wall -fsanitize=address"
+FLAGS="-g -ggdb -pg -O0 -Wall" # -fsanitize=address"
 DEFINES=
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I."
 ENTRYPOINT="main.cpp"
-SRC="./utils/allocators.cpp"
+SRC="./*/*.cpp"
 CXX=clang++
 
 function echo () {
