@@ -230,7 +230,7 @@ f32abs(float a) {
     return u.f;
 }
 
-void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b) {
+void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Color c) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
 
@@ -251,7 +251,7 @@ void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b) {
         // h - y so that top left is 0, 0
         u32 linear = (u32)(h-tmp.y)*w + (u32)tmp.x;
         u32* pixel = framebuffer + linear;
-        *pixel = 0xFFA500;
+        *pixel = c;
     }
 }
 
@@ -291,29 +291,106 @@ void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
 
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer) {
-        for (int i=0; i<vector_alloc_count(model->faces); ++i) {
-            Face* f = (Face*)vector_alloc_get(model->faces, i);
+    for (int i=0; i<vector_alloc_count(model->faces); ++i) {
+        Face* f = (Face*)vector_alloc_get(model->faces, i);
 
-            // Only use the x y components atm
-            // Can work with perspective and camera later
-            Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-            Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-            Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        // Only use the x y components atm
+        // Can work with perspective and camera later
+        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
+        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
+        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
 
-            // Scale to center of the screen
-            a.x = (a.x * 0.2f + 0.5f) * w;
-            a.y = (a.y * 0.2f + 0.5f) * h;
-            b.x = (b.x * 0.2f + 0.5f) * w;
-            b.y = (b.y * 0.2f + 0.5f) * h;
-            c.x = (c.x * 0.2f + 0.5f) * w;
-            c.y = (c.y * 0.2f + 0.5f) * h;
+        // Scale to center of the screen
+        a.x = (a.x * 0.2f + 0.5f) * w;
+        a.y = (a.y * 0.2f + 0.5f) * h;
+        b.x = (b.x * 0.2f + 0.5f) * w;
+        b.y = (b.y * 0.2f + 0.5f) * h;
+        c.x = (c.x * 0.2f + 0.5f) * w;
+        c.y = (c.y * 0.2f + 0.5f) * h;
 
-            draw_line(framebuffer, w, h, &a, &b);
-            draw_line(framebuffer, w, h, &b, &c);
-            draw_line(framebuffer, w, h, &c, &a);
+        draw_line(framebuffer, w, h, &a, &b, 0xFFA500);
+        draw_line(framebuffer, w, h, &b, &c, 0xFFA500);
+        draw_line(framebuffer, w, h, &c, &a, 0xFFA500);
 
-            // line(framebuffer, w, h, a.x, a.y, b.x, b.y );
-            // line(framebuffer, w, h, b.x, b.y, c.x, c.y );
-            // line(framebuffer, w, h, c.x, c.y, a.x, a.y );
+        // line(framebuffer, w, h, a.x, a.y, b.x, b.y );
+        // line(framebuffer, w, h, b.x, b.y, c.x, c.y );
+        // line(framebuffer, w, h, c.x, c.y, a.x, a.y );
+    }
+}
+
+void swap_vertices(Vertex* a, Vertex* b) {
+    Vertex tmp = *b;
+    *b = *a;
+    *a = tmp;
+}
+
+void fill_triangle(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+    for (int y=(int)a->y; y<b->y; y++) {
+        if (y<0 || y>=h) continue;
+        int xs;
+        if (f32abs(c->y-a->y) <= 0.000001) {
+            xs = a->x;
+        } else
+            xs = a->x + ((y - a->y)/(c->y-a->y)) * (c->x - a->x);
+
+        int xe;
+        if (f32abs(b->y-a->y) <= 0.000001) {
+            xe = a->x;
+        } else
+            xe = a->x + ((y - a->y)/(b->y-a->y)) * (b->x - a->x);
+        printf("xs, xe: (%d,%d)\n", xs, xe);
+        if (xs > xe) {
+            int tmp = xs;
+            xs = xe;
+            xe = tmp;
         }
+        printf("xs, xe: (%d,%d)\n", xs, xe);
+        u32 row_linear_index = (u32)(h-y)*w;
+        for (int x=xs; x<=xe; x++) {
+            if (x<0 || x>=w) continue;
+            // printf("h,y,w: (%d,%d,%d) \ t", h, y, w); printf("x,y: (%d, %d) \t row index,x: (%d,%lu)\n", x, y, row_linear_index, (u32)x);
+            u32* pixel = framebuffer + row_linear_index + (u32)x;
+            *pixel = color;
+        }
+    }
+}
+
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
+    for (int i=0; i<vector_alloc_count(model->faces); ++i) {
+        Face* f = (Face*)vector_alloc_get(model->faces, i);
+
+        if (true || i%100==0) {
+        // Only use the x y components atm
+        // Can work with perspective and camera later
+        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
+        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
+        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+
+        // Scale to center of the screen
+        a.x = (a.x * 0.2f + 0.5f) * w;
+        a.y = (a.y * 0.2f + 0.5f) * h;
+        b.x = (b.x * 0.2f + 0.5f) * w;
+        b.y = (b.y * 0.2f + 0.5f) * h;
+        c.x = (c.x * 0.2f + 0.5f) * w;
+        c.y = (c.y * 0.2f + 0.5f) * h;
+
+        u32 color = 0x777777;
+        // fill_triangle(a, b, c, color);
+
+        if (a.y > b.y) {
+            swap_vertices(&a, &b);
+        }
+        if (b.y > c.y) {
+            swap_vertices(&b, &c);
+        }
+        if (a.y > b.y) {
+            swap_vertices(&a, &b);
+        }
+
+        // draw_line(framebuffer, w, h, &a, &b, 0xFFFF00);
+        // draw_line(framebuffer, w, h, &a, &c, 0x00FFFF);
+        // draw_line(framebuffer, w, h, &b, &c, 0x0000FF);
+        fill_triangle(framebuffer, w, h, &a, &b, &c, 0xFFA500);
+        }
+    }
 }

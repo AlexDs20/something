@@ -14,9 +14,9 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    main_io();
+    // main_io();
 
-#if 0
+#if 1
     char file_path[] = "assets/backpack/backpack.obj";
     Model* model = read_model_file(file_path);
 
@@ -35,7 +35,8 @@ int main() {
             u32* pixel = (u32*)win.buffer + i;
             *pixel = bg_color;
         }
-        draw_model_wireframe(model, win.w, win.h, win.buffer);
+        // draw_model_wireframe(model, win.w, win.h, win.buffer);
+        draw_model(model, win.w, win.h, win.buffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         usleep(16);

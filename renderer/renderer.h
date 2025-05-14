@@ -4,6 +4,8 @@
 #include "utils/defines.h"
 #include "memory/allocators.h"
 
+typedef u32 Color;
+
 typedef struct {
     float x, y, z;
 } Vertex;
@@ -26,12 +28,6 @@ typedef struct {
 
 } Material;
 
-// tmp?
-void print(Vertex* v);
-void print(Normal* n);
-void print(TexCoord* t);
-void print(Face* t);
-
 typedef struct {
     Vector* vertices;
     Vector* tex_coords;
@@ -40,9 +36,17 @@ typedef struct {
     Vector* mat;
 } Model;
 
+// tmp?
+void print(Vertex* v);
+void print(Normal* n);
+void print(TexCoord* t);
+void print(Face* t);
+
 Model* read_model_file(char* filepath);
 void free_model(Model* model);
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
+
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer);
 
 #endif
