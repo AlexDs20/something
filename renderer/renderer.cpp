@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -324,42 +325,62 @@ void swap_vertices(Vertex* a, Vertex* b) {
     *a = tmp;
 }
 
-void fill_triangle(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
-    for (int y=(int)a->y; y<b->y; y++) {
-        if (y<0 || y>=h) continue;
-        int xs;
-        if (f32abs(c->y-a->y) <= 0.000001) {
-            xs = a->x;
-        } else
-            xs = a->x + ((y - a->y)/(c->y-a->y)) * (c->x - a->x);
+void fill_triangle_line_sweep(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+    if (a->y > b->y) { swap_vertices(a, b); }
+    if (b->y > c->y) { swap_vertices(b, c); }
+    if (a->y > b->y) { swap_vertices(a, b); }
 
+    int ylow = (int)a->y;
+    int ymid = (int)b->y;
+    int yhigh = (int)c->y;
+
+    for (int y=ylow; y<=yhigh; y++) {
+        if (y < 0 || y >= h) continue;
+
+        int xs;
         int xe;
-        if (f32abs(b->y-a->y) <= 0.000001) {
-            xe = a->x;
-        } else
-            xe = a->x + ((y - a->y)/(b->y-a->y)) * (b->x - a->x);
-        printf("xs, xe: (%d,%d)\n", xs, xe);
-        if (xs > xe) {
-            int tmp = xs;
-            xs = xe;
-            xe = tmp;
+
+        if (ylow == yhigh) {
+            xs = (int)a->x;
+        } else {
+            xs = (int)(a->x + (c->x-a->x) * (y - ylow)/(yhigh-ylow));
         }
-        printf("xs, xe: (%d,%d)\n", xs, xe);
-        u32 row_linear_index = (u32)(h-y)*w;
+
+        if (y<=ymid) {
+            if (ymid == ylow) {
+                xe = (int)b->x;
+            } else {
+                xe = (int)(a->x + (b->x-a->x) * (y - ylow)/(ymid-ylow));
+            }
+
+        } else {
+            if (yhigh == ymid) {
+                xe = (int)c->x;
+            } else {
+                xe = (int)(b->x + (c->x-b->x) * (y - ymid)/(yhigh-ymid));
+            }
+        }
+        if (xs>xe) { int tmp = xs; xs = xe; xe = tmp; }
         for (int x=xs; x<=xe; x++) {
-            if (x<0 || x>=w) continue;
-            // printf("h,y,w: (%d,%d,%d) \ t", h, y, w); printf("x,y: (%d, %d) \t row index,x: (%d,%lu)\n", x, y, row_linear_index, (u32)x);
-            u32* pixel = framebuffer + row_linear_index + (u32)x;
+            if (x < 0 || x >= w) continue;
+            u32* pixel = framebuffer + w*(h-y) + x;
             *pixel = color;
         }
     }
+}
+
+u32 random_color(void) {
+    u32 u = rand();
+    u32 c = 0xFFFFFF * (u / (f64)RAND_MAX);
+    return c;
 }
 
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
     for (int i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
-        if (true || i%100==0) {
+        // if (i%50==0)
+        {
         // Only use the x y components atm
         // Can work with perspective and camera later
         Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
@@ -374,23 +395,9 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
         c.x = (c.x * 0.2f + 0.5f) * w;
         c.y = (c.y * 0.2f + 0.5f) * h;
 
-        u32 color = 0x777777;
-        // fill_triangle(a, b, c, color);
-
-        if (a.y > b.y) {
-            swap_vertices(&a, &b);
-        }
-        if (b.y > c.y) {
-            swap_vertices(&b, &c);
-        }
-        if (a.y > b.y) {
-            swap_vertices(&a, &b);
-        }
-
-        // draw_line(framebuffer, w, h, &a, &b, 0xFFFF00);
-        // draw_line(framebuffer, w, h, &a, &c, 0x00FFFF);
-        // draw_line(framebuffer, w, h, &b, &c, 0x0000FF);
-        fill_triangle(framebuffer, w, h, &a, &b, &c, 0xFFA500);
+        u32 color = 0xFFA500;
+        u32 col = random_color();
+        fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
         }
     }
 }
