@@ -369,9 +369,8 @@ void fill_triangle_line_sweep(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex*
     }
 }
 
-u32 random_color(void) {
-    u32 u = rand();
-    u32 c = 0xFFFFFF * (u / (f64)RAND_MAX);
+u32 random_color(u64 v) {
+    u32 c = 0xFFFFFF * (v / (f64)RAND_MAX);
     return c;
 }
 
@@ -395,8 +394,11 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
         c.x = (c.x * 0.2f + 0.5f) * w;
         c.y = (c.y * 0.2f + 0.5f) * h;
 
-        u32 color = 0xFFA500;
-        u32 col = random_color();
+        // u32 col = 0xFFA500;
+        u32 col = random_color(
+                (u64)vector_alloc_get(model->vertices, f->v[0]-1)
+                + (u64)vector_alloc_get(model->vertices, f->v[1]-1)
+                - (u64)vector_alloc_get(model->vertices, f->v[2]-1));
         fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
         }
     }
