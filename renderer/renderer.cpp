@@ -369,6 +369,48 @@ void fill_triangle_line_sweep(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex*
     }
 }
 
+
+void fill_triangle_line_sweep_reference(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+    if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
+    if (a->y>b->y) swap_vertices(a, b);
+    if (a->y>c->y) swap_vertices(a, c);
+    if (b->y>c->y) swap_vertices(b, c);
+
+    s32 ax = (u32)a->x;
+    s32 ay = (u32)a->y;
+    s32 bx = (u32)b->x;
+    s32 by = (u32)b->y;
+    s32 cx = (u32)c->x;
+    s32 cy = (u32)c->y;
+
+    int total_height = cy-ay;
+    for (int i=0; i<total_height; i++) {
+        bool second_half = i>by-ay || by==ay;
+        int segment_height = second_half ? cy-by : by-ay;
+        float alpha = (float)i/total_height;
+        float beta  = (float)(i-(second_half ? by-ay : 0))/segment_height; // be careful: with above conditions no division by zero here
+        s32 Ax = ax + (cx-ax)*alpha;
+        s32 Ay = ay + (cy-ay)*alpha;
+        s32 Bx = second_half ? bx + (cx-bx)*beta : ax + (bx-ax)*beta;
+        s32 By = second_half ? by + (cy-by)*beta : ay + (by-ay)*beta;
+        if (Ax>Bx) {
+            u32 tmp = Ax;
+            Ax = Bx;
+            Bx = tmp;
+            tmp = Ay;
+            Ay = By;
+            By = tmp;
+        }
+        for (int j=Ax; j<=Bx; j++) {
+            if (ay+i<0 || ay+i>=h || j<0 || j>=w) continue;
+            u32 linear = w*(h- (ay+i)) + j;
+            u32* pixel = framebuffer + linear;
+            *pixel = color;
+            // image.set(j, ay+i, color); // attention, due to int casts a->y+i != A.y
+        }
+    }
+}
+
 u32 random_color(u64 v) {
     u32 c = 0xFFFFFF * (v / (f64)RAND_MAX);
     return c;
@@ -399,7 +441,9 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
                 (u64)vector_alloc_get(model->vertices, f->v[0]-1)
                 + (u64)vector_alloc_get(model->vertices, f->v[1]-1)
                 - (u64)vector_alloc_get(model->vertices, f->v[2]-1));
+
         fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep_reference(framebuffer, w, h, &a, &b, &c, col);
         }
     }
 }
