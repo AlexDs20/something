@@ -3,8 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+// #include <math.h>
 
 #include "renderer/renderer.h"
+#include "utils/libmath.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -231,7 +233,7 @@ f32abs(float a) {
     return u.f;
 }
 
-void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Color c) {
+void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
 
@@ -411,6 +413,48 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, u32 w, u32 h, Vertex* 
     }
 }
 
+f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
+    f32x3 v1 = {C->x-A->x, B->x-A->x, A->x-P.x};
+    f32x3 v2 = {C->y-A->y, B->y-A->y, A->y-P.y};
+    f32x3 u = cross(v1, v2);
+    if (u.z <= 0) {
+        return {-1, -1, -1};
+    }
+    return {u.x/u.z, u.y/u.z, 1};
+}
+
+typedef union {
+    struct {
+        f32 left;
+        f32 top;
+        f32 right;
+        f32 bottom;
+    };
+    f32 data[4];
+} Bboxf;
+
+void fill_triangle_bbox_triangle_check(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+    Bboxf bbox = {0};
+    bbox.left    = min(a->x, min(b->x, c->x));
+    bbox.right   = max(a->x, max(b->x, c->x));
+    bbox.bottom  = min(a->y, min(b->y, c->y));
+    bbox.top     = max(a->y, max(b->y, c->y));
+
+    for (f32 j=bbox.bottom; j<bbox.top; j++) {
+        if ((u32)j < 0 || (u32)j >= h) continue;
+        for (f32 i=bbox.left; i<bbox.right; i++) {
+            if ((u32)i < 0 || (u32)i >= w) continue;
+            f32x2 P = {.x=i, .y=j};
+            f32x3 bary = barycentric_coordinate(P, (f32x3*)a, (f32x3*)b, (f32x3*)c);
+            if (bary.x<0 || bary.y<0 || bary.x+bary.y>1) {
+                continue;
+            }
+            u32* pixel = framebuffer + w*(h-(u32)j) + (u32)i;
+            *pixel = color;
+        }
+    }
+}
+
 u32 random_color(u64 v) {
     u32 c = 0xFFFFFF * (v / (f64)RAND_MAX);
     return c;
@@ -442,8 +486,9 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
                 + (u64)vector_alloc_get(model->vertices, f->v[1]-1)
                 - (u64)vector_alloc_get(model->vertices, f->v[2]-1));
 
-        fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep_reference(framebuffer, w, h, &a, &b, &c, col);
+        fill_triangle_bbox_triangle_check(framebuffer, w, h, &a, &b, &c, col);
         }
     }
 }

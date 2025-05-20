@@ -4,8 +4,6 @@
 #include "utils/defines.h"
 #include "memory/allocators.h"
 
-typedef u32 Color;
-
 typedef struct {
     float x, y, z;
 } Vertex;

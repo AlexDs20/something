@@ -8,6 +8,8 @@
 #include "utils/defines.h"
 #include "utils/io.h"
 
+#include "gf_profiling.c"
+
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
