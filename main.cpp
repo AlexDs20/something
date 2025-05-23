@@ -10,6 +10,11 @@
 
 #include "gf_profiling.c"
 
+typedef union {
+    f32 f;
+    u32 u;
+} float_bits;
+
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -29,6 +34,9 @@ int main() {
 
     Win win = platform_init_win(w, h, msg);
 
+    f32* zbuffer = (f32*)malloc(win.max_h * win.max_w * sizeof(f32));
+    float_bits zdefault = {.u = 0xFF7FFFFF};
+
     u32 running = 1;
     while (running) {
         running = platform_handle_events(&win);
@@ -36,9 +44,11 @@ int main() {
         for (int i=0; i<win.h*win.w; i++) {
             u32* pixel = (u32*)win.buffer + i;
             *pixel = bg_color;
+            f32* zpixel = (f32*)zbuffer + i;
+            *zpixel = zdefault.f;
         }
         // draw_model_wireframe(model, win.w, win.h, win.buffer);
-        draw_model(model, win.w, win.h, win.buffer);
+        draw_model(model, win.w, win.h, win.buffer, zbuffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         usleep(16);

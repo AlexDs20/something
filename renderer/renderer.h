@@ -45,6 +45,6 @@ void free_model(Model* model);
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer);
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer);
 
 #endif

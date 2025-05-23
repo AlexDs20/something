@@ -327,10 +327,12 @@ void swap_vertices(Vertex* a, Vertex* b) {
     *a = tmp;
 }
 
-void fill_triangle_line_sweep(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+void fill_triangle_line_sweep(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
     if (a->y > b->y) { swap_vertices(a, b); }
     if (b->y > c->y) { swap_vertices(b, c); }
     if (a->y > b->y) { swap_vertices(a, b); }
+
+    f32 zmid = (a->z + b->z + c->z) / 3;
 
     u32 ylow = (u32)a->y;
     u32 ymid = (u32)b->y;
@@ -365,18 +367,26 @@ void fill_triangle_line_sweep(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex*
         if (xs>xe) { u32 tmp = xs; xs = xe; xe = tmp; }
         for (u32 x=xs; x<=xe; x++) {
             if (x < 0 || x >= w) continue;
-            u32* pixel = framebuffer + w*(h-y) + x;
-            *pixel = color;
+            f32* zpix = zbuffer + w*(h-y) + x;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+
+                u32* pixel = framebuffer + w*(h-y) + x;
+                *pixel = color;
+            }
         }
     }
 }
 
 
-void fill_triangle_line_sweep_reference(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
     if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
     if (a->y>b->y) swap_vertices(a, b);
     if (a->y>c->y) swap_vertices(a, c);
     if (b->y>c->y) swap_vertices(b, c);
+
+
+    f32 zmid = (a->z + b->z + c->z) / 3;
 
     s32 ax = (u32)a->x;
     s32 ay = (u32)a->y;
@@ -406,9 +416,14 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, u32 w, u32 h, Vertex* 
         for (int j=Ax; j<=Bx; j++) {
             if (ay+i<0 || ay+i>=h || j<0 || j>=w) continue;
             u32 linear = w*(h- (ay+i)) + j;
-            u32* pixel = framebuffer + linear;
-            *pixel = color;
-            // image.set(j, ay+i, color); // attention, due to int casts a->y+i != A.y
+
+            f32* zpix = zbuffer + linear;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+
+                u32* pixel = framebuffer + linear;
+                *pixel = color;
+            }
         }
     }
 }
@@ -433,12 +448,14 @@ typedef union {
     f32 data[4];
 } Bboxf;
 
-void fill_triangle_bbox_triangle_check(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
     Bboxf bbox = {0};
     bbox.left    = min(a->x, min(b->x, c->x));
     bbox.right   = max(a->x, max(b->x, c->x));
     bbox.bottom  = min(a->y, min(b->y, c->y));
     bbox.top     = max(a->y, max(b->y, c->y));
+
+    f32 zmid = (a->z + b->z + c->z) / 3;
 
     for (u32 j=(u32)bbox.bottom; j<=(u32)bbox.top; j++) {
         if (j < 0 || j >= h) continue;
@@ -450,8 +467,13 @@ void fill_triangle_bbox_triangle_check(u32* framebuffer, u32 w, u32 h, Vertex* a
                 // printf("(%.4f,%.4f,%.4f)\n", bary.x, bary.y, bary.z);
                 continue;
             }
-            u32* pixel = framebuffer + w*(h-j) + i;
-            *pixel = color;
+            f32* zpix = zbuffer + w*(h-j) + i;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+
+                u32* pixel = framebuffer + w*(h-j) + i;
+                *pixel = color;
+            }
         }
     }
 }
@@ -461,8 +483,8 @@ u32 random_color(u64 v) {
     return c;
 }
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
-
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
+    static bool swapper = false;
     for (int i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
@@ -486,8 +508,9 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer) {
                 + (u64)vector_alloc_get(model->vertices, f->v[1]-1)
                 - (u64)vector_alloc_get(model->vertices, f->v[2]-1));
 
-        // fill_triangle_bbox_triangle_check(framebuffer, w, h, &a, &b, &c, col);
-        // fill_triangle_line_sweep(framebuffer, w, h, &a, &b, &c, col);
-        fill_triangle_line_sweep_reference(framebuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
     }
+    swapper = !swapper;
 }
