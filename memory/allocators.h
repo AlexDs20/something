@@ -1,9 +1,9 @@
 #ifndef _ALLOCATORS_H
 #define _ALLOCATORS_H
 
-#include "utils/defines.h"
+#include "utils/types.h"
 
-#define DEFAULT_ALIGN 4
+#define DEFAULT_ALIGN 4  // Bytes
 #define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
 
 typedef struct {
@@ -12,13 +12,6 @@ typedef struct {
     u64 top;
 } Arena;
 
-typedef struct {
-
-} Stack;
-
-typedef struct {
-
-} Pool;
 
 Arena* arena_alloc_create(u64 capacity);
 void* arena_alloc_alloc(Arena* arena, u64 size);

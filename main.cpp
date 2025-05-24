@@ -5,15 +5,11 @@
 
 #include "platform/window.h"
 #include "renderer/renderer.h"
+#include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
 
 #include "gf_profiling.c"
-
-typedef union {
-    f32 f;
-    u32 u;
-} float_bits;
 
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
@@ -35,7 +31,7 @@ int main() {
     Win win = platform_init_win(w, h, msg);
 
     f32* zbuffer = (f32*)malloc(win.max_h * win.max_w * sizeof(f32));
-    float_bits zdefault = {.u = 0xFF7FFFFF};
+    f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
     u32 running = 1;
     while (running) {

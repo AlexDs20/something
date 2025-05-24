@@ -1,7 +1,7 @@
 #ifndef _RENDERER_H
 #define _RENDERER_H
 
-#include "utils/defines.h"
+#include "utils/types.h"
 #include "memory/allocators.h"
 
 typedef struct {

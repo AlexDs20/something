@@ -7,6 +7,7 @@
 
 #include "renderer/renderer.h"
 #include "utils/libmath.h"
+#include "utils/defines.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -484,7 +485,7 @@ u32 random_color(u64 v) {
 }
 
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
-    static bool swapper = false;
+    // local_variable bool swapper = false;
     for (int i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
@@ -510,7 +511,11 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
 
         // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // if (swapper)
+        // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // else
+        fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
     }
-    swapper = !swapper;
+    // swapper = !swapper;
 }
