@@ -10,7 +10,7 @@
 #include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
-#include "platform/linux/memory.h"
+#include "platform/memory.h"
 
 #include "gf_profiling.c"
 

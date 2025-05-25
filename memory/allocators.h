@@ -10,6 +10,7 @@ typedef struct {
     u8* buffer;
     u64 capacity;
     u64 top;
+    u64 committed;
 } Arena;
 
 

@@ -1,11 +1,5 @@
 #include <sys/mman.h>
-#include <stddef.h>
-#include <unistd.h>
-
-typedef struct {
-    void* ptr;
-    size_t size;
-} MemoryBlock;
+#include "platform/memory.h"
 
 MemoryBlock os_memory_alloc(u64 size) {
     void* pa = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
