@@ -34,61 +34,74 @@ min(f32 a, f32 b) {
 // +
 s32x2
 operator+(s32x2 a, s32x2 b) {
-    return {a.x+b.x, a.y+b.y};
+    s32x2 result = {.x = a.x+b.x, .y = a.y+b.y};
+    return result;
 }
 s32x2
 operator+(s32 a, s32x2 b) {
-    return {a+b.x, a+b.y};
+    s32x2 result = {.x = a+b.x, .y = a+b.y};
+    return result;
 }
 s32x2
 operator+(s32x2 a, s32 b) {
-    return {a.x+b, a.y+b};
+    s32x2 result = {.x = a.x+b, .y = a.y+b};
+    return result;
 }
 
 // -
 s32x2
 operator-(s32x2 a, s32x2 b) {
-    return {a.x-b.x, a.y-b.y};
+    s32x2 result = {.x = a.x-b.x, .y = a.y-b.y};
+    return result;
 }
 s32x2
 operator-(s32 a, s32x2 b) {
-    return {a-b.x, a-b.y};
+    s32x2 result = {.x = a-b.x, .y = a-b.y};
+    return result;
 }
 s32x2
 operator-(s32x2 a, s32 b) {
-    return {a.x-b, a.y-b};
+    s32x2 result = {.x = a.x-b, .y = a.y-b};
+    return result;
 }
 s32x2
 operator-(s32x2 a) {
-    return {-a.x, -a.y};
+    s32x2 result = {.x = -a.x, .y = -a.y};
+    return result;
 }
 
 // *
 s32x2
 operator*(s32x2 a, s32x2 b) {
-    return {a.x*b.x, a.y*b.y};
+    s32x2 result = {.x = a.x*b.x, .y = a.y*b.y};
+    return result;
 }
 s32x2
 operator*(s32 a, s32x2 b) {
-    return {a*b.x, a*b.y};
+    s32x2 result = {.x = a*b.x, .y = a*b.y};
+    return result;
 }
 s32x2
 operator*(s32x2 a, s32 b) {
-    return {a.x*b, a.y*b};
+    s32x2 result = {.x = a.x*b, .y = a.y*b};
+    return result;
 }
 
 // /
 s32x2
 operator/(s32x2 a, s32x2 b) {
-    return {a.x/b.x, a.y/b.y};
+    s32x2 result = {.x = a.x/b.x, .y = a.y/b.y};
+    return result;
 }
 s32x2
 operator/(s32 a, s32x2 b) {
-    return {a/b.x, a/b.y};
+    s32x2 result = {.x = a/b.x, .y = a/b.y};
+    return result;
 }
 s32x2
 operator/(s32x2 a, s32 b) {
-    return {a.x/b, a.y/b};
+    s32x2 result = {.x = a.x/b, .y = a.y/b};
+    return result;
 }
 
 // ==
@@ -125,7 +138,8 @@ dot(s32x2 a, s32x2 b) {
 }
 s32x2
 perpendicular(s32x2 a) {
-    return {-a.y, a.x};
+    s32x2 result = {.x = -a.y, .y = a.x};
+    return result;
 }
 
 //====================
@@ -134,61 +148,74 @@ perpendicular(s32x2 a) {
 // +
 s32x3
 operator+(s32x3 a, s32x3 b) {
-    return {a.x+b.x, a.y+b.y, a.z+b.z};
+    s32x3 result = {.x = a.x+b.x, .y = a.y+b.y, .z = a.z+b.z};
+    return result;
 }
 s32x3
 operator+(s32 a, s32x3 b) {
-    return {a+b.x, a+b.y, a+b.z};
+    s32x3 result = {.x = a+b.x, .y = a+b.y, .z = a+b.z};
+    return result;
 }
 s32x3
 operator+(s32x3 a, s32 b) {
-    return {a.x+b, a.y+b, a.z+b};
+    s32x3 result = {.x = a.x+b, .y = a.y+b, .z = a.z+b};
+    return result;
 }
 
 // -
 s32x3
 operator-(s32x3 a, s32x3 b) {
-    return {a.x-b.x, a.y-b.y, a.z-b.z};
+    s32x3 result = {.x = a.x-b.x, .y = a.y-b.y, .z = a.z-b.z};
+    return result;
 }
 s32x3
 operator-(s32 a, s32x3 b) {
-    return {a-b.x, a-b.y, a-b.z};
+    s32x3 result = {.x = a-b.x, .y = a-b.y, .z = a-b.z};
+    return result;
 }
 s32x3
 operator-(s32x3 a, s32 b) {
-    return {a.x-b, a.y-b, a.z-b};
+    s32x3 result = {.x = a.x-b, .y = a.y-b, .z = a.z-b};
+    return result;
 }
 s32x3
 operator-(s32x3 a) {
-    return {-a.x, -a.y, -a.z};
+    s32x3 result = {.x = -a.x, .y = -a.y, .z = -a.z};
+    return result;
 }
 
 // *
 s32x3
 operator*(s32x3 a, s32x3 b) {
-    return {a.x*b.x, a.y*b.y, a.z*b.z};
+    s32x3 result = {.x = a.x*b.x, .y = a.y*b.y, .z = a.z*b.z};
+    return result;
 }
 s32x3
 operator*(s32 a, s32x3 b) {
-    return {a*b.x, a*b.y, a*b.z};
+    s32x3 result = {.x = a*b.x, .y = a*b.y, .z = a*b.z};
+    return result;
 }
 s32x3
 operator*(s32x3 a, s32 b) {
-    return {a.x*b, a.y*b, a.z*b};
+    s32x3 result = {.x = a.x*b, .y = a.y*b, .z = a.z*b};
+    return result;
 }
 
 // /
 s32x3
 operator/(s32x3 a, s32x3 b) {
-    return {a.x/b.x, a.y/b.y, a.z/b.z};
+    s32x3 result = {.x = a.x/b.x, .y = a.y/b.y, .z = a.z/b.z};
+    return result;
 }
 s32x3
 operator/(s32 a, s32x3 b) {
-    return {a/b.x, a/b.y, a/b.z};
+    s32x3 result = {.x = a/b.x, .y = a/b.y, .z = a/b.z};
+    return result;
 }
 s32x3
 operator/(s32x3 a, s32 b) {
-    return {a.x/b, a.y/b, a.z/b};
+    s32x3 result = {.x = a.x/b, .y = a.y/b, .z = a.z/b};
+    return result;
 }
 
 // ==
@@ -225,11 +252,12 @@ dot(s32x3 a, s32x3 b) {
 }
 s32x3
 cross(s32x3 a, s32x3 b) {
-    return {
-        a.y*b.z - a.z*b.y,      \
-        a.z*b.x - a.x*b.z,      \
-        a.x*b.y - a.y*b.x       \
+    s32x3 result = {
+        .x = a.y*b.z - a.z*b.y,      \
+        .y = a.z*b.x - a.x*b.z,      \
+        .z = a.x*b.y - a.y*b.x       \
     };
+    return result;
 }
 
 //====================
@@ -238,61 +266,74 @@ cross(s32x3 a, s32x3 b) {
 // +
 f32x2
 operator+(f32x2 a, f32x2 b) {
-    return {a.x+b.x, a.y+b.y};
+    f32x2 result = {.x = a.x+b.x, .y = a.y+b.y};
+    return result;
 }
 f32x2
 operator+(f32 a, f32x2 b) {
-    return {a+b.x, a+b.y};
+    f32x2 result = {.x = a+b.x, .y = a+b.y};
+    return result;
 }
 f32x2
 operator+(f32x2 a, f32 b) {
-    return {a.x+b, a.y+b};
+    f32x2 result = {.x = a.x+b, .y = a.y+b};
+    return result;
 }
 
 // -
 f32x2
 operator-(f32x2 a, f32x2 b) {
-    return {a.x-b.x, a.y-b.y};
+    f32x2 result = {.x = a.x-b.x, .y = a.y-b.y};
+    return result;
 }
 f32x2
 operator-(f32 a, f32x2 b) {
-    return {a-b.x, a-b.y};
+    f32x2 result = {.x = a-b.x, .y = a-b.y};
+    return result;
 }
 f32x2
 operator-(f32x2 a, f32 b) {
-    return {a.x-b, a.y-b};
+    f32x2 result = {.x = a.x-b, .y = a.y-b};
+    return result;
 }
 f32x2
 operator-(f32x2 a) {
-    return {-a.x, -a.y};
+    f32x2 result = {.x = -a.x, .y = -a.y};
+    return result;
 }
 
 // *
 f32x2
 operator*(f32x2 a, f32x2 b) {
-    return {a.x*b.x, a.y*b.y};
+    f32x2 result = {.x = a.x*b.x, .y = a.y*b.y};
+    return result;
 }
 f32x2
 operator*(f32 a, f32x2 b) {
-    return {a*b.x, a*b.y};
+    f32x2 result = {.x = a*b.x, .y = a*b.y};
+    return result;
 }
 f32x2
 operator*(f32x2 a, f32 b) {
-    return {a.x*b, a.y*b};
+    f32x2 result = {.x = a.x*b, .y = a.y*b};
+    return result;
 }
 
 // /
 f32x2
 operator/(f32x2 a, f32x2 b) {
-    return {a.x/b.x, a.y/b.y};
+    f32x2 result = {.x = a.x/b.x, .y = a.y/b.y};
+    return result;
 }
 f32x2
 operator/(f32 a, f32x2 b) {
-    return {a/b.x, a/b.y};
+    f32x2 result = {.x = a/b.x, .y = a/b.y};
+    return result;
 }
 f32x2
 operator/(f32x2 a, f32 b) {
-    return {a.x/b, a.y/b};
+    f32x2 result = {.x = a.x/b, .y = a.y/b};
+    return result;
 }
 
 // ==
@@ -321,7 +362,8 @@ length(f32x2 a) {
 }
 f32x2
 normalize(f32x2 a) {
-    return a / length(a);
+    f32x2 result = a / length(a);
+    return result;
 }
 f32
 dot(f32x2 a, f32x2 b) {
@@ -329,7 +371,8 @@ dot(f32x2 a, f32x2 b) {
 }
 f32x2
 perpendicular(f32x2 a) {
-    return {-a.y, a.x};
+    f32x2 result = {.x = -a.y, .y = a.x};
+    return result;
 }
 
 //====================
@@ -338,61 +381,74 @@ perpendicular(f32x2 a) {
 // +
 f32x3
 operator+(f32x3 a, f32x3 b) {
-    return {a.x+b.x, a.y+b.y, a.z+b.z};
+    f32x3 result = {.x = a.x+b.x, .y = a.y+b.y, .z = a.z+b.z};
+    return result;
 }
 f32x3
 operator+(f32 a, f32x3 b) {
-    return {a+b.x, a+b.y, a+b.z};
+    f32x3 result = {.x = a+b.x, .y = a+b.y, .z = a+b.z};
+    return result;
 }
 f32x3
 operator+(f32x3 a, f32 b) {
-    return {a.x+b, a.y+b, a.z+b};
+    f32x3 result = {.x = a.x+b, .y = a.y+b, .z = a.z+b};
+    return result;
 }
 
 // -
 f32x3
 operator-(f32x3 a, f32x3 b) {
-    return {a.x-b.x, a.y-b.y, a.z-b.z};
+    f32x3 result = {.x = a.x-b.x, .y = a.y-b.y, .z = a.z-b.z};
+    return result;
 }
 f32x3
 operator-(f32 a, f32x3 b) {
-    return {a-b.x, a-b.y, a-b.z};
+    f32x3 result = {.x = a-b.x, .y = a-b.y, .z = a-b.z};
+    return result;
 }
 f32x3
 operator-(f32x3 a, f32 b) {
-    return {a.x-b, a.y-b, a.z-b};
+    f32x3 result = {.x = a.x-b, .y = a.y-b, .z = a.z-b};
+    return result;
 }
 f32x3
 operator-(f32x3 a) {
-    return {-a.x, -a.y, -a.z};
+    f32x3 result = {.x = -a.x, .y = -a.y, .z = -a.z};
+    return result;
 }
 
 // *
 f32x3
 operator*(f32x3 a, f32x3 b) {
-    return {a.x*b.x, a.y*b.y, a.z*b.z};
+    f32x3 result = {.x = a.x*b.x, .y = a.y*b.y, .z = a.z*b.z};
+    return result;
 }
 f32x3
 operator*(f32 a, f32x3 b) {
-    return {a*b.x, a*b.y, a*b.z};
+    f32x3 result = {.x = a*b.x, .y = a*b.y, .z = a*b.z};
+    return result;
 }
 f32x3
 operator*(f32x3 a, f32 b) {
-    return {a.x*b, a.y*b, a.z*b};
+    f32x3 result = {.x = a.x*b, .y = a.y*b, .z = a.z*b};
+    return result;
 }
 
 // /
 f32x3
 operator/(f32x3 a, f32x3 b) {
-    return {a.x/b.x, a.y/b.y, a.z/b.z};
+    f32x3 result = {.x = a.x/b.x, .y = a.y/b.y, .z = a.z/b.z};
+    return result;
 }
 f32x3
 operator/(f32 a, f32x3 b) {
-    return {a/b.x, a/b.y, a/b.z};
+    f32x3 result = {.x = a/b.x, .y = a/b.y, .z = a/b.z};
+    return result;
 }
 f32x3
 operator/(f32x3 a, f32 b) {
-    return {a.x/b, a.y/b, a.z/b};
+    f32x3 result = {.x = a.x/b, .y = a.y/b, .z = a.z/b};
+    return result;
 }
 
 // ==
@@ -421,7 +477,8 @@ length(f32x3 a) {
 }
 f32x3
 normalize(f32x3 a) {
-    return a / length(a);
+    f32x3 result = a / length(a);
+    return result;
 }
 f32
 dot(f32x3 a, f32x3 b) {
@@ -429,11 +486,12 @@ dot(f32x3 a, f32x3 b) {
 }
 f32x3
 cross(f32x3 a, f32x3 b) {
-    return {
-        a.y*b.z - a.z*b.y,      \
-        a.z*b.x - a.x*b.z,      \
-        a.x*b.y - a.y*b.x       \
+    f32x3 result = {
+        .x = a.y*b.z - a.z*b.y,      \
+        .y = a.z*b.x - a.x*b.z,      \
+        .z = a.x*b.y - a.y*b.x       \
     };
+    return result;
 }
 
 #endif // _LIBMATH_H

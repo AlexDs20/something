@@ -2,12 +2,15 @@
 #include <sys/syscall.h>    // syscall()
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
+#include "memory/allocators.h"
 #include "platform/window.h"
 #include "renderer/renderer.h"
 #include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
+#include "platform/linux/memory.h"
 
 #include "gf_profiling.c"
 
@@ -19,7 +22,44 @@ int main() {
 
     // main_io();
 
-#if 1
+    Arena* global_arena = arena_alloc_create(2*MiB);
+
+    MemoryBlock block = os_memory_alloc(2*MiB);
+    bool success = os_memory_free(block.ptr, block.size);
+    if (!success) {
+        printf("Not freed!\n");
+    } else {
+        printf("Freed!\n");
+    }
+
+    MemoryBlock reserved_block = os_memory_reserve(2*MiB);
+    bool commit = os_memory_commit(block.ptr, 1*MiB);
+    if (!commit) {
+        printf("Could not commit!\n");
+    } else {
+        printf("Committed memory!\n");
+    }
+    commit = os_memory_commit(block.ptr, 1*MiB);
+    if (!commit) {
+        printf("Could not commit again!\n");
+    } else {
+        printf("Committed memory again!\n");
+    }
+    bool decommit = os_memory_decommit(block.ptr, block.size);
+    if (!decommit) {
+        printf("Could not decommit!\n");
+    } else {
+        printf("Decommitted memory!\n");
+    }
+    success = os_memory_free(block.ptr, block.size);
+    if (!success) {
+        printf("Not freed!\n");
+    } else {
+        printf("Freed!\n");
+    }
+
+
+#if 0
     char file_path[] = "assets/backpack/backpack.obj";
     Model* model = read_model_file(file_path);
 
@@ -56,4 +96,9 @@ int main() {
 
     char done_msg[] = "Done doing something!\n";
     syscall(1, STDOUT_FILENO, done_msg, sizeof(done_msg)-1);
+
+    // No need
+    if (false) {
+        arena_alloc_free(global_arena);
+    }
 }

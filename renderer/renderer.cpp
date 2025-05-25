@@ -430,13 +430,13 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
 }
 
 f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
-    f32x3 v1 = {C->x-A->x, B->x-A->x, A->x-P.x};
-    f32x3 v2 = {C->y-A->y, B->y-A->y, A->y-P.y};
+    f32x3 v1 = {.x = C->x-A->x, .y = B->x-A->x, .z = A->x-P.x};
+    f32x3 v2 = {.x = C->y-A->y, .y = B->y-A->y, .z = A->y-P.y};
     f32x3 u = cross(v1, v2);
     if (f32abs(u.z) <= EPS) {
-        return {-1, -1, -1};
+        return {.x = -1, .y = -1, .z = -1};
     }
-    return {u.x/u.z, u.y/u.z, 1};
+    return {.x = u.x/u.z, .y = u.y/u.z, .z = 1};
 }
 
 typedef union {
@@ -450,7 +450,7 @@ typedef union {
 } Bboxf;
 
 void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
-    Bboxf bbox = {0};
+    Bboxf bbox = {};
     bbox.left    = min(a->x, min(b->x, c->x));
     bbox.right   = max(a->x, max(b->x, c->x));
     bbox.bottom  = min(a->y, min(b->y, c->y));
