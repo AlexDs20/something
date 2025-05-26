@@ -20,47 +20,10 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    // main_io();
-
     Arena* global_arena = arena_alloc_create(2*MiB);
 
-    MemoryBlock block = os_memory_alloc(2*MiB);
-    bool success = os_memory_free(block.ptr, block.size);
-    if (!success) {
-        printf("Not freed!\n");
-    } else {
-        printf("Freed!\n");
-    }
-
-    MemoryBlock reserved_block = os_memory_reserve(2*MiB);
-    bool commit = os_memory_commit(block.ptr, 1*MiB);
-    if (!commit) {
-        printf("Could not commit!\n");
-    } else {
-        printf("Committed memory!\n");
-    }
-    commit = os_memory_commit(block.ptr, 1*MiB);
-    if (!commit) {
-        printf("Could not commit again!\n");
-    } else {
-        printf("Committed memory again!\n");
-    }
-    bool decommit = os_memory_decommit(block.ptr, block.size);
-    if (!decommit) {
-        printf("Could not decommit!\n");
-    } else {
-        printf("Decommitted memory!\n");
-    }
-    success = os_memory_free(block.ptr, block.size);
-    if (!success) {
-        printf("Not freed!\n");
-    } else {
-        printf("Freed!\n");
-    }
-
-
 #if 0
-    char file_path[] = "assets/backpack/backpack.obj";
+    char* file_path = "assets/backpack/backpack.obj";
     Model* model = read_model_file(file_path);
 
     const u32 w = 1024;
@@ -98,7 +61,7 @@ int main() {
     syscall(1, STDOUT_FILENO, done_msg, sizeof(done_msg)-1);
 
     // No need
-    if (false) {
+    if (true) {
         arena_alloc_free(global_arena);
     }
 }

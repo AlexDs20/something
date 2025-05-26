@@ -4,7 +4,7 @@
 #include "utils/types.h"
 
 #define DEFAULT_ALIGN 4  // Bytes
-#define ALIGN(v) ((v)+(DEFAULT_ALIGN-1) & (~(DEFAULT_ALIGN-1)))
+#define ALIGN(v) (((v)+(DEFAULT_ALIGN-1)) & (~(DEFAULT_ALIGN-1)))
 
 typedef struct {
     u8* buffer;
@@ -22,6 +22,8 @@ void* arena_alloc_get(Arena* arena, u64 pos);
 
 void* arena_alloc_push(Arena* arena, u64 size);
 void* arena_alloc_push_zero(Arena* arena, u64 size);
+// void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
+// void* arena_alloc_push_aligned_zero(Arena* arena, u64 size, u64 alignment);
 
 void arena_alloc_pop_by(Arena* arena, u64 bytes_to_pop);
 void arena_alloc_pop_by_zero(Arena* arena, u64 bytes_to_pop);
@@ -33,6 +35,11 @@ void arena_alloc_reset(Arena* arena);
 void arena_alloc_reset_zero(Arena* arena);
 
 void* arena_alloc_copy(Arena* dest, Arena* src);
+u64 arena_alloc_checkpoint(Arena* arena);
+void arena_alloc_restore(Arena* arena, u64 checkpoint);
+
+void arena_debug_map(Arena* arena, u64 width);
+void arena_debug_print(Arena* arena);
 
 // Resizes the arena's internal buffer to a new capacity. Useful for dynamic arenas.
 // If new_capacity < arena->top, reject or truncate.

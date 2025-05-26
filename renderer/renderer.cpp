@@ -30,7 +30,7 @@ void print(Face* f) {
 }
 
 Arena* read_file(char* file_path, bool trim) {
-    Arena* arena = arena_alloc_create(4*1024);
+    Arena* arena = arena_alloc_create(4*KiB);
     if (!arena) {
         printf("Failed to create the initial arena\n");
         return(0);
@@ -62,9 +62,11 @@ Arena* read_file(char* file_path, bool trim) {
 
         bytes_read = fread(arena->buffer+arena->top, 1, chunk_size, file);
         if (bytes_read < chunk_size && ferror(file)) {
-            printf("Failed while reading the file!\n");
+            printf("Failed while reading the file: %s!\n", file);
             arena_alloc_free(arena);
             return(0);
+        } else {
+            printf("Chunk read\n");
         }
         arena->top += bytes_read;
     } while (bytes_read == chunk_size);

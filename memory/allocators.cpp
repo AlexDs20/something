@@ -3,96 +3,27 @@
 #include <stdio.h>
 #include "memory/allocators.h"
 #include "utils/types.h"
-
-/*
-// Chained arena
-// This is
-typedef struct Arena Arena;
-struct Arena {
-    u8* start;
-    u64 top;
-    u64 capacity;
-    Arena* next;
-    bool chain;
-};
-
-Arena* arena_create(u64 capacity, bool chain_expand) {
-    Arena* arena = (Arena*)malloc(sizeof(Arena));
-    if (!arena) {
-        printf("Could not allocate space for Arena*\n");
-        return(0);
-    }
-    arena->start = (u8*)malloc(capacity);
-    if (!arena->start) {
-        free(arena);
-        printf("Could not allocate space for the arena's buffer\n");
-        return(0);
-    }
-    memset((void*)arena->start, 0, capacity);
-    arena->top = 0;
-    arena->capacity = capacity;
-    arena->next = 0;
-    arena->chain = chain_expand;
-    return arena;
-}
-
-void* arena_alloc(Arena* arena, u64 size) {
-    if (!arena || !arena->start) {
-        return(0);
-    }
-    u64 aligned_size = ALIGN(size);
-
-    // Traverse chain
-    Arena* this_arena = arena;
-    while(this_arena->next) {
-        this_arena = this_arena->next;
-    }
-    if (this_arena->top + aligned_size > this_arena->capacity) {
-        if (!this_arena->chain) {
-            printf("Not enough memory left in the allocator!\n");
-            return(0);
-        }
-        Arena* arena_new_next = arena_create(arena->capacity, true);
-        if (!arena_new_next) {
-            printf("Could not allocate more memory to chain the arena.\n");
-            return(0);
-        }
-        this_arena->next = arena_new_next;
-        this_arena = arena_new_next;
-    }
-
-    void* allocation = (void*)(this_arena->start + this_arena->top);
-    memset(allocation, 0, aligned_size);
-    this_arena->top += aligned_size;
-    return allocation;
-}
-
-void arena_free(Arena* arena) {
-    Arena* this_arena = arena;
-    while(this_arena) {
-        Arena* next_arena = this_arena->next;
-        if (this_arena->start) {
-            free(this_arena->start);
-        }
-        free(this_arena);
-        this_arena = next_arena;
-    }
-}
-*/
+#include "platform/memory.h"
 
 //==============================
 // Arena (Linear)
 Arena* arena_alloc_create(u64 capacity) {
-    Arena* arena = (Arena*) malloc(sizeof(Arena));
+    MemoryBlock block;
+    block = os_memory_alloc(sizeof(Arena));
+    Arena* arena = (Arena*) block.ptr;
 
     if (!arena) {
         return 0;
     }
-    arena->capacity = ALIGN(capacity);
-    arena->buffer = (u8*)malloc(arena->capacity);
-    if (!arena->buffer) {
+    u64 aligned_cap = ALIGN(capacity);
+    block = os_memory_reserve(aligned_cap);
+    if (!block.ptr) {
+        os_memory_free(arena, sizeof(Arena));
         return 0;
     }
+    arena->buffer = (u8*)block.ptr;
+    arena->capacity = block.size;
+    arena->committed = block.committed;
     arena->top = 0;
     return arena;
 }
@@ -102,7 +33,7 @@ Arena* arena_alloc_create_zero(u64 capacity) {
     if (!arena || !arena->buffer) {
         return 0;
     }
-    memset(arena->buffer, 0, arena->capacity);
+    // memset(arena->buffer, 0, arena->capacity);       // Not Needed as mmap automatically sets to 0.
     return arena;
 }
 
@@ -138,9 +69,18 @@ void* arena_alloc_push(Arena* arena, u64 size) {
     u64 aligned_size = ALIGN(size);
 
     if (arena->top + aligned_size > arena->capacity) {
-        // TODO(alex): Resize once we use mmap/VirtualAlloc by commiting pages
         printf("Arena overflow\n");
         return 0;
+    }
+    u64 needed = arena->top + aligned_size;
+    if ( needed > arena->committed) {
+        u64 commit_amount = needed - arena->committed;
+        MemoryBlock block = os_memory_commit(arena->buffer + arena->committed, commit_amount);
+        if (!block.committed) {
+            printf("Could not commit the memory\n");
+            return 0;
+        }
+        arena->committed += block.committed;
     }
 
     void* allocation = arena->buffer + arena->top;
@@ -157,6 +97,10 @@ void* arena_alloc_push_zero(Arena* arena, u64 size) {
     memset(allocation, 0, aligned_size);
     return allocation;
 }
+
+// TODO(alex)
+// void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
+// void* arena_alloc_push_aligned_zero(Arena* arena, u64 size, u64 alignment);
 
 void arena_alloc_pop_by(Arena* arena, u64 size) {
     u64 aligned_size = ALIGN(size);
@@ -203,9 +147,9 @@ void arena_alloc_pop_to_zero(Arena* arena, void* addr) {
 void arena_alloc_free(Arena* arena) {
     if (arena) {
         if (arena->buffer) {
-            free(arena->buffer);
+            os_memory_free(arena->buffer, arena->capacity);
         }
-        free(arena);
+        os_memory_free(arena, sizeof(Arena));
     }
 }
 
@@ -234,6 +178,46 @@ void* arena_alloc_copy(Arena* dest, Arena* src) {
     }
     void* alloc = memcpy(new_alloc, src->buffer, src->top);
     return alloc;
+}
+
+u64 arena_alloc_checkpoint(Arena* arena) {
+    return arena ? arena->top : 0;
+}
+
+void arena_alloc_restore(Arena* arena, u64 checkpoint) {
+    if (arena && checkpoint <= arena->top) {
+        arena->top = ALIGN(checkpoint);
+    }
+}
+
+void arena_debug_print(Arena* arena) {
+    if (!arena) return;
+    printf("Arena Debug Info:\n");
+    printf("  buffer:     %p\n", arena->buffer);
+    printf("  capacity:   %llu bytes\n", arena->capacity);
+    printf("  committed:  %llu bytes\n", arena->committed);
+    printf("  used:       %llu bytes\n", arena->top);
+    printf("  free:       %llu bytes\n", arena->capacity - arena->top);
+}
+
+void arena_debug_map(Arena* arena, u64 width) {
+    if (!arena) return;
+
+    const u64 total = arena->capacity;
+    const u64 committed = arena->committed;
+    const u64 used = arena->top;
+
+    for (u64 i = 0; i < width; i++) {
+        u64 offset = (i * total) / width;
+        char symbol = '.';
+        if (offset < used) {
+            symbol = '#';
+        } else if (offset < committed) {
+            symbol = '~';
+        }
+        putchar(symbol);
+    }
+    putchar('\n');
 }
 
 //==============================

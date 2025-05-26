@@ -204,7 +204,7 @@ bool platform_handle_events(Win* win) {
 
 int platform_main() {
     int w=1024, h=768;
-    char* title = "Handmade something";
+    char title[] = "Handmade something";
 
     Win win = platform_init_win(w, h, title);
 
