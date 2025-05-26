@@ -29,66 +29,44 @@ void print(Face* f) {
             );
 }
 
-Arena* read_file(char* file_path, bool trim) {
-    Arena* arena = arena_alloc_create(4*KiB);
-    if (!arena) {
-        printf("Failed to create the initial arena\n");
-        return(0);
-    }
-
+Arena* read_file(Arena* arena, char* file_path) {
     FILE* file = fopen(file_path, "r");
 
     if (!file) {
-        printf("Could not open file %s\n", file_path);
-        arena_alloc_free(arena);
-        return(0);
+        printf("fopen %s failed: %s\n", file_path, strerror(errno));
+        return 0;
     }
 
-    u64 chunk_size = 4*1024;
-    u64 bytes_read;
+    u64 chunk_size = 4*KiB;
+    u64 bytes_read = 0;
     do {
         // Allocate more if needed
         if (arena_alloc_remaining(arena) < chunk_size) {
             Arena* arena2 = arena_alloc_create(2*arena->capacity);
             if (!arena2) {
                 printf("Could not allocate enough memory!\n");
-                arena_alloc_free(arena);
-                return(0);
+                return 0;
             }
             arena_alloc_copy(arena2, arena);
             arena_alloc_free(arena);
             arena = arena2;
         }
 
-        bytes_read = fread(arena->buffer+arena->top, 1, chunk_size, file);
+        void* loc = arena_alloc_push(arena, chunk_size);
+        bytes_read = fread(loc, 1, chunk_size, file);
         if (bytes_read < chunk_size && ferror(file)) {
             printf("Failed while reading the file: %s!\n", file);
-            arena_alloc_free(arena);
-            return(0);
-        } else {
-            printf("Chunk read\n");
+            arena_alloc_pop_by(arena, chunk_size - bytes_read);
+            return 0;
         }
-        arena->top += bytes_read;
+
     } while (bytes_read == chunk_size);
 
     int error = fclose(file);
     if (error) {
         printf("fclose failed: %s\n", strerror(errno));
         arena_alloc_free(arena);
-        return(0);
-    }
-
-    // Make it just the right size
-    if (trim && arena_alloc_remaining(arena)>0) {
-        Arena* arena2 = arena_alloc_create(arena->top);
-        if (!arena2) {
-            printf("Failed to trim the arena\n");
-            arena_alloc_free(arena);
-            return(0);
-        }
-        arena_alloc_copy(arena2, arena);
-        arena_alloc_free(arena);
-        arena = arena2;
+        return 0;
     }
     return arena;
 }
@@ -218,8 +196,8 @@ void free_model(Model* model) {
     free(model);
 }
 
-Model* read_model_file(char* file_path) {
-    Arena* arena = read_file(file_path, true);
+Model* read_model_file(Arena* arena, char* file_path) {
+    read_file(arena, file_path);
     Model* model = parse_obj_content(arena);
     arena_alloc_free(arena);
     return model;

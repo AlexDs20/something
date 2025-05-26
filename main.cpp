@@ -22,9 +22,9 @@ int main() {
 
     Arena* global_arena = arena_alloc_create(2*MiB);
 
-#if 0
+#if 1
     char* file_path = "assets/backpack/backpack.obj";
-    Model* model = read_model_file(file_path);
+    Model* model = read_model_file(global_arena, file_path);
 
     const u32 w = 1024;
     const u32 h = 768;

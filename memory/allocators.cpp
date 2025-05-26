@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "memory/allocators.h"
+#include "allocators.h"
 #include "utils/types.h"
 #include "platform/memory.h"
 
@@ -176,7 +177,7 @@ void* arena_alloc_copy(Arena* dest, Arena* src) {
     if (!new_alloc) {
         return 0;
     }
-    void* alloc = memcpy(new_alloc, src->buffer, src->top);
+    void* alloc = memcpy(new_alloc, (void*)src->buffer, src->top);
     return alloc;
 }
 

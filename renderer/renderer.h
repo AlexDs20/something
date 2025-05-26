@@ -40,7 +40,7 @@ void print(Normal* n);
 void print(TexCoord* t);
 void print(Face* t);
 
-Model* read_model_file(char* filepath);
+Model* read_model_file(Arena* arena, char* filepath);
 void free_model(Model* model);
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
