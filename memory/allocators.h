@@ -4,7 +4,8 @@
 #include "utils/types.h"
 
 #define DEFAULT_ALIGN 4  // Bytes
-#define ALIGN(v) (((v)+(DEFAULT_ALIGN-1)) & (~(DEFAULT_ALIGN-1)))
+#define ALIGN_TO(v, a) (((v)+((a)-1)) & (~((a)-1)))
+#define ALIGN(v) ALIGN_TO((v), DEFAULT_ALIGN)
 
 typedef struct {
     u8* buffer;
@@ -22,8 +23,10 @@ void* arena_alloc_get(Arena* arena, u64 pos);
 
 void* arena_alloc_push(Arena* arena, u64 size);
 void* arena_alloc_push_zero(Arena* arena, u64 size);
-// void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
-// void* arena_alloc_push_aligned_zero(Arena* arena, u64 size, u64 alignment);
+void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
+void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment);
+void* arena_alloc_push_struct(Arena* arena, void* data, u64 size);
+void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment);
 
 void arena_alloc_pop_by(Arena* arena, u64 bytes_to_pop);
 void arena_alloc_pop_by_zero(Arena* arena, u64 bytes_to_pop);
@@ -41,18 +44,6 @@ void arena_alloc_restore(Arena* arena, u64 checkpoint);
 void arena_debug_map(Arena* arena, u64 width);
 void arena_debug_print(Arena* arena);
 
-// Resizes the arena's internal buffer to a new capacity. Useful for dynamic arenas.
-// If new_capacity < arena->top, reject or truncate.
-// If growing, realloc or allocate new memory and copy existing data.
-// Update capacity.
-//
-// bool arena_alloc_resize(Arena* arena, u64 new_capacity);
-//
-//
-// Ensures that the arena has at least the specified capacity. Basically a conditional resize.
-// bool arena_alloc_reserve(Arena* arena, u64 min_capacity);
-//     If arena->capacity >= min_capacity, do nothing.
-//     Else, resize.
 
 //==============================
 // Vector

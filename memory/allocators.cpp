@@ -63,17 +63,30 @@ void* arena_alloc_get(Arena* arena, u64 pos) {
 }
 
 void* arena_alloc_push(Arena* arena, u64 size) {
+    return arena_alloc_push_aligned(arena, size, DEFAULT_ALIGN);
+};
+
+void* arena_alloc_push_zero(Arena* arena, u64 size) {
+    return arena_alloc_push_zero_aligned(arena, size, DEFAULT_ALIGN);
+}
+
+void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment) {
     if (!arena || !arena->buffer) {
         return 0;
     }
 
-    u64 aligned_size = ALIGN(size);
+    bool power_of_two = (alignment & (alignment-1)) == 0;
+    if (!power_of_two) {
+        return 0;
+    }
 
-    if (arena->top + aligned_size > arena->capacity) {
+    u64 aligned_top = ALIGN_TO(arena->top, alignment);
+
+    if (aligned_top + size > arena->capacity) {
         printf("Arena overflow\n");
         return 0;
     }
-    u64 needed = arena->top + aligned_size;
+    u64 needed = aligned_top + size;
     if ( needed > arena->committed) {
         u64 commit_amount = needed - arena->committed;
         MemoryBlock block = os_memory_commit(arena->buffer + arena->committed, commit_amount);
@@ -84,13 +97,13 @@ void* arena_alloc_push(Arena* arena, u64 size) {
         arena->committed += block.committed;
     }
 
-    void* allocation = arena->buffer + arena->top;
-    arena->top += aligned_size;
+    void* allocation = arena->buffer + aligned_top;
+    arena->top = aligned_top + size;
     return allocation;
 }
 
-void* arena_alloc_push_zero(Arena* arena, u64 size) {
-    void* allocation = arena_alloc_push(arena, size);
+void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment) {
+    void* allocation = arena_alloc_push_aligned(arena, size, alignment);
     if (!allocation) {
         return 0;
     }
@@ -99,9 +112,18 @@ void* arena_alloc_push_zero(Arena* arena, u64 size) {
     return allocation;
 }
 
-// TODO(alex)
-// void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
-// void* arena_alloc_push_aligned_zero(Arena* arena, u64 size, u64 alignment);
+void* arena_alloc_push_struct(Arena* arena, void* data, u64 size) {
+    return arena_alloc_push_struct_aligned(arena, data, size, DEFAULT_ALIGN);
+}
+
+void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment) {
+    void* out = arena_alloc_push_aligned(arena, size, alignment);
+    if (!out) {
+        return 0;
+    }
+    out = memcpy(out, data, size);
+    return out;
+}
 
 void arena_alloc_pop_by(Arena* arena, u64 size) {
     u64 aligned_size = ALIGN(size);

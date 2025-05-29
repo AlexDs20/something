@@ -199,7 +199,6 @@ void free_model(Model* model) {
 Model* read_model_file(Arena* arena, char* file_path) {
     read_file(arena, file_path);
     Model* model = parse_obj_content(arena);
-    arena_alloc_free(arena);
     return model;
 }
 

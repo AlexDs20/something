@@ -20,7 +20,7 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    Arena* global_arena = arena_alloc_create(2*MiB);
+    Arena* global_arena = arena_alloc_create(10*MiB);
 
 #if 1
     char* file_path = "assets/backpack/backpack.obj";
