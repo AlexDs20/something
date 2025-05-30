@@ -6,25 +6,27 @@
 #include "utils/types.h"
 #include "platform/memory.h"
 
+#define DEFAULT_ALIGN (sizeof(void*))                       // Bytes
+#define ALIGN_TO(v, a) (((v)+((a)-1)) & (~((a)-1)))
+#define ALIGN(v) ALIGN_TO((v), DEFAULT_ALIGN)
+
 //==============================
 // Arena (Linear)
 Arena* arena_alloc_create(u64 capacity) {
-    MemoryBlock block;
-    block = os_memory_alloc(sizeof(Arena));
-    Arena* arena = (Arena*) block.ptr;
+    MemoryBlock arena_block = os_memory_alloc(sizeof(Arena));
+    Arena* arena = (Arena*) arena_block.ptr;
 
     if (!arena) {
         return 0;
     }
-    u64 aligned_cap = ALIGN(capacity);
-    block = os_memory_reserve(aligned_cap);
-    if (!block.ptr) {
+    MemoryBlock buffer_block = os_memory_reserve(capacity);
+    if (!buffer_block.ptr) {
         os_memory_free(arena, sizeof(Arena));
         return 0;
     }
-    arena->buffer = (u8*)block.ptr;
-    arena->capacity = block.size;
-    arena->committed = block.committed;
+    arena->buffer = (u8*)buffer_block.ptr;
+    arena->capacity = buffer_block.size;
+    arena->committed = 0;
     arena->top = 0;
     return arena;
 }
@@ -34,7 +36,7 @@ Arena* arena_alloc_create_zero(u64 capacity) {
     if (!arena || !arena->buffer) {
         return 0;
     }
-    // memset(arena->buffer, 0, arena->capacity);       // Not Needed as mmap automatically sets to 0.
+    // memset(arena->buffer, 0, arena->capacity);       // Not Needed as mmap automatically sets to 0 => use when going multi platform
     return arena;
 }
 
@@ -66,49 +68,70 @@ void* arena_alloc_push(Arena* arena, u64 size) {
     return arena_alloc_push_aligned(arena, size, DEFAULT_ALIGN);
 };
 
-void* arena_alloc_push_zero(Arena* arena, u64 size) {
-    return arena_alloc_push_zero_aligned(arena, size, DEFAULT_ALIGN);
-}
-
 void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment) {
-    if (!arena || !arena->buffer) {
-        return 0;
-    }
-
     bool power_of_two = (alignment & (alignment-1)) == 0;
     if (!power_of_two) {
         return 0;
     }
-
-    u64 aligned_top = ALIGN_TO(arena->top, alignment);
-
-    if (aligned_top + size > arena->capacity) {
-        printf("Arena overflow\n");
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    arena->top = ALIGN_TO(arena->top, alignment);               // push_unaligned handles the overflow
+    void* allocation = arena_alloc_push_unaligned(arena, size);
+    if (!allocation) {
+        arena_alloc_restore(arena, checkpoint);
         return 0;
     }
-    u64 needed = aligned_top + size;
-    if ( needed > arena->committed) {
-        u64 commit_amount = needed - arena->committed;
-        MemoryBlock block = os_memory_commit(arena->buffer + arena->committed, commit_amount);
-        if (!block.committed) {
-            printf("Could not commit the memory\n");
-            return 0;
-        }
-        arena->committed += block.committed;
-    }
-
-    void* allocation = arena->buffer + aligned_top;
-    arena->top = aligned_top + size;
     return allocation;
 }
 
+void* arena_alloc_push_unaligned(Arena* arena, u64 size) {
+    if (!arena || !arena->buffer) {
+        return 0;
+    }
+    u64 needed = arena->top + size;
+    if (needed > arena->capacity) {
+        printf("Arena overflow. Not enough space left.\n");
+        return 0;
+    }
+    if (needed > arena->committed) {
+        u64 commit_amount = needed - arena->committed;
+        MemoryBlock block = os_memory_commit(arena->buffer + arena->committed, commit_amount);
+        if (!block.size) {
+            return 0;
+        }
+        arena->committed += block.size;
+    }
+
+    void* allocation = arena->buffer + arena->top;
+    arena->top += size;
+    return allocation;
+}
+
+void* arena_alloc_push_zero(Arena* arena, u64 size) {
+    return arena_alloc_push_zero_aligned(arena, size, DEFAULT_ALIGN);
+}
+
 void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment) {
-    void* allocation = arena_alloc_push_aligned(arena, size, alignment);
+    bool power_of_two = (alignment & (alignment-1)) == 0;
+    if (!power_of_two) {
+        return 0;
+    }
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    arena->top = ALIGN_TO(arena->top, alignment);
+
+    void* allocation = arena_alloc_push_zero_unaligned(arena, size);
+    if (!allocation) {
+        arena_alloc_restore(arena, checkpoint);
+        return 0;
+    }
+    return allocation;
+}
+
+void* arena_alloc_push_zero_unaligned(Arena* arena, u64 size) {
+    void* allocation = arena_alloc_push_unaligned(arena, size);
     if (!allocation) {
         return 0;
     }
-    u64 aligned_size = arena->top - ((u64)allocation - (u64)arena->buffer);
-    memset(allocation, 0, aligned_size);
+    memset(allocation, 0, size);
     return allocation;
 }
 
@@ -117,21 +140,36 @@ void* arena_alloc_push_struct(Arena* arena, void* data, u64 size) {
 }
 
 void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment) {
-    void* out = arena_alloc_push_aligned(arena, size, alignment);
-    if (!out) {
+    bool power_of_two = (alignment & (alignment-1)) == 0;
+    if (!power_of_two) {
         return 0;
     }
-    out = memcpy(out, data, size);
-    return out;
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    arena->top = ALIGN_TO(arena->top, alignment);
+
+    void* allocation = arena_alloc_push_struct_unaligned(arena, data, size);
+    if (!allocation) {
+        arena_alloc_restore(arena, checkpoint);
+        return 0;
+    }
+    return allocation;
+}
+
+void* arena_alloc_push_struct_unaligned(Arena* arena, void* data, u64 size) {
+    void* allocation = arena_alloc_push_unaligned(arena, size);
+    if (!allocation) {
+        return 0;
+    }
+    memcpy(allocation, data, size);
+    return allocation;
 }
 
 void arena_alloc_pop_by(Arena* arena, u64 size) {
-    u64 aligned_size = ALIGN(size);
-    if(!arena || aligned_size > arena->top) {
+    if(!arena || size > arena->top) {
         printf("Invalid pop from arena.\n");
         return;
     }
-    arena->top -= aligned_size;
+    arena->top -= size;
 }
 
 void arena_alloc_pop_by_zero(Arena* arena, u64 size) {
@@ -139,32 +177,30 @@ void arena_alloc_pop_by_zero(Arena* arena, u64 size) {
         printf("Invalid pop from arena.\n");
         return;
     }
-    u64 aligned_size = ALIGN(size);
-    arena->top -= aligned_size;
-    memset(arena->buffer + arena->top, 0, aligned_size);
+    arena->top -= size;
+    memset(arena->buffer + arena->top, 0, size);
 }
 
-void arena_alloc_pop_to(Arena* arena, void* addr) {
+void* arena_alloc_pop_to(Arena* arena, void* addr) {
     if (!arena || !arena->buffer) {
-        return;
+        return 0;
     }
     if ((u64)addr < (u64)arena->buffer || (u64)addr>=(u64)(arena->buffer+arena->top)) {
-        return;
+        return 0;
     }
 
-    arena->top = ALIGN((u64)addr - (u64)arena->buffer);
+    arena->top = (u64)addr - (u64)arena->buffer;
+    return (void*)(arena->buffer + arena->top);
 }
 
-void arena_alloc_pop_to_zero(Arena* arena, void* addr) {
-    if (!arena || !arena->buffer) {
-        return;
+void* arena_alloc_pop_to_zero(Arena* arena, void* addr) {
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    void* ret = arena_alloc_pop_to(arena, addr);
+    if (!ret) {
+        return 0;
     }
-    if (addr < (void*)arena->buffer || addr>=(void*)(arena->buffer+arena->top)) {
-        return;
-    }
-    u64 initial_top = arena->top;
-    arena->top = ALIGN((u64)addr - (u64)arena->buffer);
-    memset(arena->buffer + arena->top, 0, initial_top - arena->top);
+    memset(arena->buffer + arena->top, 0, checkpoint - arena->top);
+    return ret;
 }
 
 void arena_alloc_free(Arena* arena) {
@@ -209,7 +245,7 @@ u64 arena_alloc_checkpoint(Arena* arena) {
 
 void arena_alloc_restore(Arena* arena, u64 checkpoint) {
     if (arena && checkpoint <= arena->top) {
-        arena->top = ALIGN(checkpoint);
+        arena->top = checkpoint;
     }
 }
 
@@ -217,10 +253,10 @@ void arena_debug_print(Arena* arena) {
     if (!arena) return;
     printf("Arena Debug Info:\n");
     printf("  buffer:     %p\n", arena->buffer);
-    printf("  capacity:   %llu bytes\n", arena->capacity);
-    printf("  committed:  %llu bytes\n", arena->committed);
-    printf("  used:       %llu bytes\n", arena->top);
-    printf("  free:       %llu bytes\n", arena->capacity - arena->top);
+    printf("  capacity:   %lu bytes\n", arena->capacity);
+    printf("  committed:  %lu bytes\n", arena->committed);
+    printf("  used:       %lu bytes\n", arena->top);
+    printf("  free:       %lu bytes\n", arena->capacity - arena->top);
 }
 
 void arena_debug_map(Arena* arena, u64 width) {
@@ -271,7 +307,7 @@ void* vector_alloc_push(Vector* vector, void* data) {
     if (vector->top+vector->element_size > vector->capacity) {
         u8* new_buffer = (u8*)malloc(2*vector->capacity);
         if (!new_buffer) {
-            printf("Could not expand memory buffer\n");
+            printf("could not expand memory buffer\n");
             return 0;
         }
         memcpy(new_buffer, vector->buffer, vector->top);
@@ -312,7 +348,6 @@ void vector_alloc_trim(Vector* vector) {
     vector->buffer = new_buffer;
     vector->capacity = vector->top;
 }
-
 
 u64 vector_alloc_count(Vector* vector) {
     if (vector) {

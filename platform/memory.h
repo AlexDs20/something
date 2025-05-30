@@ -7,7 +7,6 @@
 typedef struct {
     void* ptr;
     size_t size;
-    size_t committed;
 } MemoryBlock;
 
 MemoryBlock os_memory_alloc(u64 size);

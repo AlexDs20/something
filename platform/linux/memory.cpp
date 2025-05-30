@@ -16,7 +16,7 @@ MemoryBlock os_memory_alloc(u64 size) {
 
     long page_size = sysconf(_SC_PAGESIZE);
     u64 aligned_size = ALIGN_TO(size, page_size);
-    MemoryBlock block = { .ptr = pa, .size = aligned_size, .committed = aligned_size };
+    MemoryBlock block = { .ptr = pa, .size = aligned_size };
     return block;
 }
 
@@ -32,7 +32,7 @@ MemoryBlock os_memory_reserve(u64 size) {
     }
 
     long page_size = sysconf(_SC_PAGESIZE);
-    MemoryBlock block = { .ptr = pa, .size = ALIGN_TO(size, page_size), .committed = 0 };
+    MemoryBlock block = { .ptr = pa, .size = ALIGN_TO(size, page_size) };
     return block;
 }
 
@@ -45,7 +45,7 @@ MemoryBlock os_memory_commit(void* addr, u64 size) {
         MemoryBlock block = {0};
         return block;
     }
-    MemoryBlock block = { .ptr = addr, .size=ALIGN_TO(size, page_size), .committed=ALIGN_TO(size, page_size) };
+    MemoryBlock block = { .ptr = addr, .size=ALIGN_TO(size, page_size) };
     return block;
 }
 
