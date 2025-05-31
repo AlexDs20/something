@@ -9,7 +9,7 @@ LINKSDIR=
 INCLUDES="-I."
 ENTRYPOINT="main.cpp"
 SRC="./*/*.cpp"
-CXX=clang++
+CXX=g++
 
 function echo () {
     builtin echo "[$(date +'%Y-%m-%d %H:%M:%S.%3N')] $@"

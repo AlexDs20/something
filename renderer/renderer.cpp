@@ -98,7 +98,6 @@ Model* parse_obj_content(Arena* file) {
     u64 end_line = 0;
     u64 size_line = 0;
 
-    // TODO(alex): Make it so that it rescales instead of overflowing.
     Vector* vertices     = vector_alloc_create(1000, sizeof(Vertex));
     Vector* tex_coords   = vector_alloc_create(1000, sizeof(TexCoord));
     Vector* normals      = vector_alloc_create(1000, sizeof(Normal));
@@ -177,10 +176,6 @@ Model* parse_obj_content(Arena* file) {
     free(line_buffer);
 
     Model* model = (Model*)malloc(sizeof(Model));
-    // vector_alloc_trim(vertices);
-    // vector_alloc_trim(faces);
-    // vector_alloc_trim(normals);
-    // vector_alloc_trim(tex_coords);
     model->vertices = vertices;
     model->faces = faces;
     model->normals = normals;

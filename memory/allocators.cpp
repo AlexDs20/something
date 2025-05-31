@@ -282,20 +282,17 @@ void arena_debug_map(Arena* arena, u64 width) {
 //==============================
 // Vector
 Vector* vector_alloc_create(u64 n, u64 size) {
-    Vector* vector = (Vector*)malloc(sizeof(Vector));
-    if (!vector) {
-        printf("Could not allocate memory for the vector structure.\n");
+    Arena* arena = arena_alloc_create(n*size);
+    if (!arena) {
         return 0;
     }
-
-    vector->buffer = (u8*)malloc(n*size);
-    if(!vector->buffer) {
-        printf("Could not allocate memory for the vector buffer.\n");
-        free(vector);
+    MemoryBlock block = os_memory_alloc(sizeof(Vector));
+    if (!block.ptr) {
+        arena_alloc_free(arena);
         return 0;
     }
-    vector->capacity = n*size;
-    vector->top = 0;
+    Vector* vector = (Vector*)block.ptr;
+    vector->arena = arena;
     vector->element_size = size;
     return vector;
 }
@@ -304,71 +301,70 @@ void* vector_alloc_push(Vector* vector, void* data) {
     if (!vector) {
         return 0;
     }
-    if (vector->top+vector->element_size > vector->capacity) {
-        u8* new_buffer = (u8*)malloc(2*vector->capacity);
-        if (!new_buffer) {
-            printf("could not expand memory buffer\n");
+    if (vector->arena->top + vector->element_size > vector->arena->capacity) {
+        Arena* arena_bigger = arena_alloc_create(2*vector->arena->capacity);
+        if (!arena_bigger) {
             return 0;
         }
-        memcpy(new_buffer, vector->buffer, vector->top);
-        free(vector->buffer);
-        vector->capacity *= 2;
-        vector->buffer = new_buffer;
+        void* new_alloc = arena_alloc_copy(arena_bigger, vector->arena);
+        if (!new_alloc) {
+            arena_alloc_free(arena_bigger);
+            return 0;
+        }
+        arena_alloc_free(vector->arena);
+        vector->arena = arena_bigger;
     }
-    void* allocated = memcpy((void*)(vector->buffer + vector->top), data, vector->element_size);
-    vector->top += vector->element_size;
-    return allocated;
+    return arena_alloc_push_struct_unaligned(vector->arena, data, vector->element_size);
 }
 
 void vector_alloc_pop(Vector* vector) {
-    if (vector) {
-        if (vector->buffer && vector->top>=vector->element_size) {
-            vector->top -= vector->element_size;
-            memset((void*)(vector->buffer + vector->top), 0, vector->element_size);
-        }
+    if (!vector) {
+        return;
     }
+    arena_alloc_pop_by(vector->arena, vector->element_size);
+}
+
+void vector_alloc_pop_zero(Vector* vector) {
+    if (!vector) {
+        return;
+    }
+    arena_alloc_pop_by_zero(vector->arena, vector->element_size);
+}
+
+void vector_alloc_clear(Vector* vector) {
+    if (!vector) {
+        return;
+    }
+    arena_alloc_reset(vector->arena);
+}
+
+void vector_alloc_clear_zero(Vector* vector) {
+    if (!vector) {
+        return;
+    }
+    arena_alloc_reset_zero(vector->arena);
 }
 
 void vector_alloc_free(Vector* vector) {
     if (vector) {
-        if (vector->buffer) {
-            free(vector->buffer);
-        }
-        free(vector);
+        arena_alloc_free(vector->arena);
+        os_memory_free(vector, sizeof(Vector));
     }
-}
-
-void vector_alloc_trim(Vector* vector) {
-    if (vector->top == vector->capacity) {
-        return;
-    }
-    u8* new_buffer = (u8*)malloc(vector->top);
-    memcpy((void*)new_buffer, (void*)vector->buffer, vector->top);
-    free(vector->buffer);
-    vector->buffer = new_buffer;
-    vector->capacity = vector->top;
 }
 
 u64 vector_alloc_count(Vector* vector) {
-    if (vector) {
-        return vector->top / vector->element_size;
+    if (!vector) {
+        return 0;
     }
-    return 0;
+    u64 used = arena_alloc_used(vector->arena);
+    return used / vector->element_size;
 }
 
 void* vector_alloc_get(Vector* vector, u64 index) {
-    if (index*vector->element_size < vector->top) {
-        return vector->buffer + index*vector->element_size;
+    if (!vector) {
+        return 0;
     }
-    return 0;
-}
-
-void* vector_alloc_set(Vector* vector, u64 index, void* data) {
-    if (index<vector->top) {
-        memcpy((void*)(vector->buffer + index*vector->element_size), data, vector->element_size);
-        return vector->buffer + index*vector->element_size;
-    }
-    return 0;
+    return arena_alloc_get(vector->arena, vector->element_size * index);
 }
 //==============================
 

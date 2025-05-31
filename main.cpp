@@ -20,11 +20,12 @@ int main() {
     char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
-    Arena* global_arena = arena_alloc_create(10*MiB);
-
+    Arena* global_arena = arena_alloc_create(1*GiB);
+    Arena* frame_arena = arena_alloc_create(1*GiB);
+    Arena* scene_arena = arena_alloc_create(1*GiB);
 #if 1
     char* file_path = "assets/backpack/backpack.obj";
-    Model* model = read_model_file(global_arena, file_path);
+    Model* model = read_model_file(scene_arena, file_path);
 
     const u32 w = 1024;
     const u32 h = 768;
@@ -55,6 +56,7 @@ int main() {
 
     free_model(model);
     free(win.buffer);
+    free(zbuffer);
 #endif
 
     char done_msg[] = "Done doing something!\n";
@@ -63,5 +65,7 @@ int main() {
     // No need
     if (true) {
         arena_alloc_free(global_arena);
+        arena_alloc_free(frame_arena);
+        arena_alloc_free(scene_arena);
     }
 }
