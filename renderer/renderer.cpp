@@ -55,7 +55,7 @@ Arena* read_file(Arena* arena, char* file_path) {
         void* loc = arena_alloc_push(arena, chunk_size);
         bytes_read = fread(loc, 1, chunk_size, file);
         if (bytes_read < chunk_size && ferror(file)) {
-            printf("Failed while reading the file: %s!\n", file);
+            printf("Failed while reading the file: %s!\n", file_path);
             arena_alloc_pop_by(arena, chunk_size - bytes_read);
             return 0;
         }
