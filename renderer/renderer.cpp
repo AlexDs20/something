@@ -39,20 +39,25 @@ Arena* read_file(Arena* arena, char* file_path) {
 
     u64 chunk_size = 4*KiB;
     u64 bytes_read = 0;
+    u8* first_loc = 0;
     do {
-        // Allocate more if needed
-        if (arena_alloc_remaining(arena) < chunk_size) {
-            Arena* arena2 = arena_alloc_create(2*arena->capacity);
-            if (!arena2) {
-                printf("Could not allocate enough memory!\n");
-                return 0;
-            }
-            arena_alloc_copy(arena2, arena);
-            arena_alloc_free(arena);
-            arena = arena2;
-        }
+        // This should not happen here but in arena_alloc_push_unaligned
+        // // Allocate more if needed
+        // if (arena_alloc_remaining(arena) < chunk_size) {
+        //     Arena* arena2 = arena_alloc_create(2*arena->capacity);
+        //     if (!arena2) {
+        //         printf("Could not allocate enough memory!\n");
+        //         return 0;
+        //     }
+        //     arena_alloc_copy(arena2, arena);
+        //     arena_alloc_free(arena);
+        //     arena = arena2;
+        // }
 
-        void* loc = arena_alloc_push(arena, chunk_size);
+        void* loc = arena_alloc_push_unaligned(arena, chunk_size);
+        if (!first_loc) {
+            first_loc = (u8*)loc;
+        }
         bytes_read = fread(loc, 1, chunk_size, file);
         if (bytes_read < chunk_size && ferror(file)) {
             printf("Failed while reading the file: %s!\n", file_path);
@@ -98,10 +103,15 @@ Model* parse_obj_content(Arena* arena, Arena* file) {
     u64 end_line = 0;
     u64 size_line = 0;
 
-    Vector* vertices     = vector_alloc_create(1000, sizeof(Vertex));
-    Vector* tex_coords   = vector_alloc_create(1000, sizeof(TexCoord));
-    Vector* normals      = vector_alloc_create(1000, sizeof(Normal));
-    Vector* faces        = vector_alloc_create(1000, sizeof(Face));
+    Arena* vertices_arena = arena_alloc_create(1*GiB);
+    Arena* tex_coords_arena = arena_alloc_create(1*GiB);
+    Arena* normals_arena = arena_alloc_create(1*GiB);
+    Arena* faces_arena = arena_alloc_create(1*GiB);
+
+    Vector* vertices   = vector_alloc_create(vertices_arena, sizeof(Vertex));
+    Vector* tex_coords = vector_alloc_create(tex_coords_arena, sizeof(TexCoord));
+    Vector* normals    = vector_alloc_create(normals_arena, sizeof(Normal));
+    Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
 
     u32 line_buffer_length = 128;
     char* line_buffer = (char*)malloc(line_buffer_length);
@@ -175,26 +185,26 @@ Model* parse_obj_content(Arena* arena, Arena* file) {
 
     free(line_buffer);
 
-    Model* model = (Model*)malloc(sizeof(Model));
-    model->vertices = vertices;
-    model->faces = faces;
-    model->normals = normals;
-    model->tex_coords = tex_coords;
-    return model;
-}
+    Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
 
-void free_model(Model* model) {
-    vector_alloc_free(model->tex_coords);
-    vector_alloc_free(model->vertices);
-    vector_alloc_free(model->faces);
-    vector_alloc_free(model->normals);
-    free(model);
+    model->vertices = vector_alloc_copy_to_arena(arena, vertices);
+    model->faces = vector_alloc_copy_to_arena(arena, faces);
+    model->normals = vector_alloc_copy_to_arena(arena, normals);
+    model->tex_coords = vector_alloc_copy_to_arena(arena, tex_coords);
+
+    arena_alloc_free(vertices_arena);
+    arena_alloc_free(tex_coords_arena);
+    arena_alloc_free(normals_arena);
+    arena_alloc_free(faces_arena);
+
+    return model;
 }
 
 Model* read_model_file(Arena* arena, char* file_path) {
     Arena* file_arena = arena_alloc_create(1*GiB);
     read_file(file_arena, file_path);
     Model* model = parse_obj_content(arena, file_arena);
+    arena_alloc_free(file_arena);
     return model;
 }
 

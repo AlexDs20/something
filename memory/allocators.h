@@ -46,6 +46,7 @@ void* arena_alloc_copy(Arena* dest, Arena* src);
 u64 arena_alloc_checkpoint(Arena* arena);
 void arena_alloc_restore(Arena* arena, u64 checkpoint);
 
+void* arena_alloc_align(Arena* arena);
 void arena_debug_map(Arena* arena, u64 width);
 void arena_debug_print(Arena* arena);
 
@@ -55,10 +56,12 @@ void arena_debug_print(Arena* arena);
 
 typedef struct {
     Arena* arena;
+    u8* buffer;
+    u64 count;
     u64 element_size;
 } Vector;
 
-Vector* vector_alloc_create(u64 n, u64 size);
+Vector* vector_alloc_create(Arena* arena, u64 size);
 void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);
 void vector_alloc_pop_zero(Vector* vector);
@@ -67,5 +70,6 @@ void vector_alloc_clear_zero(Vector* vector);
 void vector_alloc_free(Vector* vector);
 u64 vector_alloc_count(Vector* vector);
 void* vector_alloc_get(Vector* vector, u64 index);
+Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 
 #endif  // _ALLOCATORS_H

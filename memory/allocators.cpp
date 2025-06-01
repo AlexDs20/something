@@ -254,6 +254,13 @@ void arena_alloc_restore(Arena* arena, u64 checkpoint) {
     }
 }
 
+void* arena_alloc_align(Arena* arena) {
+    if (!arena || !arena->buffer) {
+        return 0;
+    }
+    return arena_alloc_push(arena, 0);
+}
+
 void arena_debug_print(Arena* arena) {
     if (!arena) return;
     printf("Arena Debug Info:\n");
@@ -284,56 +291,54 @@ void arena_debug_map(Arena* arena, u64 width) {
     putchar('\n');
 }
 
+
 //==============================
 // Vector
-Vector* vector_alloc_create(u64 n, u64 size) {
-    Arena* arena = arena_alloc_create(n*size);
-    if (!arena) {
+
+Vector* vector_alloc_create(Arena* arena, u64 element_size) {
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    Vector* vector = (Vector*)arena_alloc_push(arena, sizeof(Vector));
+    if (!vector) {
         return 0;
     }
-    MemoryBlock block = os_memory_alloc(sizeof(Vector));
-    if (!block.ptr) {
-        arena_alloc_free(arena);
+    vector->buffer = (u8*)arena_alloc_align(arena);
+    if (!vector->buffer) {
+        arena_alloc_restore(arena, checkpoint);
         return 0;
     }
-    Vector* vector = (Vector*)block.ptr;
+    vector->count = 0;
+    vector->element_size = element_size;
     vector->arena = arena;
-    vector->element_size = size;
     return vector;
 }
 
 void* vector_alloc_push(Vector* vector, void* data) {
-    if (!vector) {
+    void* allocation = arena_alloc_push_struct_unaligned(vector->arena, data, vector->element_size);
+    if (!allocation) {
         return 0;
     }
-    if (vector->arena->top + vector->element_size > vector->arena->capacity) {
-        Arena* arena_bigger = arena_alloc_create(2*vector->arena->capacity);
-        if (!arena_bigger) {
-            return 0;
-        }
-        void* new_alloc = arena_alloc_copy(arena_bigger, vector->arena);
-        if (!new_alloc) {
-            arena_alloc_free(arena_bigger);
-            return 0;
-        }
-        arena_alloc_free(vector->arena);
-        vector->arena = arena_bigger;
-    }
-    return arena_alloc_push_struct_unaligned(vector->arena, data, vector->element_size);
+    vector->count++;
+    return allocation;
 }
 
 void vector_alloc_pop(Vector* vector) {
-    if (!vector) {
+    if (!vector || !vector->arena) {
         return;
     }
-    arena_alloc_pop_by(vector->arena, vector->element_size);
+    if (vector->count > 0) {
+        arena_alloc_pop_by(vector->arena, vector->element_size);
+        vector->count--;
+    }
 }
 
 void vector_alloc_pop_zero(Vector* vector) {
-    if (!vector) {
+    if (!vector || !vector->arena) {
         return;
     }
-    arena_alloc_pop_by_zero(vector->arena, vector->element_size);
+    if (vector->count > 0) {
+        arena_alloc_pop_by_zero(vector->arena, vector->element_size);
+        vector->count--;
+    }
 }
 
 void vector_alloc_clear(Vector* vector) {
@@ -341,6 +346,7 @@ void vector_alloc_clear(Vector* vector) {
         return;
     }
     arena_alloc_reset(vector->arena);
+    vector->count = 0;
 }
 
 void vector_alloc_clear_zero(Vector* vector) {
@@ -348,28 +354,41 @@ void vector_alloc_clear_zero(Vector* vector) {
         return;
     }
     arena_alloc_reset_zero(vector->arena);
-}
-
-void vector_alloc_free(Vector* vector) {
-    if (vector) {
-        arena_alloc_free(vector->arena);
-        os_memory_free(vector, sizeof(Vector));
-    }
+    vector->count = 0;
 }
 
 u64 vector_alloc_count(Vector* vector) {
     if (!vector) {
         return 0;
     }
-    u64 used = arena_alloc_used(vector->arena);
-    return used / vector->element_size;
+    return vector->count;
 }
 
 void* vector_alloc_get(Vector* vector, u64 index) {
     if (!vector) {
         return 0;
     }
-    return arena_alloc_get(vector->arena, vector->element_size * index);
+    void* data = (void*)(vector->buffer + index * vector->element_size);
+    return data;
+}
+
+Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector) {
+    if (!arena || !vector) {
+        return 0;
+    }
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    Vector* new_vector = (Vector*)arena_alloc_push_struct(arena, vector, sizeof(Vector));
+    if (!new_vector) {
+        return 0;
+    }
+    void* new_data = arena_alloc_push_struct(arena, vector->buffer, vector->count*vector->element_size);
+    if (!new_data) {
+        arena_alloc_restore(arena, checkpoint);
+        return 0;
+    }
+    new_vector->buffer = (u8*)new_data;
+    new_vector->arena = arena;
+    return new_vector;
 }
 //==============================
 
