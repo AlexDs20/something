@@ -73,7 +73,7 @@ int toggle_fullscreen(Display* display, Window window) {
     return(0);
 }
 
-Win platform_init_win(unsigned int w, unsigned int h, char* title) {
+Win platform_init_win(Arena* arena, unsigned int w, unsigned int h, char* title) {
     Win win = {};
     win.w = w;
     win.h = h;
@@ -128,28 +128,136 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
 
     // Buffer image
     win.pixel_bytes = 4;
-    win.buffer = (unsigned int*)malloc(win.max_w*win.max_h*win.pixel_bytes);
+    win.buffer = (unsigned int*)arena_alloc_push(arena, win.max_w*win.max_h*win.pixel_bytes);
 
     int offset = 0;
     win.bitmap_pad = 32;
     int bytes_per_line = w*4;
-    win.xim = XCreateImage(win.display, win.visual, win.depth, ZPixmap, offset, (char*)win.buffer, win.w, win.h, win.bitmap_pad, bytes_per_line);
+    win.xim = XCreateImage(win.display, win.visual, win.depth, ZPixmap, offset, NULL, win.w, win.h, win.bitmap_pad, bytes_per_line);
+    win.xim->data = (char*)win.buffer;
 
     win.gc = DefaultGC(win.display, screen);
     XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
 
-    // set_fullscreen(display, window, true);
     win.wm_delete_window = XInternAtom(win.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(win.display, win.window, &win.wm_delete_window, 1);
 
     return(win);
 }
 
-bool platform_handle_events(Win* win) {
+void print_event_type(int event_type) {
+        switch (event_type) {
+            case KeyPress: {
+                printf("\t KeyPress\n");
+            } break;
+            case KeyRelease: {
+                printf("\t KeyRelease\n");
+            } break;
+            case ButtonPress: {
+                printf("\t ButtonPress\n");
+            } break;
+            case ButtonRelease: {
+                printf("\t ButtonRelease\n");
+            } break;
+            case MotionNotify: {
+                printf("\t MotionNotify\n");
+            } break;
+            case EnterNotify: {
+                printf("\t EnterNotify\n");
+            } break;
+            case LeaveNotify: {
+                printf("\t LeaveNotify\n");
+            } break;
+            case FocusIn: {
+                printf("\t FocusIn\n");
+            } break;
+            case FocusOut: {
+                printf("\t FocusOut\n");
+            } break;
+            case KeymapNotify: {
+               printf("\t KeymapNotify\n");
+            } break;
+            case Expose: {
+                printf("\t Expose\n");
+            } break;
+            case GraphicsExpose: {
+                printf("\t GraphicsExpose\n");
+            } break;
+            case NoExpose: {
+                printf("\t NoExpose\n");
+            } break;
+            case VisibilityNotify: {
+                printf("\t VisibilityNotify\n");
+            } break;
+            case CreateNotify: {
+                printf("\t CreateNotify\n");
+            } break;
+            case DestroyNotify: {
+                printf("\t DestroyNotify\n");
+            } break;
+            case UnmapNotify: {
+                printf("\t UnmapNotify\n");
+            } break;
+            case MapNotify: {
+                printf("\t MapNotify\n");
+            } break;
+            case MapRequest: {
+                printf("\t MapRequest\n");
+            } break;
+            case ReparentNotify: {
+                printf("\t ReparentNotify\n");
+            } break;
+            case ConfigureNotify: {
+                printf("\t ConfigureNotify\n");
+            } break;
+            case ConfigureRequest: {
+                printf("\t ConfigureRequest\n");
+            } break;
+            case GravityNotify: {
+                printf("\t GravityNotify\n");
+            } break;
+            case ResizeRequest: {
+                printf("\t ResizeRequest\n");
+            } break;
+            case CirculateNotify: {
+                printf("\t CirculateNotify\n");
+            } break;
+            case CirculateRequest: {
+                printf("\t CirculateRequest\n");
+            } break;
+            case PropertyNotify: {
+                printf("\t PropertyNotify\n");
+            } break;
+            case SelectionClear: {
+                printf("\t SelectionClear\n");
+            } break;
+            case SelectionRequest: {
+                printf("\t SelectionRequest\n");
+            } break;
+            case SelectionNotify: {
+                printf("\t SelectionNotify\n");
+            } break;
+            case ColormapNotify: {
+                printf("\t ColormapNotify\n");
+            } break;
+            case ClientMessage: {
+                printf("\t ClientMessage\n");
+            } break;
+            case MappingNotify: {
+                printf("\t MappingNotify\n");
+            } break;
+            case GenericEvent: {
+               printf("\t GenericEvent\n");
+           } break;
+        }
+}
+
+bool platform_handle_events(Arena* arena, Win* win) {
     int running = 1;
     XEvent event;
     while(XPending(win->display)>0) {
         XNextEvent(win->display, &event);
+        // print_event_type(event.type);
         switch (event.type) {
             case Expose: {
                 XPutImage(win->display, win->window, win->gc, win->xim, 0, 0, 0, 0, win->w, win->h);
@@ -185,11 +293,10 @@ bool platform_handle_events(Win* win) {
                     // set the data to null so that the DestroyImage doesn't free the buffer
                     win->xim->data = 0;
                     XDestroyImage(win->xim);
-                    if (win->w*win->h>win->max_w*win->max_h) {
-                        free(win->buffer);
-                        win->buffer = (unsigned int*)malloc(win->w*win->h*win->pixel_bytes);
-                    }
-                    win->xim = XCreateImage(win->display, win->visual, win->depth, ZPixmap, 0, (char*)win->buffer, win->w, win->h, win->bitmap_pad, win->w*4);
+
+                    win->xim = XCreateImage(win->display, win->visual, win->depth, ZPixmap, 0, NULL, win->w, win->h, win->bitmap_pad, win->w*4);
+                    win->buffer = (unsigned int*)arena_alloc_push(arena, win->w*win->h*win->pixel_bytes);
+                    win->xim->data = (char*)win->buffer;
                 }
             } break;
             case ClientMessage: {
@@ -202,37 +309,11 @@ bool platform_handle_events(Win* win) {
     return(running);
 }
 
-int platform_main() {
-    int w=1024, h=768;
-    char title[] = "Handmade something";
-
-    Win win = platform_init_win(w, h, title);
-
-    bool running = 1;
-    while(running){
-
-        running = platform_handle_events(&win);
-
-
-        // Write over the buffer
-        for (int i=0; i<win.w*win.h; ++i) {
-            unsigned int* p = win.buffer + i;
-            if (i % win.w < win.w / 3) {
-                *p = 0;
-            // } else if (i%win.w>= win.w/3 && i%win.w < 2*win.w/3) {
-            //     *p = 0x00FFFF00;
-            } else {
-                *p = 0x00FF0000;
-            }
-        }
-
-        // Draw the buffer
-        XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
+void platform_cleanup_window(Win win) {
+    if (win.xim) {
+        win.xim->data = NULL; // Prevent XDestroyImage from trying to free arena memory
+        XDestroyImage(win.xim);
     }
-
     XDestroyWindow(win.display, win.window);
-    win.xim->data = 0;
-    XFree(win.xim);
-    free(win.buffer);
-    return(0);
+    XCloseDisplay(win.display);
 }

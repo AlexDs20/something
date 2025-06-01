@@ -33,30 +33,33 @@ int main() {
 
     const u32 bg_color = 0x777777;
 
-    Win win = platform_init_win(w, h, msg);
+    Win win = platform_init_win(frame_arena, w, h, msg);
 
-    f32* zbuffer = (f32*)malloc(win.max_h * win.max_w * sizeof(f32));
     f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
     u32 running = 1;
     while (running) {
-        running = platform_handle_events(&win);
+        // This is kinda ugly...
+        arena_alloc_reset_zero(frame_arena);
+        win.buffer = (u32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(u32));
+        win.xim->data = (char*)win.buffer;
+
+        running = platform_handle_events(frame_arena, &win);
+
+        // And this is uglier...
+        f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
 
         for (int i=0; i<win.h*win.w; i++) {
-            u32* pixel = (u32*)win.buffer + i;
-            *pixel = bg_color;
-            f32* zpixel = (f32*)zbuffer + i;
-            *zpixel = zdefault.f;
+            win.buffer[i] = bg_color;
+            zbuffer[i] = zdefault.f;
         }
+
         // draw_model_wireframe(model, win.w, win.h, win.buffer);
         draw_model(model, win.w, win.h, win.buffer, zbuffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         usleep(16);
     }
-
-    free(win.buffer);
-    free(zbuffer);
 #endif
 
     char done_msg[] = "Done doing something!\n";
@@ -64,6 +67,7 @@ int main() {
 
     // No need
     if (true) {
+        platform_cleanup_window(win);
         arena_alloc_free(global_arena);
         arena_alloc_free(frame_arena);
         arena_alloc_free(scene_arena);

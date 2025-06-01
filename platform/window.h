@@ -3,8 +3,7 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-
-int platform_main();
+#include "memory/allocators.h"
 
 typedef struct {
     int w;
@@ -23,7 +22,8 @@ typedef struct {
     Atom wm_delete_window;
 } Win;
 
-Win platform_init_win(unsigned int w, unsigned int h, char* title);
-bool platform_handle_events(Win* win);
+Win platform_init_win(Arena* frame_arena, unsigned int w, unsigned int h, char* title);
+bool platform_handle_events(Arena* frame_arena, Win* win);
+void platform_cleanup_window(Win win);
 
 #endif // _PLATFORM_WINDOW_H
