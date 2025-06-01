@@ -89,8 +89,13 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size) {
     }
     u64 needed = arena->top + size;
     if (needed > arena->capacity) {
-        printf("Arena overflow. Not enough space left.\n");
-        return 0;
+        // TODO
+        if (arena->resize_method == ARENA_RESIZE_COPY) {
+        } else if (arena->resize_method == ARENA_RESIZE_CHAIN) {
+        } else {
+            printf("Arena overflow. Not enough space left.\n");
+            return 0;
+        }
     }
     if (needed > arena->committed) {
         u64 commit_amount = needed - arena->committed;

@@ -71,7 +71,7 @@ Arena* read_file(Arena* arena, char* file_path) {
     return arena;
 }
 
-Model* parse_obj_content(Arena* file) {
+Model* parse_obj_content(Arena* arena, Arena* file) {
     /*
         From wiki
         symbol meanings:
@@ -192,8 +192,9 @@ void free_model(Model* model) {
 }
 
 Model* read_model_file(Arena* arena, char* file_path) {
-    read_file(arena, file_path);
-    Model* model = parse_obj_content(arena);
+    Arena* file_arena = arena_alloc_create(1*GiB);
+    read_file(file_arena, file_path);
+    Model* model = parse_obj_content(arena, file_arena);
     return model;
 }
 

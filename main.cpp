@@ -21,8 +21,8 @@ int main() {
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
     Arena* global_arena = arena_alloc_create(1*GiB);
-    Arena* frame_arena = arena_alloc_create(1*GiB);
     Arena* scene_arena = arena_alloc_create(1*GiB);
+    Arena* frame_arena = arena_alloc_create(1*GiB);
 #if 1
     char* file_path = "assets/backpack/backpack.obj";
     Model* model = read_model_file(scene_arena, file_path);

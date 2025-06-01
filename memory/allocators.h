@@ -3,11 +3,18 @@
 
 #include "utils/types.h"
 
+typedef enum ARENA_RESIZE_METHOD{
+    ARENA_RESIZE_NONE = 0,
+    ARENA_RESIZE_COPY = 1,
+    ARENA_RESIZE_CHAIN = 2,
+} ARENA_RESIZE_METHOD;
+
 typedef struct {
     u8* buffer;
     u64 capacity;
     u64 top;
     u64 committed;
+    ARENA_RESIZE_METHOD resize_method;
 } Arena;
 
 Arena* arena_alloc_create(u64 capacity);
