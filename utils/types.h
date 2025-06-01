@@ -60,10 +60,9 @@ typedef union {
     s32 data[3];
 } s32x3;
 
-// TODO
-// struct string8 {
-//     u8* buffer;
-//     u64 size;
-// };
+struct string8 {
+    u8* buffer;
+    u64 size;
+};
 
 #endif  // _TYPES_H

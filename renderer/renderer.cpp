@@ -29,40 +29,32 @@ void print(Face* f) {
             );
 }
 
-Arena* read_file(Arena* arena, char* file_path) {
+string8 read_file(Arena* arena, char* file_path) {
     FILE* file = fopen(file_path, "r");
+
+    string8 file_content = {0};
 
     if (!file) {
         printf("fopen %s failed: %s\n", file_path, strerror(errno));
-        return 0;
+        return file_content;
     }
+
+    u64 checkpoint = arena_alloc_checkpoint(arena);
 
     u64 chunk_size = 4*KiB;
     u64 bytes_read = 0;
-    u8* first_loc = 0;
-    do {
-        // This should not happen here but in arena_alloc_push_unaligned
-        // // Allocate more if needed
-        // if (arena_alloc_remaining(arena) < chunk_size) {
-        //     Arena* arena2 = arena_alloc_create(2*arena->capacity);
-        //     if (!arena2) {
-        //         printf("Could not allocate enough memory!\n");
-        //         return 0;
-        //     }
-        //     arena_alloc_copy(arena2, arena);
-        //     arena_alloc_free(arena);
-        //     arena = arena2;
-        // }
+    u8* first_loc = (u8*)arena_alloc_align(arena);
 
+    do {
         void* loc = arena_alloc_push_unaligned(arena, chunk_size);
-        if (!first_loc) {
-            first_loc = (u8*)loc;
-        }
         bytes_read = fread(loc, 1, chunk_size, file);
-        if (bytes_read < chunk_size && ferror(file)) {
-            printf("Failed while reading the file: %s!\n", file_path);
+        if (bytes_read < chunk_size) {
+            if (ferror(file)) {
+                printf("Failed while reading the file: %s!\n", file_path);
+                arena_alloc_restore(arena, checkpoint);
+                return file_content;
+            }
             arena_alloc_pop_by(arena, chunk_size - bytes_read);
-            return 0;
         }
 
     } while (bytes_read == chunk_size);
@@ -70,13 +62,16 @@ Arena* read_file(Arena* arena, char* file_path) {
     int error = fclose(file);
     if (error) {
         printf("fclose failed: %s\n", strerror(errno));
-        arena_alloc_free(arena);
-        return 0;
+        arena_alloc_restore(arena, checkpoint);
+        return file_content;
     }
-    return arena;
+
+    file_content.buffer = first_loc;
+    file_content.size = (u64)((arena->buffer+arena->top) - first_loc);
+    return file_content;
 }
 
-Model* parse_obj_content(Arena* arena, Arena* file) {
+Model* parse_obj_content(Arena* arena, string8 file) {
     /*
         From wiki
         symbol meanings:
@@ -115,8 +110,8 @@ Model* parse_obj_content(Arena* arena, Arena* file) {
 
     u32 line_buffer_length = 128;
     char* line_buffer = (char*)malloc(line_buffer_length);
-    for (u64 i=0; i<file->top; i++) {
-        if (file->buffer[i] == '\n' || (i==file->top-1)) {
+    for (u64 i=0; i<file.size; i++) {
+        if (file.buffer[i] == '\n' || (i==file.size-1)) {
             // Get current line
             end_line = i;
             size_line = end_line - start_line + 1;
@@ -128,7 +123,7 @@ Model* parse_obj_content(Arena* arena, Arena* file) {
                     line_buffer = (char*)malloc(2*size_line);
                     line_buffer_length = 2*size_line;
                 }
-                memcpy((void*)line_buffer, (void*)&file->buffer[start_line], size_line);
+                memcpy((void*)line_buffer, (void*)&file.buffer[start_line], size_line);
                 line_buffer[size_line] = '\0';
 
                 // Process the line
@@ -202,8 +197,11 @@ Model* parse_obj_content(Arena* arena, Arena* file) {
 
 Model* read_model_file(Arena* arena, char* file_path) {
     Arena* file_arena = arena_alloc_create(1*GiB);
-    read_file(file_arena, file_path);
-    Model* model = parse_obj_content(arena, file_arena);
+    Model* model = 0;
+
+    string8 file_content = read_file(file_arena, file_path);
+    model = parse_obj_content(arena, file_content);
+
     arena_alloc_free(file_arena);
     return model;
 }
