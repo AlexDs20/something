@@ -94,6 +94,7 @@ Model* parse_obj_content(Arena* arena, string8 file) {
 
         Using fgets()? and sscanf()?
     */
+    u64 checkpoint = arena_alloc_checkpoint(arena);
     u64 start_line = 0;
     u64 end_line = 0;
     u64 size_line = 0;
@@ -109,7 +110,8 @@ Model* parse_obj_content(Arena* arena, string8 file) {
     Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
 
     u32 line_buffer_length = 128;
-    char* line_buffer = (char*)malloc(line_buffer_length);
+    char* line_buffer = (char*)arena_alloc_push(arena, line_buffer_length);
+
     for (u64 i=0; i<file.size; i++) {
         if (file.buffer[i] == '\n' || (i==file.size-1)) {
             // Get current line
@@ -119,9 +121,9 @@ Model* parse_obj_content(Arena* arena, string8 file) {
             if (size_line >= 3) {
                 // Make line_buffer bigger if needed
                 if (size_line >= line_buffer_length) {         // = because we add a \0 at the end of the string
-                    free(line_buffer);
-                    line_buffer = (char*)malloc(2*size_line);
+                    arena_alloc_restore(arena, checkpoint);
                     line_buffer_length = 2*size_line;
+                    line_buffer = (char*)arena_alloc_push(arena, line_buffer_length);
                 }
                 memcpy((void*)line_buffer, (void*)&file.buffer[start_line], size_line);
                 line_buffer[size_line] = '\0';
@@ -177,8 +179,7 @@ Model* parse_obj_content(Arena* arena, string8 file) {
             start_line = i+1;
         }
     }
-
-    free(line_buffer);
+    arena_alloc_restore(arena, checkpoint);
 
     Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
 
