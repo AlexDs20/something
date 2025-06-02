@@ -12,8 +12,7 @@ typedef struct {
     Visual* visual;
     int depth;
     Window window;
-    int max_w;
-    int max_h;
+    Arena* arena;
     char pixel_bytes;
     unsigned int* buffer;
     int bitmap_pad;
@@ -22,8 +21,8 @@ typedef struct {
     Atom wm_delete_window;
 } Win;
 
-Win platform_init_win(Arena* frame_arena, unsigned int w, unsigned int h, char* title);
-bool platform_handle_events(Arena* frame_arena, Win* win);
+Win platform_init_win(unsigned int w, unsigned int h, char* title);
+bool platform_handle_events(Win* win);
 void platform_cleanup_window(Win win);
 
 #endif // _PLATFORM_WINDOW_H

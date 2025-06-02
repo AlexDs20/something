@@ -10,6 +10,7 @@
 #include <X11/extensions/XShm.h>
 
 #include "platform/window.h"
+#include "utils/defines.h"
 
 // https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
 
@@ -73,7 +74,7 @@ int toggle_fullscreen(Display* display, Window window) {
     return(0);
 }
 
-Win platform_init_win(Arena* arena, unsigned int w, unsigned int h, char* title) {
+Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     Win win = {};
     win.w = w;
     win.h = h;
@@ -123,12 +124,12 @@ Win platform_init_win(Arena* arena, unsigned int w, unsigned int h, char* title)
 
     XWindowAttributes wa;
     XGetWindowAttributes(win.display, root, &wa);
-    win.max_w = wa.width;
-    win.max_h = wa.height;
+
+    win.arena = arena_alloc_create(1*GiB);
 
     // Buffer image
     win.pixel_bytes = 4;
-    win.buffer = (unsigned int*)arena_alloc_push(arena, win.max_w*win.max_h*win.pixel_bytes);
+    win.buffer = (unsigned int*)arena_alloc_push(win.arena, wa.width*wa.height*win.pixel_bytes);
 
     int offset = 0;
     win.bitmap_pad = 32;
@@ -252,7 +253,7 @@ void print_event_type(int event_type) {
         }
 }
 
-bool platform_handle_events(Arena* arena, Win* win) {
+bool platform_handle_events(Win* win) {
     int running = 1;
     XEvent event;
     while(XPending(win->display)>0) {
@@ -295,7 +296,8 @@ bool platform_handle_events(Arena* arena, Win* win) {
                     XDestroyImage(win->xim);
 
                     win->xim = XCreateImage(win->display, win->visual, win->depth, ZPixmap, 0, NULL, win->w, win->h, win->bitmap_pad, win->w*4);
-                    win->buffer = (unsigned int*)arena_alloc_push(arena, win->w*win->h*win->pixel_bytes);
+                    arena_alloc_reset(win->arena);
+                    win->buffer = (unsigned int*)arena_alloc_push(win->arena, win->w*win->h*win->pixel_bytes);
                     win->xim->data = (char*)win->buffer;
                 }
             } break;
@@ -314,6 +316,7 @@ void platform_cleanup_window(Win win) {
         win.xim->data = NULL; // Prevent XDestroyImage from trying to free arena memory
         XDestroyImage(win.xim);
     }
+    arena_alloc_free(win.arena);
     XDestroyWindow(win.display, win.window);
     XCloseDisplay(win.display);
 }

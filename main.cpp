@@ -33,18 +33,14 @@ int main() {
 
     const u32 bg_color = 0x777777;
 
-    Win win = platform_init_win(frame_arena, w, h, msg);
+    Win win = platform_init_win(w, h, msg);
 
     f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
     u32 running = 1;
     while (running) {
-        // This is kinda ugly...
         arena_alloc_reset_zero(frame_arena);
-        win.buffer = (u32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(u32));
-        win.xim->data = (char*)win.buffer;
-
-        running = platform_handle_events(frame_arena, &win);
+        running = platform_handle_events(&win);
 
         // And this is uglier...
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
