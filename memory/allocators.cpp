@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "utils/defines.h"
 #include "memory/allocators.h"
 #include "allocators.h"
 #include "utils/types.h"
@@ -291,6 +292,36 @@ void arena_debug_map(Arena* arena, u64 width) {
     putchar('\n');
 }
 
+#if not defined(LOCAL_ARENA_POOL_COUNT)
+#define LOCAL_ARENA_POOL_COUNT 10
+#endif
+#define LOCAL_ARENA_CAPACITY (1*GiB)
+global LocalArena local_arena_pool[LOCAL_ARENA_POOL_COUNT] = {0};
+
+LocalArena* local_arena_alloc_create() {
+    LocalArena* out = 0;
+    for (u64 i=0; i<LOCAL_ARENA_POOL_COUNT; i++) {
+        // Initialize the local arena if it hasn't been done yet
+        if (local_arena_pool[i].arena == 0) {
+            local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
+        }
+        if (!local_arena_pool[i].used) {
+            out = &local_arena_pool[i];
+            break;
+        }
+    }
+    if (out) {
+        out->used = 1;
+    } else {
+        printf("No more local arenas available. Used: %d of %d.\n", LOCAL_ARENA_POOL_COUNT, LOCAL_ARENA_POOL_COUNT);
+    }
+    return out;
+}
+
+void local_arena_alloc_reset(LocalArena* local_arena) {
+    local_arena->used = 0;
+    arena_alloc_reset_zero(local_arena->arena);
+}
 
 //==============================
 // Vector

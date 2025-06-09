@@ -50,6 +50,13 @@ void* arena_alloc_align(Arena* arena);
 void arena_debug_map(Arena* arena, u64 width);
 void arena_debug_print(Arena* arena);
 
+typedef struct {
+    Arena* arena;
+    bool used;
+} LocalArena;
+
+LocalArena* local_arena_alloc_create();
+void local_arena_alloc_reset(LocalArena* local_arena);
 
 //==============================
 // Vector
