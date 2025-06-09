@@ -50,14 +50,22 @@ f32x3 string_to_f32x3(Arena* arena, string8 data) {
 }
 
 
-Material* parse_mtl_file_content(Arena* arena, string8 content) {
-    Material* material = (Material*)arena_alloc_push(arena, sizeof(Material));
+Material* read_mtl_file(Arena* arena, string8 file_path) {
     LocalArena* local_arena = local_arena_alloc_create();
+
+    string8 content = read_file(local_arena->arena, file_path);
+
+    Material* material = (Material*)arena_alloc_push(arena, sizeof(Material));
 
     u64 line_start = 0;
     for (u64 i=0; i<content.size; i++) {
         if ((content.buffer[i] == '\n') || (i == content.size-1)) {
-            string8 line = string_substring(content, line_start, i);
+            u64 line_end = i-1;
+            if (i == content.size-1) {
+                line_end = i;
+            }
+            string8 line = string_substring(content, line_start, line_end+1);
+
             if (string_starts_with(line, "newmtl ")) {
                 string8 mtl_name = string_substring(line, 7, line.size);
                 string8 name = string_copy_to_arena(arena, mtl_name);
@@ -91,23 +99,11 @@ Material* parse_mtl_file_content(Arena* arena, string8 content) {
                 char* c_data = string_to_cstr(local_arena->arena, data);
                 material->illum = atol(c_data);
             } else if (string_starts_with(line, "map_Kd ")) {
-                string8 filename = string_substring(line, 7, line.size);
-                // TODO(alex): Fix filepath
-                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
-                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Kd = read_image_file(arena, complete_filename);
+                material->map_Kd = read_image_file(arena, file_path);
             } else if (string_starts_with(line, "map_Bump ")) {
-                string8 filename = string_substring(line, 9, line.size);
-                // TODO(alex): Fix filepath
-                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
-                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Bump = read_image_file(arena, complete_filename);
+                material->map_Bump = read_image_file(arena, file_path);
             } else if (string_starts_with(line, "map_Ks ")) {
-                string8 filename = string_substring(line, 7, line.size);
-                // TODO(alex): Fix filepath
-                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
-                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Ks = read_image_file(arena, complete_filename);
+                material->map_Ks = read_image_file(arena, file_path);
             }
             line_start = i+1;
         }
@@ -117,30 +113,35 @@ Material* parse_mtl_file_content(Arena* arena, string8 content) {
     return material;
 }
 
-Model* parse_obj_file_content(Arena* arena, string8 file) {
-    /*
-        From wiki
-        symbol meanings:
-        # -> comments
-        v x y z [w=1] -> vertex coords
-        vn x y z -> vertex normals (seems to have n instead)
-        vt u [v=0] [w=0] -> texture coordinates 2D sometimes 3D
-        vp u [v] [w] -> vertex parameter
-        f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ... -> face definition usually a triangle     index 1-based not all are present (vt vn)
-        l a b c d e -> line element
+/*
+    From wiki
+    symbol meanings:
+    # -> comments
+    v x y z [w=1] -> vertex coords
+    vn x y z -> vertex normals (seems to have n instead)
+    vt u [v=0] [w=0] -> texture coordinates 2D sometimes 3D
+    vp u [v] [w] -> vertex parameter
+    f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ... -> face definition usually a triangle     index 1-based not all are present (vt vn)
+    l a b c d e -> line element
 
-        mtllib [external .mtl file name]
-        usemtl [material name]
+    mtllib [external .mtl file name]
+    usemtl [material name]
 
-        o => object name
-         g => group name
+    o => object name
+     g => group name
 
-        s 1  => smooth shading
-         s off
+    s 1  => smooth shading
+     s off
 
-        Using fgets()? and sscanf()?
-    */
-    u64 checkpoint = arena_alloc_checkpoint(arena);
+    Using fgets()? and sscanf()?
+*/
+Model* read_obj_model_file(Arena* arena, string8 file_path) {
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    string8 dirname = string_dirname(file_path);
+    string8 file = read_file(local_arena->arena, file_path);
+
+    u64 checkpoint = arena_alloc_checkpoint(local_arena->arena);
     u64 start_line = 0;
     u64 end_line = 0;
     u64 size_line = 0;
@@ -156,51 +157,55 @@ Model* parse_obj_file_content(Arena* arena, string8 file) {
     Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
 
     u32 line_buffer_length = 128;
-    char* line_buffer = (char*)arena_alloc_push(arena, line_buffer_length);
+    char* line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
     string8 mat_file = {0};
 
     for (u64 i=0; i<file.size; i++) {
         if (file.buffer[i] == '\n' || (i==file.size-1)) {
             // Get current line
-            end_line = i;
+            end_line = i-1;
+            if (i == file.size-1) {
+                end_line = i;
+            }
             size_line = end_line - start_line + 1;
 
             if (size_line >= 3) {
                 // Make line_buffer bigger if needed
                 if (size_line >= line_buffer_length) {         // = because we add a \0 at the end of the string
-                    arena_alloc_restore(arena, checkpoint);
+                    arena_alloc_restore(local_arena->arena, checkpoint);
                     line_buffer_length = 2*size_line;
-                    line_buffer = (char*)arena_alloc_push(arena, line_buffer_length);
+                    line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
                 }
                 memcpy((void*)line_buffer, (void*)&file.buffer[start_line], size_line);
                 line_buffer[size_line] = '\0';
 
                 // Process the line
                 char first = line_buffer[0];
+                char second = line_buffer[1];
+                char third = line_buffer[2];
                 if (first == 'v') {                                                 // Could be v vn vt vp
-                    char second = line_buffer[1];
                     if (second == ' ') {
                         // process vertex
                         Vertex v = {};
-                        sscanf(line_buffer, "v %f %f %f\n", &v.x, &v.y, &v.z);
+                        sscanf(line_buffer, "v %f %f %f", &v.x, &v.y, &v.z);
                         vector_alloc_push(vertices, (void*)&v);
                     } else if (second == 'n') {
                         // process normal
                         Normal n = {};
-                        sscanf(line_buffer, "vn %f %f %f\n", &n.x, &n.y, &n.z);
+                        sscanf(line_buffer, "vn %f %f %f", &n.x, &n.y, &n.z);
                         vector_alloc_push(normals, (void*)&n);
 
                     } else if (second == 't') {
                         // process texture
                         TexCoord t = {};
-                        sscanf(line_buffer, "vt %f %f\n", &t.u, &t.v);
+                        sscanf(line_buffer, "vt %f %f", &t.u, &t.v);
                         vector_alloc_push(tex_coords, (void*)&t);
                     } else if (second == 'p') {
                         // process vertex parameter
                     }
                 } else if (first == 'f') {
                     Face f = {};
-                    sscanf(line_buffer, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
+                    sscanf(line_buffer, "f %d/%d/%d %d/%d/%d %d/%d/%d",
                             &f.v[0], &f.vt[0], &f.vn[0],
                             &f.v[1], &f.vt[1], &f.vn[1],
                             &f.v[2], &f.vt[2], &f.vn[2]);
@@ -211,14 +216,13 @@ Model* parse_obj_file_content(Arena* arena, string8 file) {
                 } else if (first == 'g') {                                          // Group
                     // process group
                 } else if (first == 's') {                                          // smooth shading
-                    char third = line_buffer[2];
                     if (third == 'o') {
                         // process shading off
                     } else {
                         // process shading (intensity?)
                     }
                 } else if (first == 'm') {                                          // mtllib (external .mtl file name)
-                    string8 l = { .buffer=(u8*)&file.buffer[start_line], .size=size_line-1 };       // -1 removes \n
+                    string8 l = { .buffer=(u8*)&file.buffer[start_line], .size=size_line };
                     char tmp[] = "mtllib";
                     string8 mtllib = { .buffer=(u8*)&tmp[0], .size=6 };
 
@@ -233,20 +237,14 @@ Model* parse_obj_file_content(Arena* arena, string8 file) {
             start_line = i+1;
         }
     }
-    arena_alloc_restore(arena, checkpoint);
+    arena_alloc_restore(local_arena->arena, checkpoint);
 
     // If mtllib => read and parse
     Material* material = 0;
     if (mat_file.buffer) {
-        LocalArena* local_arena = local_arena_alloc_create();
-
-        string8 obj_file_string = string_from_cstr(local_arena->arena, "assets/backpack/backpack.mtl");
-        string8 dirname = string_dirname(obj_file_string);
         string8 complete_mat_path = string_join_strings(local_arena->arena, dirname, mat_file);
-        string8 mtlcontent = read_file(local_arena->arena, complete_mat_path);
 
-        material = parse_mtl_file_content(arena, mtlcontent);
-        local_arena_alloc_reset(local_arena);
+        material = read_mtl_file(arena, complete_mat_path);
 
         string_print(material->name);
         printf("\n");
@@ -270,15 +268,6 @@ Model* parse_obj_file_content(Arena* arena, string8 file) {
     arena_alloc_free(tex_coords_arena);
     arena_alloc_free(normals_arena);
     arena_alloc_free(faces_arena);
-
-    return model;
-}
-
-Model* read_obj_model_file(Arena* arena, string8 file_path) {
-    LocalArena* local_arena = local_arena_alloc_create();
-
-    string8 file_content = read_file(local_arena->arena, file_path);
-    Model* model = parse_obj_file_content(arena, file_content);
 
     local_arena_alloc_reset(local_arena);
     return model;
@@ -440,7 +429,6 @@ void fill_triangle_line_sweep(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vert
     }
 }
 
-
 void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
     if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
     if (a->y>b->y) swap_vertices(a, b);
@@ -508,10 +496,10 @@ typedef union {
         f32 bottom;
     };
     f32 data[4];
-} Bboxf;
+} Bboxf32;
 
 void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
-    Bboxf bbox = {};
+    Bboxf32 bbox = {};
     bbox.left    = min(a->x, min(b->x, c->x));
     bbox.right   = max(a->x, max(b->x, c->x));
     bbox.bottom  = min(a->y, min(b->y, c->y));
