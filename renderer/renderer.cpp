@@ -1,13 +1,14 @@
-#include <cstdlib>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-// #include <math.h>
 
 #include "renderer/renderer.h"
 #include "utils/libmath.h"
+#include "utils/libstring.h"
+#include "utils/libimages.h"
 #include "utils/defines.h"
+#include "platform/io.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -29,49 +30,94 @@ void print(Face* f) {
             );
 }
 
-string8 read_file(Arena* arena, char* file_path) {
-    FILE* file = fopen(file_path, "r");
 
-    string8 file_content = {0};
+f32x3 string_to_f32x3(Arena* arena, string8 data) {
+    f32x3 out = {0};
+    u64 space = string_find_first(data, ' ');
+    string8 r = string_substring(data, 0, space);
+    out.r = atof(string_to_cstr(arena, r));
 
-    if (!file) {
-        printf("fopen %s failed: %s\n", file_path, strerror(errno));
-        return file_content;
-    }
+    string_move_forward(&data, space+1);
+    space = string_find_first(data, ' ');
+    string8 g = string_substring(data, 0, space);
+    out.g = atof(string_to_cstr(arena, g));
 
-    u64 checkpoint = arena_alloc_checkpoint(arena);
-
-    u64 chunk_size = 4*KiB;
-    u64 bytes_read = 0;
-    u8* first_loc = (u8*)arena_alloc_align(arena);
-
-    do {
-        void* loc = arena_alloc_push_unaligned(arena, chunk_size);
-        bytes_read = fread(loc, 1, chunk_size, file);
-        if (bytes_read < chunk_size) {
-            if (ferror(file)) {
-                printf("Failed while reading the file: %s!\n", file_path);
-                arena_alloc_restore(arena, checkpoint);
-                return file_content;
-            }
-            arena_alloc_pop_by(arena, chunk_size - bytes_read);
-        }
-
-    } while (bytes_read == chunk_size);
-
-    int error = fclose(file);
-    if (error) {
-        printf("fclose failed: %s\n", strerror(errno));
-        arena_alloc_restore(arena, checkpoint);
-        return file_content;
-    }
-
-    file_content.buffer = first_loc;
-    file_content.size = (u64)((arena->buffer+arena->top) - first_loc);
-    return file_content;
+    string_move_forward(&data, space+1);
+    space = string_find_first(data, ' ');
+    string8 b = string_substring(data, 0, space);
+    out.b = atof(string_to_cstr(arena, b));
+    return out;
 }
 
-Model* parse_obj_content(Arena* arena, string8 file) {
+
+Material* parse_mtl_file_content(Arena* arena, string8 content) {
+    Material* material = (Material*)arena_alloc_push(arena, sizeof(Material));
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    u64 line_start = 0;
+    for (u64 i=0; i<content.size; i++) {
+        if ((content.buffer[i] == '\n') || (i == content.size-1)) {
+            string8 line = string_substring(content, line_start, i);
+            if (string_starts_with(line, "newmtl ")) {
+                string8 mtl_name = string_substring(line, 7, line.size);
+                string8 name = string_copy_to_arena(arena, mtl_name);
+                material->name = name;
+            } else if (string_starts_with(line, "Ns ")) {
+                string8 data = string_substring(line, 3, line.size);
+                char* c_data = string_to_cstr(local_arena->arena, data);
+                material->Ns = atof(c_data);
+            } else if (string_starts_with(line, "Ka ")) {
+                string8 data = string_substring(line, 3, line.size);
+                material->Ka = string_to_f32x3(arena, data);
+            } else if (string_starts_with(line, "Kd ")) {
+                string8 data = string_substring(line, 3, line.size);
+                material->Kd = string_to_f32x3(arena, data);
+            } else if (string_starts_with(line, "Ks ")) {
+                string8 data = string_substring(line, 3, line.size);
+                material->Ks = string_to_f32x3(arena, data);
+            } else if (string_starts_with(line, "Ke ")) {
+                string8 data = string_substring(line, 3, line.size);
+                material->Ke = string_to_f32x3(arena, data);
+            } else if (string_starts_with(line, "Ni ")) {
+                string8 data = string_substring(line, 3, line.size);
+                char* c_data = string_to_cstr(local_arena->arena, data);
+                material->Ni = atof(c_data);
+            } else if (string_starts_with(line, "d ")) {
+                string8 data = string_substring(line, 2, line.size);
+                char* c_data = string_to_cstr(local_arena->arena, data);
+                material->d = atof(c_data);
+            } else if (string_starts_with(line, "illum ")) {
+                string8 data = string_substring(line, 6, line.size);
+                char* c_data = string_to_cstr(local_arena->arena, data);
+                material->illum = atol(c_data);
+            } else if (string_starts_with(line, "map_Kd ")) {
+                string8 filename = string_substring(line, 7, line.size);
+                // TODO(alex): Fix filepath
+                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
+                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Kd = read_image_file(arena, complete_filename);
+            } else if (string_starts_with(line, "map_Bump ")) {
+                string8 filename = string_substring(line, 9, line.size);
+                // TODO(alex): Fix filepath
+                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
+                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Bump = read_image_file(arena, complete_filename);
+            } else if (string_starts_with(line, "map_Ks ")) {
+                string8 filename = string_substring(line, 7, line.size);
+                // TODO(alex): Fix filepath
+                string8 dirname = string_from_cstr(local_arena->arena, "assets/backpack/");
+                string8 complete_filename = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Ks = read_image_file(arena, complete_filename);
+            }
+            line_start = i+1;
+        }
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return material;
+}
+
+Model* parse_obj_file_content(Arena* arena, string8 file) {
     /*
         From wiki
         symbol meanings:
@@ -111,6 +157,7 @@ Model* parse_obj_content(Arena* arena, string8 file) {
 
     u32 line_buffer_length = 128;
     char* line_buffer = (char*)arena_alloc_push(arena, line_buffer_length);
+    string8 mat_file = {0};
 
     for (u64 i=0; i<file.size; i++) {
         if (file.buffer[i] == '\n' || (i==file.size-1)) {
@@ -171,6 +218,13 @@ Model* parse_obj_content(Arena* arena, string8 file) {
                         // process shading (intensity?)
                     }
                 } else if (first == 'm') {                                          // mtllib (external .mtl file name)
+                    string8 l = { .buffer=(u8*)&file.buffer[start_line], .size=size_line-1 };       // -1 removes \n
+                    char tmp[] = "mtllib";
+                    string8 mtllib = { .buffer=(u8*)&tmp[0], .size=6 };
+
+                    if (string_starts_with(l, mtllib)) {
+                        mat_file = string_substring(l, string_find_first(l, ' ')+1, l.size);
+                    }
                 } else if (first == 'u') {                                          // usemtl (material name)
                 } else if (first == '\n' || first == '#') {                         // new lines or comments
                 }
@@ -181,8 +235,32 @@ Model* parse_obj_content(Arena* arena, string8 file) {
     }
     arena_alloc_restore(arena, checkpoint);
 
-    Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
+    // If mtllib => read and parse
+    Material* material = 0;
+    if (mat_file.buffer) {
+        LocalArena* local_arena = local_arena_alloc_create();
 
+        string8 obj_file_string = string_from_cstr(local_arena->arena, "assets/backpack/backpack.mtl");
+        string8 dirname = string_dirname(obj_file_string);
+        string8 complete_mat_path = string_join_strings(local_arena->arena, dirname, mat_file);
+        string8 mtlcontent = read_file(local_arena->arena, complete_mat_path);
+
+        material = parse_mtl_file_content(arena, mtlcontent);
+        local_arena_alloc_reset(local_arena);
+
+        string_print(material->name);
+        printf("\n");
+        printf("Ka: (%f,%f,%f)\n", material->Ka.r, material->Ka.g, material->Ka.b);
+        printf("Kd: (%f,%f,%f)\n", material->Kd.r, material->Kd.g, material->Kd.b);
+        printf("Ks: (%f,%f,%f)\n", material->Ks.r, material->Ks.g, material->Ks.b);
+        printf("Ke: (%f,%f,%f)\n", material->Ke.r, material->Ke.g, material->Ke.b);
+        printf("Ni: %f\n", material->Ni);
+        printf("d: %f\n", material->d);
+        printf("illum: %d\n", material->illum);
+    }
+
+    Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
+    model->material = material;
     model->vertices = vector_alloc_copy_to_arena(arena, vertices);
     model->faces = vector_alloc_copy_to_arena(arena, faces);
     model->normals = vector_alloc_copy_to_arena(arena, normals);
@@ -196,19 +274,18 @@ Model* parse_obj_content(Arena* arena, string8 file) {
     return model;
 }
 
-Model* read_model_file(Arena* arena, char* file_path) {
-    Arena* file_arena = arena_alloc_create(1*GiB);
-    Model* model = 0;
+Model* read_obj_model_file(Arena* arena, string8 file_path) {
+    LocalArena* local_arena = local_arena_alloc_create();
 
-    string8 file_content = read_file(file_arena, file_path);
-    model = parse_obj_content(arena, file_content);
+    string8 file_content = read_file(local_arena->arena, file_path);
+    Model* model = parse_obj_file_content(arena, file_content);
 
-    arena_alloc_free(file_arena);
+    local_arena_alloc_reset(local_arena);
     return model;
 }
 
 static float
-f32abs(float a) {
+absf32(float a) {
     union {
         float f;
         u32 i;
@@ -222,7 +299,7 @@ void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
 
-    u32 steps = f32abs(dx)>f32abs(dy) ? f32abs(dx) : f32abs(dy);
+    u32 steps = absf32(dx)>absf32(dy) ? absf32(dx) : absf32(dy);
 
     float step_size_x = dx/steps;
     float step_size_y = dy/steps;
@@ -417,7 +494,7 @@ f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
     f32x3 v1 = {.x = C->x-A->x, .y = B->x-A->x, .z = A->x-P.x};
     f32x3 v2 = {.x = C->y-A->y, .y = B->y-A->y, .z = A->y-P.y};
     f32x3 u = cross(v1, v2);
-    if (f32abs(u.z) <= EPS) {
+    if (absf32(u.z) <= EPS) {
         return {.x = -1, .y = -1, .z = -1};
     }
     return {.x = u.x/u.z, .y = u.y/u.z, .z = 1};

@@ -7,6 +7,7 @@
 #include "memory/allocators.h"
 #include "platform/window.h"
 #include "renderer/renderer.h"
+#include "utils/libstring.h"
 #include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
@@ -25,8 +26,8 @@ int main() {
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
 #if 1
-    char* file_path = "assets/backpack/backpack.obj";
-    Model* model = read_model_file(scene_arena, file_path);
+    string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
+    Model* model = read_obj_model_file(scene_arena, file_path);
 
     const u32 w = 1024;
     const u32 h = 768;

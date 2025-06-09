@@ -23,10 +23,34 @@ typedef struct {
 } Face;
 
 typedef struct {
+    string8 name;       // newmtl Scene_-_Root
+    f32 Ns;             // Specular exponent Ns 225.000000
+    f32x3 Ka;           // ambient color Ka 1.000000 1.000000 1.000000
+    f32x3 Kd;           // diffuse color Kd 0.800000 0.800000 0.800000
+    f32x3 Ks;           // specular color Ks 0.500000 0.500000 0.500000
+    f32x3 Ke;           // emissive color Ke 0.0 0.0 0.0
+    f32 Ni;             // index of refraction Ni 1.450000
+    f32 d;              // dissolve / alpha d 1.000000
+    u32 illum;          // illumination model illum 2
+                        // 0. Color on and Ambient off
+                        // 1. Color on and Ambient on
+                        // 2. Highlight on
+                        // 3. Reflection on and Ray trace on
+                        // 4. Transparency: Glass on, Reflection: Ray trace on
+                        // 5. Reflection: Fresnel on and Ray trace on
+                        // 6. Transparency: Refraction on, Reflection: Fresnel off and Ray trace on
+                        // 7. Transparency: Refraction on, Reflection: Fresnel on and Ray trace on
+                        // 8. Reflection on and Ray trace off
+                        // 9. Transparency: Glass on, Reflection: Ray trace off
+                        // 10. Casts shadows onto invisible surfaces
 
+    u32* map_Kd;        // texturemap diffuse map_Kd diffuse.jpg
+    u32* map_Bump;      // texture map bump map_Bump normal.png
+    u32* map_Ks;        // texture map specular map_Ks specular.jpg
 } Material;
 
 typedef struct {
+    Material* material;             // TODO(alex): To change to a vector of materials
     Vector* vertices;
     Vector* tex_coords;
     Vector* normals;
@@ -40,8 +64,7 @@ void print(Normal* n);
 void print(TexCoord* t);
 void print(Face* t);
 
-Model* read_model_file(Arena* arena, char* filepath);
-void free_model(Model* model);
+Model* read_obj_model_file(Arena* arena, string8 filepath);
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
 

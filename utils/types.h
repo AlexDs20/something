@@ -37,6 +37,9 @@ typedef union {
     struct {
         f32 u, v, w;
     };
+    struct {
+        f32 r, g, b;
+    };
     f32 data[3];
 } f32x3;
 
