@@ -53,6 +53,7 @@ f32x3 string_to_f32x3(Arena* arena, string8 data) {
 Material* read_mtl_file(Arena* arena, string8 file_path) {
     LocalArena* local_arena = local_arena_alloc_create();
 
+    string8 dirname = string_dirname(file_path);
     string8 content = read_file(local_arena->arena, file_path);
 
     Material* material = (Material*)arena_alloc_push(arena, sizeof(Material));
@@ -65,7 +66,6 @@ Material* read_mtl_file(Arena* arena, string8 file_path) {
                 line_end = i;
             }
             string8 line = string_substring(content, line_start, line_end+1);
-
             if (string_starts_with(line, "newmtl ")) {
                 string8 mtl_name = string_substring(line, 7, line.size);
                 string8 name = string_copy_to_arena(arena, mtl_name);
@@ -99,11 +99,17 @@ Material* read_mtl_file(Arena* arena, string8 file_path) {
                 char* c_data = string_to_cstr(local_arena->arena, data);
                 material->illum = atol(c_data);
             } else if (string_starts_with(line, "map_Kd ")) {
-                material->map_Kd = read_image_file(arena, file_path);
+                string8 filename = string_substring(line, 7, line.size);
+                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Kd = read_image_file(arena, complete_path);
             } else if (string_starts_with(line, "map_Bump ")) {
-                material->map_Bump = read_image_file(arena, file_path);
+                string8 filename = string_substring(line, 9, line.size);
+                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Bump = read_image_file(arena, complete_path);
             } else if (string_starts_with(line, "map_Ks ")) {
-                material->map_Ks = read_image_file(arena, file_path);
+                string8 filename = string_substring(line, 7, line.size);
+                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
+                material->map_Ks = read_image_file(arena, complete_path);
             }
             line_start = i+1;
         }

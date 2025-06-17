@@ -4,6 +4,18 @@
 #include "utils/types.h"
 
 //====================
+//      u32
+//====================
+u32
+max(u32 a, u32 b) {
+    return a > b ? a : b;
+}
+u32
+min(u32 a, u32 b) {
+    return a < b ? a : b;
+}
+
+//====================
 //      s32
 //====================
 s32
@@ -25,6 +37,233 @@ max(f32 a, f32 b) {
 f32
 min(f32 a, f32 b) {
     return a < b ? a : b;
+}
+
+//====================
+//      u32x2
+//====================
+// +
+u32x2
+operator+(u32x2 a, u32x2 b) {
+    u32x2 result = {.x = a.x+b.x, .y = a.y+b.y};
+    return result;
+}
+u32x2
+operator+(u32 a, u32x2 b) {
+    u32x2 result = {.x = a+b.x, .y = a+b.y};
+    return result;
+}
+u32x2
+operator+(u32x2 a, u32 b) {
+    u32x2 result = {.x = a.x+b, .y = a.y+b};
+    return result;
+}
+
+// -
+u32x2
+operator-(u32x2 a, u32x2 b) {
+    u32x2 result = {.x = a.x-b.x, .y = a.y-b.y};
+    return result;
+}
+u32x2
+operator-(u32 a, u32x2 b) {
+    u32x2 result = {.x = a-b.x, .y = a-b.y};
+    return result;
+}
+u32x2
+operator-(u32x2 a, u32 b) {
+    u32x2 result = {.x = a.x-b, .y = a.y-b};
+    return result;
+}
+
+// *
+u32x2
+operator*(u32x2 a, u32x2 b) {
+    u32x2 result = {.x = a.x*b.x, .y = a.y*b.y};
+    return result;
+}
+u32x2
+operator*(u32 a, u32x2 b) {
+    u32x2 result = {.x = a*b.x, .y = a*b.y};
+    return result;
+}
+u32x2
+operator*(u32x2 a, u32 b) {
+    u32x2 result = {.x = a.x*b, .y = a.y*b};
+    return result;
+}
+
+// /
+u32x2
+operator/(u32x2 a, u32x2 b) {
+    u32x2 result = {.x = a.x/b.x, .y = a.y/b.y};
+    return result;
+}
+u32x2
+operator/(u32 a, u32x2 b) {
+    u32x2 result = {.x = a/b.x, .y = a/b.y};
+    return result;
+}
+u32x2
+operator/(u32x2 a, u32 b) {
+    u32x2 result = {.x = a.x/b, .y = a.y/b};
+    return result;
+}
+
+// ==
+bool
+operator==(u32x2 a, u32x2 b){
+    return ((a.x==b.x) && (a.y==b.y));
+}
+// !=
+bool
+operator!=(u32x2 a, u32x2 b){
+    return ((a.x!=b.x) || (a.y!=b.y));
+}
+
+// functions
+u32
+length2(u32x2 a) {
+    return (a.x*a.x + a.y*a.y);
+}
+// u32
+// norm(u32x2 a) {
+//     return sqrt(a.x*a.x + a.y*a.y);
+// }
+// u32
+// length(u32x2 a) {
+//     return sqrt(a.x*a.x + a.y*a.y);
+// }
+// u32x2
+// normalize(u32x2 a) {
+//     return a / length(a);
+// }
+u32
+dot(u32x2 a, u32x2 b) {
+    return a.x*b.x + a.y*b.y;
+}
+u32x2
+perpendicular(u32x2 a) {
+    u32x2 result = {.x = -a.y, .y = a.x};
+    return result;
+}
+
+//====================
+//      u32x3
+//====================
+// +
+u32x3
+operator+(u32x3 a, u32x3 b) {
+    u32x3 result = {.x = a.x+b.x, .y = a.y+b.y, .z = a.z+b.z};
+    return result;
+}
+u32x3
+operator+(u32 a, u32x3 b) {
+    u32x3 result = {.x = a+b.x, .y = a+b.y, .z = a+b.z};
+    return result;
+}
+u32x3
+operator+(u32x3 a, u32 b) {
+    u32x3 result = {.x = a.x+b, .y = a.y+b, .z = a.z+b};
+    return result;
+}
+
+// -
+u32x3
+operator-(u32x3 a, u32x3 b) {
+    u32x3 result = {.x = a.x-b.x, .y = a.y-b.y, .z = a.z-b.z};
+    return result;
+}
+u32x3
+operator-(u32 a, u32x3 b) {
+    u32x3 result = {.x = a-b.x, .y = a-b.y, .z = a-b.z};
+    return result;
+}
+u32x3
+operator-(u32x3 a, u32 b) {
+    u32x3 result = {.x = a.x-b, .y = a.y-b, .z = a.z-b};
+    return result;
+}
+u32x3
+operator-(u32x3 a) {
+    u32x3 result = {.x = -a.x, .y = -a.y, .z = -a.z};
+    return result;
+}
+
+// *
+u32x3
+operator*(u32x3 a, u32x3 b) {
+    u32x3 result = {.x = a.x*b.x, .y = a.y*b.y, .z = a.z*b.z};
+    return result;
+}
+u32x3
+operator*(u32 a, u32x3 b) {
+    u32x3 result = {.x = a*b.x, .y = a*b.y, .z = a*b.z};
+    return result;
+}
+u32x3
+operator*(u32x3 a, u32 b) {
+    u32x3 result = {.x = a.x*b, .y = a.y*b, .z = a.z*b};
+    return result;
+}
+
+// /
+u32x3
+operator/(u32x3 a, u32x3 b) {
+    u32x3 result = {.x = a.x/b.x, .y = a.y/b.y, .z = a.z/b.z};
+    return result;
+}
+u32x3
+operator/(u32 a, u32x3 b) {
+    u32x3 result = {.x = a/b.x, .y = a/b.y, .z = a/b.z};
+    return result;
+}
+u32x3
+operator/(u32x3 a, u32 b) {
+    u32x3 result = {.x = a.x/b, .y = a.y/b, .z = a.z/b};
+    return result;
+}
+
+// ==
+bool
+operator==(u32x3 a, u32x3 b){
+    return ((a.x==b.x) && (a.y==b.y) && (a.z==b.z));
+}
+// !=
+bool
+operator!=(u32x3 a, u32x3 b){
+    return ((a.x!=b.x) || (a.y!=b.y) || (a.z!=b.z));
+}
+
+// functions
+u32
+length2(u32x3 a) {
+    return (a.x*a.x + a.y*a.y + a.z*a.z);
+}
+// u32
+// norm(u32x3 a) {
+//     return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+// }
+// u32
+// length(u32x3 a) {
+//     return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+// }
+// u32x3
+// normalize(u32x3 a) {
+//     return a / length(a);
+// }
+u32
+dot(u32x3 a, u32x3 b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+u32x3
+cross(u32x3 a, u32x3 b) {
+    u32x3 result = {
+        .x = a.y*b.z - a.z*b.y,      \
+        .y = a.z*b.x - a.x*b.z,      \
+        .z = a.x*b.y - a.y*b.x       \
+    };
+    return result;
 }
 
 

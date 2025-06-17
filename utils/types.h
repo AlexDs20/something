@@ -16,6 +16,13 @@ typedef float f32;
 typedef double f64;
 
 typedef union {
+    u32 data;
+    struct {
+        u8 a, r, g, b;
+    };
+} u32Bytes;
+
+typedef union {
     f32 f;
     u32 u;
 } f32Bits;
@@ -45,6 +52,26 @@ typedef union {
 
 typedef union {
     struct {
+        u32 x, y;
+    };
+    struct {
+        u32 u, v;
+    };
+    u32 data[2];
+} u32x2;
+
+typedef union {
+    struct {
+        u32 a, r, g, b;
+    };
+    struct {
+        u32 _, Y, Cb, Cr;
+    };
+    u32 data[4];
+} u32x4;
+
+typedef union {
+    struct {
         s32 x, y;
     };
     struct {
@@ -59,6 +86,9 @@ typedef union {
     };
     struct {
         s32 u, v, w;
+    };
+    struct {
+        s32 Y, Cb, Cr;
     };
     s32 data[3];
 } s32x3;
