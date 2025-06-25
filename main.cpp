@@ -7,7 +7,9 @@
 #include "memory/allocators.h"
 #include "platform/window.h"
 #include "renderer/renderer.h"
-#include "utils/libstring.h"
+#include "libs/libstring.h"
+#define LIB_IMAGES_IMPLEMENTATION
+#include "libs/libimages.h"
 #include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
@@ -56,7 +58,10 @@ int main() {
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         usleep(16);
+        break;
     }
+    string8 outfile = string_from_cstr(frame_arena, "test.jpeg");
+    write_image_file(win.buffer, win.w, win.h, outfile);
 #endif
 
     char done_msg[] = "Done doing something!\n";

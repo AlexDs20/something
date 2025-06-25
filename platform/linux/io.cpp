@@ -3,7 +3,7 @@
 #include "utils/defines.h"
 #include "platform/io.h"
 #include "errno.h"
-#include "utils/libstring.h"
+#include "libs/libstring.h"
 
 string8 read_file(Arena* arena, string8 file_path) {
     LocalArena* local_arena = local_arena_alloc_create();

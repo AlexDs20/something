@@ -4,9 +4,9 @@
 #include <stdlib.h>
 
 #include "renderer/renderer.h"
-#include "utils/libmath.h"
-#include "utils/libstring.h"
-#include "utils/libimages.h"
+#include "libs/libmath.h"
+#include "libs/libstring.h"
+#include "libs/libimages.h"
 #include "utils/defines.h"
 #include "platform/io.h"
 

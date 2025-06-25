@@ -20,6 +20,9 @@ typedef union {
     struct {
         u8 a, r, g, b;
     };
+    struct {
+        u8 _, Y, Cb, Cr;
+    };
 } u32Bytes;
 
 typedef union {
@@ -59,6 +62,22 @@ typedef union {
     };
     u32 data[2];
 } u32x2;
+
+typedef union {
+    struct {
+        u32 x, y, z;
+    };
+    struct {
+        u32 u, v, w;
+    };
+    struct {
+        u32 r, g, b;
+    };
+    struct {
+        u32 Y, Cb, Cr;
+    };
+    u32 data[3];
+} u32x3;
 
 typedef union {
     struct {

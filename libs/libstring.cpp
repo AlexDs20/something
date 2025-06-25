@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "utils/libstring.h"
+#include "libs/libstring.h"
 
 string8 string_from_cstr(Arena* arena, const char* s) {
     string8 out = {};

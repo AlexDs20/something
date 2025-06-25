@@ -5,6 +5,9 @@
 #include "utils/types.h"
 #include "platform/io.h"
 
+u32* read_image_file(Arena* arena, string8 filename);
+
+#ifdef LIB_IMAGES_IMPLEMENTATION
 /*  ============
  *  JPEG JFIF
  *  ============
@@ -100,6 +103,7 @@ u32Bytes argb_to_ycbcr(u32Bytes* rgb) {
     out.Cr =    0.5f    * rgb->r - 0.4187f * rgb->g - 0.0813f * rgb->b + 128;
     return out;
 }
+
 s32x3 rgb_to_ycbcr_shifted(u32x3 rgb) {
     /*
         Converts rgb 8-bit to YCbCr [-128,127]
@@ -214,7 +218,7 @@ u32* decode_jpeg(void* data, u64 size) {
 void write_jpeg(u32* rgb_data, u64 width, u64 height, string8 filepath) {
     LocalArena* local_arena = local_arena_alloc_create();
 
-    u32Bytes* yc_data = arena_alloc_push(local_arena->arena, width*height*sizeof(u32));
+    u32Bytes* yc_data = (u32Bytes*)arena_alloc_push(local_arena->arena, width*height*sizeof(u32));
     u32Bytes* rgb_pixel = (u32Bytes*)rgb_data;
 
     const u8 block_size = 8;
@@ -222,6 +226,8 @@ void write_jpeg(u32* rgb_data, u64 width, u64 height, string8 filepath) {
     for (u64 y=0; y<height; y+=block_size) {
         for (u64 x=0; x<width; x+=block_size) {
             u32 block[block_size*block_size];
+
+            // Convert rgb to YCbCr
             for (u8 j=0; j<block_size; j++) {
                 for (u8 i=0; i<block_size; i++) {
                     if (i+x>width) {
@@ -229,17 +235,18 @@ void write_jpeg(u32* rgb_data, u64 width, u64 height, string8 filepath) {
                     if (j+y>height) {
                     }
 
-                    rgb_pixel = rgb_data + (y*width+x + i+j*width);
-                    block[j*block_size + i] = argb_to_ycbcr(rgb_pixel);
-
+                    rgb_pixel = (u32Bytes*)(rgb_data + (y*width+x + i+j*width));
+                    u32Bytes tmp = argb_to_ycbcr(rgb_pixel);
+                    block[j*block_size + i] = *(u32*)(&tmp);
                 }
+            }
+
+            // DCT
+
 
         }
     }
 
-    for (u64 i=0; i<width*height; i++, rgb_pixel++, yc_data++) {
-        *yc_data = argb_to_ycbcr(rgb_pixel);
-    }
 
     local_arena_alloc_reset(local_arena);
 }
@@ -280,5 +287,6 @@ u32* read_image_file(Arena* arena, string8 filename) {
     return out;
 }
 
+#endif // LIB_IMAGES_IMPLEMENTATION
 
 #endif // _LIBIMAGES_H
