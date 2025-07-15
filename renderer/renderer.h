@@ -44,9 +44,9 @@ typedef struct {
                         // 9. Transparency: Glass on, Reflection: Ray trace off
                         // 10. Casts shadows onto invisible surfaces
 
-    u32* map_Kd;        // texturemap diffuse map_Kd diffuse.jpg
-    u32* map_Bump;      // texture map bump map_Bump normal.png
-    u32* map_Ks;        // texture map specular map_Ks specular.jpg
+    Image map_Kd;        // texture map diffuse map_Kd diffuse.jpg
+    Image map_Bump;      // texture map bump map_Bump normal.png
+    Image map_Ks;        // texture map specular map_Ks specular.jpg
 } Material;
 
 typedef struct {

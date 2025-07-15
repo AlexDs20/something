@@ -146,16 +146,16 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
 
     string8 dirname = string_dirname(file_path);
     string8 file = read_file(local_arena->arena, file_path);
-
     u64 checkpoint = arena_alloc_checkpoint(local_arena->arena);
-    u64 start_line = 0;
-    u64 end_line = 0;
-    u64 size_line = 0;
 
-    Arena* vertices_arena = arena_alloc_create(1*GiB);
+    u64 start_line = 0;
+    u64 end_line   = 0;
+    u64 size_line  = 0;
+
+    Arena* vertices_arena   = arena_alloc_create(1*GiB);
     Arena* tex_coords_arena = arena_alloc_create(1*GiB);
-    Arena* normals_arena = arena_alloc_create(1*GiB);
-    Arena* faces_arena = arena_alloc_create(1*GiB);
+    Arena* normals_arena    = arena_alloc_create(1*GiB);
+    Arena* faces_arena      = arena_alloc_create(1*GiB);
 
     Vector* vertices   = vector_alloc_create(vertices_arena, sizeof(Vertex));
     Vector* tex_coords = vector_alloc_create(tex_coords_arena, sizeof(TexCoord));
@@ -164,7 +164,8 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
 
     u32 line_buffer_length = 128;
     char* line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
-    string8 mat_file = {0};
+    // string8 mat_file = {0};
+    Material* material = 0;
 
     for (u64 i=0; i<file.size; i++) {
         if (file.buffer[i] == '\n' || (i==file.size-1)) {
@@ -178,7 +179,7 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
             if (size_line >= 3) {
                 // Make line_buffer bigger if needed
                 if (size_line >= line_buffer_length) {         // = because we add a \0 at the end of the string
-                    arena_alloc_restore(local_arena->arena, checkpoint);
+                    // arena_alloc_restore(local_arena->arena, checkpoint);         // Should be done but I want to use the local arena for other stuff and don't want to lose it all
                     line_buffer_length = 2*size_line;
                     line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
                 }
@@ -229,11 +230,12 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
                     }
                 } else if (first == 'm') {                                          // mtllib (external .mtl file name)
                     string8 l = { .buffer=(u8*)&file.buffer[start_line], .size=size_line };
-                    char tmp[] = "mtllib";
-                    string8 mtllib = { .buffer=(u8*)&tmp[0], .size=6 };
+                    string8 mtllib = string_from_cstr(local_arena->arena, "mtllib");
 
                     if (string_starts_with(l, mtllib)) {
-                        mat_file = string_substring(l, string_find_first(l, ' ')+1, l.size);
+                        string8 mat_file = string_substring(l, string_find_first(l, ' ')+1, l.size);
+                        string8 complete_mat_path = string_join_strings(local_arena->arena, dirname, mat_file);
+                        material = read_mtl_file(arena, complete_mat_path);
                     }
                 } else if (first == 'u') {                                          // usemtl (material name)
                 } else if (first == '\n' || first == '#') {                         // new lines or comments
@@ -244,24 +246,6 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
         }
     }
     arena_alloc_restore(local_arena->arena, checkpoint);
-
-    // If mtllib => read and parse
-    Material* material = 0;
-    if (mat_file.buffer) {
-        string8 complete_mat_path = string_join_strings(local_arena->arena, dirname, mat_file);
-
-        material = read_mtl_file(arena, complete_mat_path);
-
-        string_print(material->name);
-        printf("\n");
-        printf("Ka: (%f,%f,%f)\n", material->Ka.r, material->Ka.g, material->Ka.b);
-        printf("Kd: (%f,%f,%f)\n", material->Kd.r, material->Kd.g, material->Kd.b);
-        printf("Ks: (%f,%f,%f)\n", material->Ks.r, material->Ks.g, material->Ks.b);
-        printf("Ke: (%f,%f,%f)\n", material->Ke.r, material->Ke.g, material->Ke.b);
-        printf("Ni: %f\n", material->Ni);
-        printf("d: %f\n", material->d);
-        printf("illum: %d\n", material->illum);
-    }
 
     Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
     model->material = material;

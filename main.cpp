@@ -29,7 +29,10 @@ int main() {
 
 #if 1
     string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
-    Model* model = read_obj_model_file(scene_arena, file_path);
+    Model* model = {0};
+    if (string_get_file_extension(file_path) == ".obj") {
+        model = read_obj_model_file(scene_arena, file_path);
+    }
 
     const u32 w = 1024;
     const u32 h = 768;
@@ -57,8 +60,8 @@ int main() {
         draw_model(model, win.w, win.h, win.buffer, zbuffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
-        usleep(16);
-        break;
+        // usleep(16);
+        // break;
     }
     string8 outfile = string_from_cstr(frame_arena, "test.jpeg");
     write_image_file(win.buffer, win.w, win.h, outfile);

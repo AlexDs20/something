@@ -5,7 +5,10 @@
 #include "utils/types.h"
 #include "platform/io.h"
 
-u32* read_image_file(Arena* arena, string8 filename);
+Image read_image_file(Arena* arena, string8 filename);
+void write_image_file(u32* data, u64 width, u64 height, string8 filename);
+
+#endif // _LIBIMAGES_H
 
 #ifdef LIB_IMAGES_IMPLEMENTATION
 /*  ============
@@ -50,15 +53,83 @@ u32* read_image_file(Arena* arena, string8 filename);
  *
  */
 
+// https://www.disktuna.com/list-of-jpeg-markers/
 enum Markers {
-    StartOfImage = 0xFFD8,
-    ApplicationDefaultHeaderJFIF = 0xFFE0,
-    ApplicationDefaultHeaderEXIF = 0xFFE1,
-    QuantizationTable = 0xFFDB,
-    StartOfFrame = 0xFFC0,
+    StartOfFrame0 = 0xFFC0,             // Baseline DCT
+    StartOfFrame1 = 0xFFC1,             // Extended Sequential DCT
+    StartOfFrame2 = 0xFFC2,             // Progressive DCT
+    StartOfFrame3 = 0xFFC3,             // Lossless (sequential)
+
     DefineHuffmanTable = 0xFFC4,
-    StartOfScan = 0xFFDA,
-    EndOfImage = 0xFFD9,
+
+    StartOfFrame5 = 0xFFC5,             // Differential sequential DCT
+    StartOfFrame6 = 0xFFC6,             // Differential progressive DCT
+    StartOfFrame7 = 0xFFC7,             // Differential lossless (sequential)
+
+    JpegExtensions = 0xFFC8,
+
+    StartOfFrame9 = 0xFFC9,             // Extended sequential DCT, Arithmetic coding
+    StartOfFrame10 = 0xFFCA,            // Progressive DCT, Arithmetic coding
+    StartOfFrame11 = 0xFFCB,            // Lossless (sequential), Arithmetic coding
+
+    DefineArithmeticCoding = 0xFFCC,
+
+    StartOfFrame13 = 0xFFCD,            // Differential sequential DCT, Arithmetic coding
+    StartOfFrame14 = 0xFFCE,            // Differential progressive DCT, Arithmetic coding
+    StartOfFrame15 = 0xFFCF,            // Differential lossless (sequential), Arithmetic coding
+
+    Reset0 = 0xFFD0,                    // Reset marker
+    Reset1 = 0xFFD1,
+    Reset2 = 0xFFD2,
+    Reset3 = 0xFFD3,
+    Reset4 = 0xFFD4,
+    Reset5 = 0xFFD5,
+    Reset6 = 0xFFD6,
+    Reset7 = 0xFFD7,
+
+    StartOfImage            = 0xFFD8,
+    EndOfImage              = 0xFFD9,
+    StartOfScan             = 0xFFDA,
+    DefineQuantizationTable = 0xFFDB,
+
+    DefineNumberOfLines     = 0xFFDC,
+    DefineRestartInterval   = 0xFFDD,
+    DefineHierarchicalProgression = 0xFFDE,
+    ExpandReferenceComponent = 0xFFDF,
+
+    ApplicationSegment0 = 0xFFE0,       // JFIF jpeg image and AVI1 motion jpeg
+    ApplicationSegment1 = 0xFFE1,       // EXIF metadata, TIFF ifd format, jpeg thumbnail, adobe xmp
+    ApplicationSegment2 = 0xFFE2,       // ICC color profile, flash pix
+    ApplicationSegment3 = 0xFFE3,       // Stereoscopic jpeg images
+    ApplicationSegment4 = 0xFFE4,
+    ApplicationSegment5 = 0xFFE5,
+    ApplicationSegment6 = 0xFFE6,       // NITF lossless profile
+    ApplicationSegment7 = 0xFFE7,
+    ApplicationSegment8 = 0xFFE8,
+    ApplicationSegment9 = 0xFFE9,
+    ApplicationSegment10 = 0xFFEA,      // ActiveObject (multimedia messages/captions)
+    ApplicationSegment11 = 0xFFEB,      // HELIOS JPEG Resources
+    ApplicationSegment12 = 0xFFEC,      // Picture Info, Photoshop Save for Web: Ducky
+    ApplicationSegment13 = 0xFFED,      // Photoshop Save As: IRB, 8BIM, IPTC
+    ApplicationSegment14 = 0xFFEE,
+    ApplicationSegment15 = 0xFFEF,
+
+    JpegExtension0 = 0xFFF0,
+    JpegExtension1 = 0xFFF1,
+    JpegExtension2 = 0xFFF2,
+    JpegExtension3 = 0xFFF3,
+    JpegExtension4 = 0xFFF4,
+    JpegExtension5 = 0xFFF5,
+    JpegExtension6 = 0xFFF6,
+    JpegExtension7 = 0xFFF7,            // Lossless jpeg
+    JpegExtension8 = 0xFFF8,            // lossless jpeg extension parameters
+    JpegExtension9 = 0xFFF9,
+    JpegExtension10 = 0xFFFA,
+    JpegExtension11 = 0xFFFB,
+    JpegExtension12 = 0xFFFC,
+    JpegExtension13 = 0xFFFD,
+
+    Comment = 0xFFFE,
 };
 
 u32x3 rgb_to_ycbcr(u32x3 rgb) {
@@ -189,28 +260,179 @@ u16 swap_endianness(u16 v) {
     return out;
 }
 
-u32* decode_jpeg(void* data, u64 size) {
-    u32* out = 0;
-    u64 pos = 0;
-    u16 marker;
+void parse_StartOfFrame(u8** data) {
+    u8* ptr = *data;
+    // length in bytes for this chunk including the 2 bytes for the length variable itself
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    u8 hdr = *ptr;
+    ptr += 1;
+    if (hdr != 8) {
+        printf("Bytes per color != 8 is not supported, file using: %d\n", hdr);
+    }
+
+    u32 height = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    u32 width = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    u32 components = *ptr;
+    ptr += 1;
+
+    printf("DCT length: %d, width: %d, height: %d, components: %d\n", length, width, height, components);
+
+    // TODO(alex): continue here! (if needed, need to check what to do...)
+
+    // Set the data pointer to the correct place
+    *data += length;
+}
+
+void parse_ApplicationSegment0(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_ApplicationSegment1(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_ApplicationSegment13(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_ApplicationSegment14(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_DefineRestartInterval(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_DefineHuffmanTable(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+void parse_StartOfScan(u8** data) {
+    u8* ptr = *data;
+    // This is the length of the metadata until before the actual scan data
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+    printf("Start of scan length: %d\n", length);
+
+    ptr += length;
+    u16 bytes = swap_endianness(*(u16*)ptr);
+    while (bytes != EndOfImage) {
+        ptr += 1;
+        bytes = swap_endianness(*(u16*)ptr);
+    }
+    *data = ptr;
+}
+
+void parse_DefineQuantizationTable(u8** data) {
+    u8* ptr = *data;
+    u16 length = swap_endianness(*(u16*)ptr);
+    ptr += 2;
+
+    *data += length;
+}
+
+Image decode_jpeg(string8 data) {
+    // FFD8     StartOfImage
+    // FFE1     App1
+    //  FFD9    EndOfImage
+    // FFED     App13
+    // FFE1     App1
+    u8* end_of_data = (u8*)(data.buffer + data.size);
+
+    Image out = {0};
+    u8* ptr = (u8*)data.buffer;
+    u16 marker = swap_endianness(*(u16*)ptr);
     u16 length;
-    u8* ptr = (u8*)data;
     u8 i=0;
 
     // Get start marker
-    marker = swap_endianness(*((u16*)(ptr + pos)));
     if (marker != StartOfImage) {
         printf("First marker is not StartOfImage!\n");
         return out;
     }
-    pos += 2;
-    marker = swap_endianness(*((u16*)(ptr + pos)));
-    if (marker == ApplicationDefaultHeaderJFIF) {
-        printf("File uses JFIF: 0x%x marker!\n", marker);
-    } else if (marker == ApplicationDefaultHeaderEXIF) {
-        printf("File uses EXIF: 0x%x marker!\n", marker);
-    } else {
-        printf("File exchange format unsupported: 0x%x", marker);
+
+    while ( (ptr < end_of_data) && (marker!=EndOfImage) ) {
+        // Increase pointer to after the marker
+        ptr += 2;
+        // TODO(alex): ptr automatically moved to the end of the data by each functions
+        bool stop = false;
+        switch (marker) {
+            case StartOfImage: {
+                printf("Start Of Image\n");
+            } break;
+            case ApplicationSegment0: {
+                printf("File uses JFIF standard\n");
+                parse_ApplicationSegment0(&ptr);
+            } break;
+            case ApplicationSegment1: {
+                printf("File uses EXIF standard\n");
+                parse_ApplicationSegment1(&ptr);
+            } break;
+            case ApplicationSegment13: {
+                printf("Application Segment 13\n");
+                parse_ApplicationSegment13(&ptr);
+            } break;
+            case ApplicationSegment14: {
+                printf("Application Segment 14\n");
+                parse_ApplicationSegment14(&ptr);
+            } break;
+            case DefineQuantizationTable: {
+                printf("Define Quantization Table\n");
+                parse_DefineQuantizationTable(&ptr);
+            } break;
+            case StartOfFrame0: {
+                printf("Start Of Frame 0: Baseline DCT\n");
+                parse_StartOfFrame(&ptr);
+            } break;
+            case DefineRestartInterval: {
+                printf("Define Restart Interval\n");
+                parse_DefineRestartInterval(&ptr);
+            } break;
+            case DefineHuffmanTable: {
+                printf("Define Huffman Table\n");
+                parse_DefineHuffmanTable(&ptr);
+            } break;
+            case StartOfScan: {
+                printf("Start Of Scan\n");
+                parse_StartOfScan(&ptr);
+            } break;
+            default: {
+                printf("JPEG MARKER NOT SUPPORTED :: 0x%X\n", marker);
+                stop = true;
+            } break;
+        }
+        if (stop) break;
+        marker = swap_endianness(*(u16*)ptr);
     }
     return out;
 }
@@ -264,23 +486,48 @@ void write_image_file(u32* data, u64 width, u64 height, string8 filename) {
     }
 }
 
-u32* read_image_file(Arena* arena, string8 filename) {
+Image create_missing_image(Arena* arena) {
+    Image out = {0};
+    out.width  = 128;
+    out.height = 128;
+    out.data = (u32*)arena_alloc_push(arena, out.width*out.height*sizeof(u32));
+
+    const u32 pattern_size = 64;
+    for (u32 j=0; j<out.height; j++) {
+        for (u32 i=0; i<out.width; i++) {
+            u32 linear_index = j*out.width + i;
+            u32 color = 0;
+            if (((u32)j/pattern_size + (u32)i/pattern_size) % 2 == 1) {
+                color = 0xFF00FF;
+            }
+            out.data[linear_index] = color;
+        }
+    }
+    return out;
+}
+
+
+Image read_image_file(Arena* arena, string8 filename) {
     LocalArena* local_arena = local_arena_alloc_create();
 
     printf("Reading file: ");
     string_print(filename);
     printf("\n");
-    u32* out = 0;
+    Image out = {0};
     string8 data = read_file(local_arena->arena, filename);
     string8 extension = string_get_file_extension(filename);
 
     if (extension == ".jpg" || extension == ".jpeg") {
-        u32* rgb = decode_jpeg((void*)data.buffer, data.size);
+        out = decode_jpeg(data);
     } else if (extension == ".png"){
-        // u32* rgb = decode_png(data);
+        // out = decode_png(data);
     } else {
         printf("File format not supported: extension = ");
         string_print(extension);
+    }
+
+    if (!out.data) {
+        out = create_missing_image(arena);
     }
 
     local_arena_alloc_reset(local_arena);
@@ -288,5 +535,3 @@ u32* read_image_file(Arena* arena, string8 filename) {
 }
 
 #endif // LIB_IMAGES_IMPLEMENTATION
-
-#endif // _LIBIMAGES_H

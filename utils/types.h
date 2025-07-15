@@ -117,4 +117,10 @@ struct string8 {
     u64 size;
 };
 
+struct Image {
+    u32 width;
+    u32 height;
+    u32* data;
+};
+
 #endif  // _TYPES_H
