@@ -335,7 +335,7 @@ void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
 
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer) {
-    for (int i=0; i<vector_alloc_count(model->faces); ++i) {
+    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
         // Only use the x y components atm
@@ -525,7 +525,7 @@ u32 random_color(u64 v) {
 
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
     // local_variable bool swapper = false;
-    for (int i=0; i<vector_alloc_count(model->faces); ++i) {
+    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
         // Only use the x y components atm

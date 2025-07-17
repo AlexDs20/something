@@ -118,9 +118,12 @@ struct string8 {
 };
 
 struct Image {
-    u32 width;
-    u32 height;
     u32* data;
+    u32 width;          // u16 should be enough for jpeg
+    u32 height;
+    u8 components;
+    u8 bits_per_color;
+    u8 rgb;             // change to enum RGB RGBA ARGB CMYK ... ?
 };
 
 #endif  // _TYPES_H

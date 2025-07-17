@@ -63,8 +63,6 @@ int main() {
         // usleep(16);
         // break;
     }
-    string8 outfile = string_from_cstr(frame_arena, "test.jpeg");
-    write_image_file(win.buffer, win.w, win.h, outfile);
 #endif
 
     char done_msg[] = "Done doing something!\n";
