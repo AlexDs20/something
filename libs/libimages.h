@@ -132,141 +132,6 @@ enum Markers {
     Reserved0 = 0xFF02,                 // 0xFF02 to 0xFFBF is reserved
 };
 
-u32x3 rgb_to_ycbcr(u32x3 rgb) {
-    /*
-        Converts rgb 8-bit to YCbCr [0,255]
-        RGB 8-bit each
-        References:
-        https://www.w3.org/Graphics/JPEG/jfif3.pdf page 4
-    */
-    u32x3 out = {0};
-    out.Y  =    0.299f  * rgb.r + 0.587f  * rgb.g + 0.114f  * rgb.b;
-    out.Cb =   -0.1687f * rgb.r - 0.3313f * rgb.g + 0.5f    * rgb.b + 128;
-    out.Cr =    0.5f    * rgb.r - 0.4187f * rgb.g - 0.0813f * rgb.b + 128;
-    return out;
-}
-
-u32x3* rgb_to_ycbcr(u32x3* rgb) {
-    /*
-        Converts rgb 8-bit to YCbCr [0,255]
-        RGB 8-bit each
-        References:
-        https://www.w3.org/Graphics/JPEG/jfif3.pdf page 4
-    */
-    u32x3 in = *rgb;
-    u32x3* out = rgb;
-    out->Y  =    0.299f  * in.r + 0.587f  * in.g + 0.114f  * in.b;
-    out->Cb =   -0.1687f * in.r - 0.3313f * in.g + 0.5f    * in.b + 128;
-    out->Cr =    0.5f    * in.r - 0.4187f * in.g - 0.0813f * in.b + 128;
-    return out;
-}
-
-u32Bytes argb_to_ycbcr(u32Bytes* rgb) {
-    /*
-        Converts rgb 8-bit to YCbCr [0,255]
-        RGB 8-bit each
-        References:
-        https://www.w3.org/Graphics/JPEG/jfif3.pdf page 4
-    */
-    u32Bytes out = {0};
-    out.Y  =    0.299f  * rgb->r + 0.587f  * rgb->g + 0.114f  * rgb->b;
-    out.Cb =   -0.1687f * rgb->r - 0.3313f * rgb->g + 0.5f    * rgb->b + 128;
-    out.Cr =    0.5f    * rgb->r - 0.4187f * rgb->g - 0.0813f * rgb->b + 128;
-    return out;
-}
-
-s32x3 rgb_to_ycbcr_shifted(u32x3 rgb) {
-    /*
-        Converts rgb 8-bit to YCbCr [-128,127]
-        RGB 8-bit each
-        References:
-        https://www.w3.org/Graphics/JPEG/jfif3.pdf page 4
-    */
-    s32x3 out = {0};
-    out.Y  =   ( 0.299f  * rgb.r + 0.587f  * rgb.g + 0.114f  * rgb.b) - 128;
-    out.Cb =   (-0.1687f * rgb.r - 0.3313f * rgb.g + 0.5f    * rgb.b);
-    out.Cr =   ( 0.5f    * rgb.r - 0.4187f * rgb.g - 0.0813f * rgb.b);
-    return out;
-}
-
-u32x3 ycbcr_to_rgb(u32x3 ycbcr) {
-    u32& Y = ycbcr.Y;
-    u32& Cb = ycbcr.Cb;
-    u32& Cr = ycbcr.Cr;
-    u32x3 out = {0};
-    out.r = Y                       + 1.402f   * (Cr-128);
-    out.g = Y - 0.34414f * (Cb-128) - 0.71414f * (Cr-128);
-    out.b = Y + 1.772f   * (Cb-128);
-    return out;
-}
-
-void DCT(void) {
-    /*
-     * Reference: https://www.w3.org/Graphics/JPEG/itu-t81.pdf page 31
-     * There seems to exists and algo called AAN to compute it faster (with fewer multiplies / adds) AAN (Arai, Agui Nakajima in 1988)
-     *  Y. Arai, T. Agui, and M. Nakajima, "A fast DCT-SQ scheme for images," Transactions of the IEICE, vol. 71, no. 11, pp. 1095-1097, 1988.
-     *  Implementation at www.ijg.org
-     *  Figure 4-8 in Pennebaker & Mitchel book: JPEG Still Image Data Compression Standard
-     */
-    // S[v,u] = 0.25f * C[u] * C[v] * (sum over all pixels in 8x8) (s[y,x] * cos((2*x+1)*u*pi / 16)) * cos((2*y+1) * v*pi / 16)
-    // if u, v = 0 => Cu, Cv = 1 / sqrt(2)
-    // else Cu, Cv = 1
-}
-
-void zigzag(void) {
-    /*
-      Order:
-      0, 1, 5, 6,14,15,27,28,
-
-      2, 4, 7,13,16,26,29,42,
-
-      3, 8,12,17,25,30,41,43,
-
-      9,11,18,24,31,40,44,53,
-
-     10,19,23,32,39,45,52,54,
-
-     20,22,33,38,46,51,55,60,
-
-     21,34,37,47,50,56,59,61,
-
-     35,36,48,49,57,58,62,63
-     */
-    // Element 0 is DC term
-    // 63 following elements are AC
-    u8 arr[8][8] = {
-        { 0,  1,  5,  6, 14, 15, 27, 28},
-        { 2,  4,  7, 13, 16, 26, 29, 42},
-        { 3,  8, 12, 17, 25, 30, 41, 43},
-        { 9, 11, 18, 24, 31, 40, 44, 53},
-        {10, 19, 23, 32, 39, 45, 52, 54},
-        {20, 22, 33, 38, 46, 51, 55, 60},
-        {21, 34, 37, 47, 50, 56, 59, 61},
-        {35, 36, 48, 49, 57, 58, 62, 63}
-    };
-}
-
-void quantization(void) {
-    /*
-     * for (i = 0 ; i<=63; i++ )
-     *      vector[i] = (int) (vector[i] / quantization_table[i] + 0.5)
-     */
-}
-
-void IDCT(void) {
-    /*
-     * Reference: https://www.w3.org/Graphics/JPEG/itu-t81.pdf page 31
-     */
-    // s[y, x] = 0.25f * (sum over all 8x8 pixels in freq. domain) * (C[u]*C[v] * S[v, u]) * cos((2*x+1)*u*pi/16) * cos((2*y+1)*v*pi / 16)
-    // if u, v = 0 => Cu, Cv = 1 / sqrt(2)
-    // else Cu, Cv = 1
-}
-
-u16 swap_endianness(u16 v) {
-    u16 out = v<<8 | v>>8;
-    return out;
-}
-
 struct FrameHeader {
     u8  src_precision;
     u16 src_height;
@@ -278,123 +143,6 @@ struct FrameHeader {
     u8 V_sample[4];
     u8 QT_selector[4];
 };
-
-void print_fh(FrameHeader& fh) {
-    printf("Frame Header: \n");
-    printf("------------  \n");
-    printf("Source image: \n");
-    printf("    Precision: %d\n", fh.src_precision);
-    printf("    Height: %d\n", fh.src_height);
-    printf("    Width: %d\n", fh.src_width);
-    printf("    Components: %d\n", fh.src_components);
-
-    for (u8 i=0;i<fh.src_components; i++) {
-        printf("Component %d:\n", i);
-        printf("  id: %d\n", fh.component_id[i]);
-        printf("  H sample: %d\n", fh.H_sample[i]);
-        printf("  V sample: %d\n", fh.V_sample[i]);
-        printf("  QT selector: %d\n", fh.QT_selector[i]);
-    }
-}
-
-FrameHeader parse_StartOfFrame(u8** data) {
-    FrameHeader fh = {0};
-    u8* ptr = *data;
-
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-
-    fh.src_precision = *ptr;
-    ptr += 1;
-    if (fh.src_precision != 8) {
-        printf("Bytes per color != 8 is not supported, file using: %d\n", fh.src_precision);
-        return FrameHeader{0};
-    }
-
-    fh.src_height = swap_endianness(*(u16*)ptr);
-    // if 0 => should be gotten from DNL
-    ptr += 2;
-
-    fh.src_width = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-
-    fh.src_components = *ptr;
-    ptr += 1;
-
-    for (u8 i=0; i<fh.src_components; i++) {
-        // If components id are 1 2 and 3 => usually YCbCr
-        //  else if 0x52, 0x47, 0x42 => RGB (very rare)
-        fh.component_id[i] = *ptr;
-        ptr++;
-        fh.H_sample[i] = (*ptr)>>4;
-        fh.V_sample[i] = (*ptr) & 0x0F;
-        ptr++;
-
-        fh.QT_selector[i] = *ptr;
-        ptr++;
-    }
-
-    // Set the data pointer to the correct place
-    // *data += length;
-    *data = ptr;
-    return fh;
-}
-
-void parse_ApplicationSegment0(u8** data) {
-    u8* ptr = *data;
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-    // string8 content = { .buffer = ptr, .size = length-2 };
-
-    *data += length;
-}
-
-void parse_ApplicationSegment1(u8** data) {
-    u8* ptr = *data;
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-    // string8 content = { .buffer = ptr, .size = length-2 };
-
-    *data += length;
-}
-
-void parse_ApplicationSegment13(u8** data) {
-    u8* ptr = *data;
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-    // string8 content = { .buffer = ptr, .size = length-2 };
-
-    *data += length;
-}
-
-void parse_ApplicationSegment14(u8** data) {
-    // This is usually used by adobe encoders
-    //
-    u8* ptr = *data;
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-
-    // string8 content = { .buffer = ptr, .size = length-2 };
-    // Adobed@
-    // Adobed
-
-    // Usually contains a color transform flag at offset 11
-    //  value: 0=>RGB, 1=>YCbCr(default), 2=>YCCK
-
-    *data += length;
-}
-
-u16 parse_DefineRestartInterval(u8** data) {
-    u8* ptr = *data;
-    u16 length = swap_endianness(*(u16*)ptr);
-    ptr += 2;
-
-    // Specifies the number of MCU in the restart interval
-    u16 restart_interval = swap_endianness(*(u16*)ptr);
-
-    *data += length;
-    return restart_interval;
-}
 
 struct HuffmanNode{
     u16 binary;
@@ -424,6 +172,51 @@ struct HuffmanTableSpec {
     HuffmanNode* root[8];
 };
 
+struct QuantizationTables {
+    u8 n;
+    u8 precision[4];                   // Precision of the Qk: 0 => 8bit, 1 => 16 bit
+    u8 destination_identifier[4];      // Specifies where the quantization table to be used in the decoder
+    u8 Q[4][64];                       // element in the zigzag ordering of the dct coefficients
+};
+
+struct ScanHeader {
+    u8 n_components;
+
+    u8 component_selector[4];
+    u8 dc_selector[4];
+    u8 ac_selector[4];
+
+    u8 start_spectral;              // Not used
+    u8 end_spectral;                // Not used
+    u8 approx_high;                 // Not used
+    u8 approx_low;                  // Not used
+};
+
+typedef struct {
+    u8* data;
+    // u64 size;
+    u64 byte_pos;
+    u8 bit_pos;
+} BitStream;
+
+void print_fh(FrameHeader& fh) {
+    printf("Frame Header: \n");
+    printf("------------  \n");
+    printf("Source image: \n");
+    printf("    Precision: %d\n", fh.src_precision);
+    printf("    Height: %d\n", fh.src_height);
+    printf("    Width: %d\n", fh.src_width);
+    printf("    Components: %d\n", fh.src_components);
+
+    for (u8 i=0;i<fh.src_components; i++) {
+        printf("Component %d:\n", i);
+        printf("  id: %d\n", fh.component_id[i]);
+        printf("  H sample: %d\n", fh.H_sample[i]);
+        printf("  V sample: %d\n", fh.V_sample[i]);
+        printf("  QT selector: %d\n", fh.QT_selector[i]);
+    }
+}
+
 void print_ht(HuffmanTableSpec& ht) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
@@ -448,11 +241,224 @@ void print_ht(HuffmanTableSpec& ht) {
     }
 }
 
-HuffmanTableSpec parse_DefineHuffmanTable(Arena* arena, u8** data) {
-    HuffmanTableSpec ht = {0};
+void print_qt(QuantizationTables& qt) {
+    u8 zigzag[8][8] = {
+        { 0,  1,  5,  6, 14, 15, 27, 28},
+        { 2,  4,  7, 13, 16, 26, 29, 42},
+        { 3,  8, 12, 17, 25, 30, 41, 43},
+        { 9, 11, 18, 24, 31, 40, 44, 53},
+        {10, 19, 23, 32, 39, 45, 52, 54},
+        {20, 22, 33, 38, 46, 51, 55, 60},
+        {21, 34, 37, 47, 50, 56, 59, 61},
+        {35, 36, 48, 49, 57, 58, 62, 63}
+    };
+
+    printf("%d Quantization Tables: \n", qt.n);
+    printf("-------------------  \n");
+    for (u8 i=0; i<qt.n; i++) {
+        printf("Precision: %d\n", qt.precision[i]);
+        printf("Identifier: %d\n", qt.destination_identifier[i]);
+        printf("Q: \n");
+        for (u8 k=0;k<8; k++) {
+            printf("    ");
+            for (u8 j=0;j<8;j++) {
+                printf(" %d ", qt.Q[i][zigzag[j][k]]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+void print_sh(ScanHeader& sh) {
+    printf("Scan Header: \n");
+    printf("-----------  \n");
+
+    for (u8 i=0; i<sh.n_components; i++) {
+        printf("Component %d: \n", i);
+        printf("    selector: %d\n", sh.component_selector[i]);
+        printf("    dc selector: %d\n", sh.dc_selector[i]);
+        printf("    ac selector: %d\n", sh.ac_selector[i]);
+    }
+    printf("Start spectral: %d\n", sh.start_spectral);
+    printf("End spectral: %d\n", sh.end_spectral);
+    printf("Approx high: %d\n", sh.approx_high);
+    printf("Approx low: %d\n", sh.approx_low);
+}
+
+void print_mk(u16 marker) {
+    printf("Marker: 0x%X\n", marker);
+}
+
+typedef struct {
+    u16 width;
+    u16 height;
+    u8 num_components;
+    Markers algorithm;
+
+    QuantizationTables qt;
+
+    FrameHeader fh;
+
+    ScanHeader sh;
+
+    HuffmanTableSpec ht;
+
+    u16 restart_interval;
+    u8 dc_pred[4];              // dc_prediction NOTE(alex): move to Quantization Table struct?
+    u16 mcu_processed;
+
+    union {
+        u32* rgba;
+        u32* rgb;
+        u8* grey;
+    };
+    // jpeg_component_t components[3];
+
+    // uint8_t quant_tables[4][64];
+    // uint8_t quant_table_set[4];
+
+    // huffman_table_t huffman_tables[2][4];
+    // uint8_t huffman_table_set[2][4];
+
+    // scan_component_t scan_components[3];
+    // uint8_t num_scan_components;
+
+    // uint8_t max_h_sampling;
+    // uint8_t max_v_sampling;
+    // uint16_t mcu_width;
+    // uint16_t mcu_height;
+
+    // uint8_t* entropy_data;
+    // size_t   entropy_size;
+
+    // int16_t* mcu_blocks;
+    // uint8_t* image_data; // final RGB or YCbCr
+} jpeg_t;
+
+u16 swap_endianness(u16 v) {
+    u16 out = v<<8 | v>>8;
+    return out;
+}
+
+u16 get_marker(u8* ptr) {
+    return swap_endianness(*(u16*)ptr);
+}
+
+bool parse_StartOfFrame(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    FrameHeader& fh = jpeg->fh;
     u8* ptr = *data;
 
-    u16 length = swap_endianness(*(u16*)ptr);
+    u16 length = get_marker(ptr);
+    ptr += 2;
+
+    fh.src_precision = *ptr;
+    ptr += 1;
+    if (fh.src_precision != 8) {
+        printf("Bytes per color != 8 is not supported, file using: %d\n", fh.src_precision);
+        error = true;
+        return error;
+    }
+
+    fh.src_height = get_marker(ptr);
+    // if 0 => should be gotten from DNL
+    ptr += 2;
+
+    fh.src_width = get_marker(ptr);
+    ptr += 2;
+
+    fh.src_components = *ptr;
+    ptr += 1;
+
+    for (u8 i=0; i<fh.src_components; i++) {
+        // If components id are 1 2 and 3 => usually YCbCr
+        //  else if 0x52, 0x47, 0x42 => RGB (very rare)
+        fh.component_id[i] = *ptr;
+        ptr++;
+        fh.H_sample[i] = (*ptr)>>4;
+        fh.V_sample[i] = (*ptr) & 0x0F;
+        ptr++;
+
+        fh.QT_selector[i] = *ptr;
+        ptr++;
+    }
+
+    *data = ptr;
+    return error;
+}
+
+bool parse_ApplicationSegment0(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    u8* ptr = *data;
+    u16 length = get_marker(ptr);
+    ptr += 2;
+    // string8 content = { .buffer = ptr, .size = length-2 };
+
+    *data += length;
+    return error;
+}
+
+bool parse_ApplicationSegment1(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    u8* ptr = *data;
+    u16 length = get_marker(ptr);
+    ptr += 2;
+    // string8 content = { .buffer = ptr, .size = length-2 };
+
+    *data += length;
+    return error;
+}
+
+bool parse_ApplicationSegment13(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    u8* ptr = *data;
+    u16 length = get_marker(ptr);
+    ptr += 2;
+    // string8 content = { .buffer = ptr, .size = length-2 };
+
+    *data += length;
+    return error;
+}
+
+bool parse_ApplicationSegment14(u8** data, jpeg_t* jpeg) {
+    // This is usually used by adobe encoders
+    //
+    bool error = false;
+    u8* ptr = *data;
+    u16 length = get_marker(ptr);
+    ptr += 2;
+
+    // string8 content = { .buffer = ptr, .size = length-2 };
+    // Adobed@
+    // Adobed
+
+    // Usually contains a color transform flag at offset 11
+    //  value: 0=>RGB, 1=>YCbCr(default), 2=>YCCK
+
+    *data += length;
+    return error;
+}
+
+bool parse_DefineRestartInterval(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    u8* ptr = *data;
+    u16 length = get_marker(ptr);
+    ptr += 2;
+
+    // Specifies the number of MCU in the restart interval
+    jpeg->restart_interval = get_marker(ptr);
+
+    *data += length;
+    return error;
+}
+
+bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    HuffmanTableSpec& ht = jpeg->ht;
+    u8* ptr = *data;
+
+    u16 length = get_marker(ptr);
     ptr += 2;
 
     // TODO(alex): This has to be done for each huffman table because the segment contains the data for all tables
@@ -515,50 +521,15 @@ HuffmanTableSpec parse_DefineHuffmanTable(Arena* arena, u8** data) {
     ht.n_tables = table_idx;
 
     *data = ptr;
-    return ht;
+    return error;
 }
 
-struct QuantizationTables {
-    u8 n;
-    u8 precision[4];                   // Precision of the Qk: 0 => 8bit, 1 => 16 bit
-    u8 destination_identifier[4];      // Specifies where the quantization table to be used in the decoder
-    u8 Q[4][64];                       // element in the zigzag ordering of the dct coefficients
-};
-
-void print_qt(QuantizationTables& qt) {
-    u8 zigzag[8][8] = {
-        { 0,  1,  5,  6, 14, 15, 27, 28},
-        { 2,  4,  7, 13, 16, 26, 29, 42},
-        { 3,  8, 12, 17, 25, 30, 41, 43},
-        { 9, 11, 18, 24, 31, 40, 44, 53},
-        {10, 19, 23, 32, 39, 45, 52, 54},
-        {20, 22, 33, 38, 46, 51, 55, 60},
-        {21, 34, 37, 47, 50, 56, 59, 61},
-        {35, 36, 48, 49, 57, 58, 62, 63}
-    };
-
-    printf("%d Quantization Tables: \n", qt.n);
-    printf("-------------------  \n");
-    for (u8 i=0; i<qt.n; i++) {
-        printf("Precision: %d\n", qt.precision[i]);
-        printf("Identifier: %d\n", qt.destination_identifier[i]);
-        printf("Q: \n");
-        for (u8 k=0;k<8; k++) {
-            printf("    ");
-            for (u8 j=0;j<8;j++) {
-                printf(" %d ", qt.Q[i][zigzag[j][k]]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
-}
-
-QuantizationTables parse_DefineQuantizationTable(u8** data) {
-    QuantizationTables qt = {0};
+bool parse_DefineQuantizationTable(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    QuantizationTables& qt = jpeg->qt;
     u8* ptr = *data;
 
-    u16 length = swap_endianness(*(u16*)ptr);
+    u16 length = get_marker(ptr);
     ptr += 2;
 
     u8 table_idx = 0;
@@ -571,7 +542,8 @@ QuantizationTables parse_DefineQuantizationTable(u8** data) {
 
         if (qt.precision[table_idx] != 0) {
             printf("Quantization table precision != 8 bits not supported!\n");
-            return QuantizationTables{0};
+            error = true;
+            return error;
         }
 
         for (u8 i=0; i<64; i++) {
@@ -581,47 +553,16 @@ QuantizationTables parse_DefineQuantizationTable(u8** data) {
         table_idx++;
     }
 
-    // This is safer
-    // *data += length;
-    // but this should work if I didn't fuck up
     *data = ptr;
-    return qt;
+    return error;
 }
 
-struct ScanHeader {
-    u8 n_components;
-
-    u8 component_selector[4];
-    u8 dc_selector[4];
-    u8 ac_selector[4];
-
-    u8 start_spectral;              // Not used
-    u8 end_spectral;                // Not used
-    u8 approx_high;                 // Not used
-    u8 approx_low;                  // Not used
-};
-
-void print_sh(ScanHeader& sh) {
-    printf("Scan Header: \n");
-    printf("-----------  \n");
-
-    for (u8 i=0; i<sh.n_components; i++) {
-        printf("Component %d: \n", i);
-        printf("    selector: %d\n", sh.component_selector[i]);
-        printf("    dc selector: %d\n", sh.dc_selector[i]);
-        printf("    ac selector: %d\n", sh.ac_selector[i]);
-    }
-    printf("Start spectral: %d\n", sh.start_spectral);
-    printf("End spectral: %d\n", sh.end_spectral);
-    printf("Approx high: %d\n", sh.approx_high);
-    printf("Approx low: %d\n", sh.approx_low);
-}
-
-ScanHeader parse_StartOfScan(u8** data) {
-    ScanHeader sh = {0};
+bool parse_StartOfScan(u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    ScanHeader& sh = jpeg->sh;
     u8* ptr = *data;
 
-    u16 length = swap_endianness(*(u16*)ptr);
+    u16 length = get_marker(ptr);
     ptr += 2;
 
     // Header
@@ -647,54 +588,8 @@ ScanHeader parse_StartOfScan(u8** data) {
     ptr++;
 
     *data = ptr;
-    return sh;
+    return error;
 }
-
-typedef struct {
-    u16 width;
-    u16 height;
-    u8 num_components;
-    Markers algorithm;
-
-    QuantizationTables qt;
-
-    FrameHeader fh;
-
-    ScanHeader sh;
-
-    HuffmanTableSpec ht;
-
-    u16 restart_interval;
-
-    // jpeg_component_t components[3];
-
-    // uint8_t quant_tables[4][64];
-    // uint8_t quant_table_set[4];
-
-    // huffman_table_t huffman_tables[2][4];
-    // uint8_t huffman_table_set[2][4];
-
-    // scan_component_t scan_components[3];
-    // uint8_t num_scan_components;
-
-    // uint8_t max_h_sampling;
-    // uint8_t max_v_sampling;
-    // uint16_t mcu_width;
-    // uint16_t mcu_height;
-
-    // uint8_t* entropy_data;
-    // size_t   entropy_size;
-
-    // int16_t* mcu_blocks;
-    // uint8_t* image_data; // final RGB or YCbCr
-} jpeg_t;
-
-typedef struct {
-    u8* data;
-    // u64 size;
-    u64 byte_pos;
-    u8 bit_pos;
-} BitStream;
 
 void next_bit(BitStream* bs, u8* bit_out) {
     // if (bs->byte_pos >= bs->size) {
@@ -713,27 +608,19 @@ void next_bit(BitStream* bs, u8* bit_out) {
     // return true;
 }
 
-// u16 peek_2bytes(BitStream* bs) {
-//     return swap_endianness(*(u16*)&(bs->data[bs->byte_pos]));
-// }
-
 void peek_2bytes(BitStream* bs, u16* data) {
-    *data = swap_endianness(*(u16*)&(bs->data[bs->byte_pos]));
+    *data = get_marker(&(bs->data[bs->byte_pos]));
 }
 
 void peek_byte(BitStream* bs, u8* byte) {
     *byte = bs->data[bs->byte_pos];
 }
 
-// u8 traverse_tree(HuffmanNode* root, BitStream* bs);
-
-void parse_EntropyStream(Arena* persist_arena, jpeg_t* jpeg, u8** data) {
+/*
+void parse_EntropyStream(Arena* persist_arena, u8** data, jpeg_t* jpeg) {
     BitStream bs = {0};
     bs.data = *data;
     u8 bit;
-    print_fh(jpeg->fh);
-    print_sh(jpeg->sh);
-    print_ht(jpeg->ht);
 
     u8 n_components = jpeg->fh.src_components;
     u8 maxHSample = 0;
@@ -743,60 +630,60 @@ void parse_EntropyStream(Arena* persist_arena, jpeg_t* jpeg, u8** data) {
         maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
     }
 
-    /*
-    for (u16 vblock = 0; vblock<jpeg->fh.src_height/maxVSample; vblock++) {
-        for (u16 hblock = 0; hblock<jpeg->fh.src_width/maxHSample; hblock++) {
 
-            for (u8 c=0; c<n_components; c++) {
-                // Assume the components are in the same order in frame header and scan header!
-                u8 component_id = jpeg->fh.component_id[c];
-                u8 qt = jpeg->fh.QT_selector[c];
-                u8 component_id_from_scan = jpeg->sh.component_selector[c];
-                if (component_id_from_scan != component_id) {
-                    printf("Components are not in the same order in Scan Header and Frame Header!\n");
-                }
-                u8 dc_table_id = jpeg->sh.dc_selector[c];
-                u8 ac_table_id = jpeg->sh.ac_selector[c];
-                // TODO(alex): change once the ht struct is changed to separate dc and ac
-                dc_table_id = 2*dc_table_id + 0;
-                ac_table_id = 2*ac_table_id + 1;
-                HuffmanNode* dc_root = jpeg->ht.root[dc_table_id];
-                HuffmanNode* ac_root = jpeg->ht.root[ac_table_id];
+    // for (u16 vblock = 0; vblock<jpeg->fh.src_height/maxVSample; vblock++) {
+    //     for (u16 hblock = 0; hblock<jpeg->fh.src_width/maxHSample; hblock++) {
 
-                for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
-                    for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-                        HuffmanNode* node = dc_root;
+    //         for (u8 c=0; c<n_components; c++) {
+    //             // Assume the components are in the same order in frame header and scan header!
+    //             u8 component_id = jpeg->fh.component_id[c];
+    //             u8 qt = jpeg->fh.QT_selector[c];
+    //             u8 component_id_from_scan = jpeg->sh.component_selector[c];
+    //             if (component_id_from_scan != component_id) {
+    //                 printf("Components are not in the same order in Scan Header and Frame Header!\n");
+    //             }
+    //             u8 dc_table_id = jpeg->sh.dc_selector[c];
+    //             u8 ac_table_id = jpeg->sh.ac_selector[c];
+    //             // TODO(alex): change once the ht struct is changed to separate dc and ac
+    //             dc_table_id = 2*dc_table_id + 0;
+    //             ac_table_id = 2*ac_table_id + 1;
+    //             HuffmanNode* dc_root = jpeg->ht.root[dc_table_id];
+    //             HuffmanNode* ac_root = jpeg->ht.root[ac_table_id];
 
-                        // TODO(alex): Need to remove 0x00 after 0xFF
+    //             for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
+    //                 for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
+    //                     HuffmanNode* node = dc_root;
 
-                        // Process 1 DC
-                        while(!node->is_leaf) {
-                            next_bit(&bs, &bit);
-                            if (bit) {
-                                node = node->right;
-                            } else {
-                                node = node->left;
-                            }
-                        }
-                        u8 dc_code = node->value;
+    //                     // TODO(alex): Need to remove 0x00 after 0xFF
 
-                        u8 n_ac = 0;
-                        // Process 63 AC
-                        // while (n_ac < 63) {
-                        // }
+    //                     // Process 1 DC
+    //                     while(!node->is_leaf) {
+    //                         next_bit(&bs, &bit);
+    //                         if (bit) {
+    //                             node = node->right;
+    //                         } else {
+    //                             node = node->left;
+    //                         }
+    //                     }
+    //                     u8 dc_code = node->value;
+
+    //                     u8 n_ac = 0;
+    //                     // Process 63 AC
+    //                     // while (n_ac < 63) {
+    //                     // }
 
 
-                    }
-                }
-                // "un"-quantize
-                // to 8x8
-                // IDCT
-                // Sample up
-                // Save to YCbCr
-            } // FOR end of components
-        } // FOR end of horizontal blocks
-    } // FOR end of vertical blocks
-    */
+    //                 }
+    //             }
+    //             // "un"-quantize
+    //             // to 8x8
+    //             // IDCT
+    //             // Sample up
+    //             // Save to YCbCr
+    //         } // FOR end of components
+    //     } // FOR end of horizontal blocks
+    // } // FOR end of vertical blocks
+
 
     // TODO(alex): In principle we should be able to remove the peek 2 bytes to check for End Of Images
     //  Because we should arrive there naturally after we have decoded all the MCUs.
@@ -808,39 +695,39 @@ void parse_EntropyStream(Arena* persist_arena, jpeg_t* jpeg, u8** data) {
     while (marker != EndOfImage) {
         switch (marker) {
             case Restart0: {
-                printf("Restart 0: %d\n", n);
+                // printf("Restart 0: %d\n", n);
                 n=0;
             } break;
             case Restart1: {
-                printf("Restart 1: %d\n", n);
+                // printf("Restart 1: %d\n", n);
                 n=0;
             } break;
             case Restart2: {
-                printf("Restart 2: %d\n", n);
+                // printf("Restart 2: %d\n", n);
                 n=0;
             } break;
             case Restart3: {
-                printf("Restart 3: %d\n", n);
+                // printf("Restart 3: %d\n", n);
                 n=0;
             } break;
             case Restart4: {
-                printf("Restart 4: %d\n", n);
+                // printf("Restart 4: %d\n", n);
                 n=0;
             } break;
             case Restart5: {
-                printf("Restart 5: %d\n", n);
+                // printf("Restart 5: %d\n", n);
                 n=0;
             } break;
             case Restart6: {
-                printf("Restart 6: %d\n", n);
+                // printf("Restart 6: %d\n", n);
                 n=0;
             } break;
             case Restart7: {
-                printf("Restart 7: %d\n", n);
+                // printf("Restart 7: %d\n", n);
                 n=0;
             } break;
             case 0xFF00: {
-                printf("0xFF00\n");
+                // printf("0xFF00\n");
             } break;
             default: {
 
@@ -855,111 +742,9 @@ void parse_EntropyStream(Arena* persist_arena, jpeg_t* jpeg, u8** data) {
 
     *data = &bs.data[bs.byte_pos];
 }
+*/
 
-Image decode_jpeg_old(Arena* persist_arena, string8 data) {
-    Image out = {0};
-    LocalArena* local_arena = local_arena_alloc_create();
-    u8* end_of_data = (u8*)(data.buffer + data.size);
-
-    // Note: Current goal is to support baseline DCT 8 bits
-
-    jpeg_t jpeg = {0};
-    u8* ptr = (u8*)data.buffer;
-    u16 marker = swap_endianness(*(u16*)ptr);
-
-    // Get start marker
-    if (marker != StartOfImage) {
-        printf("First marker is not StartOfImage!\n");
-        return out;
-    }
-
-    u16 end_marker = swap_endianness(*(u16*)(end_of_data-2));
-
-    printf("Last marker: 0x%X, EndOfImage: 0x%X\n", end_marker, EndOfImage);
-
-    while (ptr < end_of_data) {
-        // Increase pointer to after the marker
-        ptr += 2;
-        // TODO(alex): ptr automatically moved to the end of the data by each functions
-        bool break_out = false;
-        switch (marker) {
-            case StartOfImage: {
-            } break;
-            case ApplicationSegment0: {
-                // If contains JFIF => data are YCbCr not RGB (as followinf JFIF standard)
-                printf("ApplicationSegment0\n");
-                parse_ApplicationSegment0(&ptr);
-            } break;
-            case ApplicationSegment1: {
-                // Uses EXIF standard
-                printf("ApplicationSegment1\n");
-                parse_ApplicationSegment1(&ptr);
-            } break;
-            case ApplicationSegment13: {
-                printf("ApplicationSegment13\n");
-                parse_ApplicationSegment13(&ptr);
-            } break;
-            case ApplicationSegment14: {
-                printf("ApplicationSegment14\n");
-                parse_ApplicationSegment14(&ptr);
-            } break;
-            case DefineQuantizationTable: {
-                printf("DefineQuantizationTable\n");
-                jpeg.qt = parse_DefineQuantizationTable(&ptr);
-            } break;
-            case StartOfFrame0:   // Baseline DCT
-            case StartOfFrame1:   // Extended Sequential DCT
-            case StartOfFrame2:   // Progressive DCT
-            case StartOfFrame3:   // Lossless (sequential)
-            case StartOfFrame5:   // Differential sequential DCT
-            case StartOfFrame6:   // Differential progressive DCT
-            case StartOfFrame7: { // Differential lossless (sequential)
-                printf("StartOfFrame\n");
-                if (marker == StartOfFrame0) {
-                    jpeg.algorithm = (Markers)marker;
-                } else {
-                    printf("StartOfFrame: 0x%X not supported\n", marker);
-                    break_out = true;
-                    break;
-                }
-                jpeg.fh = parse_StartOfFrame(&ptr);
-            } break;
-            case DefineRestartInterval: {
-                printf("DefineRestartInterval\n");
-                jpeg.restart_interval = parse_DefineRestartInterval(&ptr);
-            } break;
-            case DefineHuffmanTable: {
-                printf("DefineHuffmanTable\n");
-                jpeg.ht = parse_DefineHuffmanTable(local_arena->arena, &ptr);
-            } break;
-            case StartOfScan: {
-                printf("StartOfScan\n");
-                jpeg.sh = parse_StartOfScan(&ptr);
-
-                // Actual scan after parsing the header
-                parse_EntropyStream(persist_arena, &jpeg, &ptr);
-            } break;
-            case EndOfImage: {
-                printf("EndOfImage\n");
-                break_out = true;
-            } break;
-            default: {
-                printf("JPEG MARKER NOT SUPPORTED :: 0x%X\n", marker);
-                break_out = true;
-            } break;
-        }
-
-        if (break_out) {
-            break;
-        }
-        marker = swap_endianness(*(u16*)ptr);
-    }
-
-    local_arena_alloc_reset(local_arena);
-    return out;
-}
-
-bool is_start_of_frame(Markers marker) {
+bool is_start_of_frame(u16 marker) {
     return marker==StartOfFrame0 ||
            marker==StartOfFrame1 ||
            marker==StartOfFrame2 ||
@@ -969,9 +754,81 @@ bool is_start_of_frame(Markers marker) {
            marker==StartOfFrame7;
 }
 
-bool interpret_marker(Markers marker, u8** data, jpeg_t* jpeg) {
+bool is_restart(u8** data, s8* idx) {
     u8* ptr = *data;
+    u16 marker = get_marker(ptr);
+    bool out = true;
+    switch (marker) {
+        case Restart0: {
+            *idx = 0;
+        } break;
+        case Restart1: {
+            *idx = 1;
+        } break;
+        case Restart2: {
+            *idx = 2;
+        } break;
+        case Restart3: {
+            *idx = 3;
+        } break;
+        case Restart4: {
+            *idx = 4;
+        } break;
+        case Restart5: {
+            *idx = 5;
+        } break;
+        case Restart6: {
+            *idx = 6;
+        } break;
+        case Restart7: {
+            *idx = 7;
+        } break;
+        default: {
+            out = false;
+        } break;
+    }
+    if (out) {
+        ptr += 2;
+    }
+    *data = ptr;
+    return out;
+}
 
+bool is_interpret_marker(u16 marker) {
+    bool out = false;
+    switch (marker) {
+        case DefineQuantizationTable:
+        case DefineHuffmanTable:
+        case DefineArithmeticCoding:
+        case DefineRestartInterval:
+        case Comment:
+        case DefineNumberOfLines:
+        case ApplicationSegment0:
+        case ApplicationSegment1:
+        case ApplicationSegment2:
+        case ApplicationSegment3:
+        case ApplicationSegment4:
+        case ApplicationSegment5:
+        case ApplicationSegment6:
+        case ApplicationSegment7:
+        case ApplicationSegment8:
+        case ApplicationSegment9:
+        case ApplicationSegment10:
+        case ApplicationSegment11:
+        case ApplicationSegment12:
+        case ApplicationSegment13:
+        case ApplicationSegment14:
+        case ApplicationSegment15: {
+            out = true;
+        } break;
+    }
+    return out;
+}
+
+bool interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
+    u8* ptr = *data;
+    u16 marker = get_marker(ptr);
+    ptr += 2;
     // Note: ptr automatically moved to the end of the data by each functions
     // TODO(alex): Each parse_ function should taker jpeg as argument and return error status
     bool error = false;
@@ -979,62 +836,224 @@ bool interpret_marker(Markers marker, u8** data, jpeg_t* jpeg) {
         case ApplicationSegment0: {
             // If contains JFIF => data are YCbCr not RGB (as followinf JFIF standard)
             printf("ApplicationSegment0\n");
-            parse_ApplicationSegment0(&ptr);
+            error = parse_ApplicationSegment0(&ptr, jpeg);
         } break;
         case ApplicationSegment1: {
             // Uses EXIF standard
             printf("ApplicationSegment1\n");
-            parse_ApplicationSegment1(&ptr);
+            error = parse_ApplicationSegment1(&ptr, jpeg);
         } break;
         case ApplicationSegment13: {
             printf("ApplicationSegment13\n");
-            parse_ApplicationSegment13(&ptr);
+            error = parse_ApplicationSegment13(&ptr, jpeg);
         } break;
         case ApplicationSegment14: {
             printf("ApplicationSegment14\n");
-            parse_ApplicationSegment14(&ptr);
+            error = parse_ApplicationSegment14(&ptr, jpeg);
         } break;
         case DefineQuantizationTable: {
             printf("DefineQuantizationTable\n");
-            jpeg.qt = parse_DefineQuantizationTable(&ptr);
+            error = parse_DefineQuantizationTable(&ptr, jpeg);
         } break;
         case DefineRestartInterval: {
             printf("DefineRestartInterval\n");
-            jpeg.restart_interval = parse_DefineRestartInterval(&ptr);
+            error = parse_DefineRestartInterval(&ptr, jpeg);
         } break;
         case DefineHuffmanTable: {
             printf("DefineHuffmanTable\n");
-            jpeg.ht = parse_DefineHuffmanTable(local_arena->arena, &ptr);
+            error = parse_DefineHuffmanTable(arena, &ptr, jpeg);
         } break;
         case Comment: {
+            printf("Comment not implemented\n");
         } break;
-        // case StartOfScan: {
-        //     printf("StartOfScan\n");
-        //     jpeg.sh = parse_StartOfScan(&ptr);
-
-        //     // Actual scan after parsing the header
-        //     parse_EntropyStream(persist_arena, &jpeg, &ptr);
-        // } break;
-        // case EndOfImage: {
-        //     printf("EndOfImage\n");
-        //     break_out = true;
-        // } break;
-        default: {
-            printf("JPEG MARKER NOT SUPPORTED :: 0x%X\n", marker);
-            error = true;
+        case DefineNumberOfLines: {
+            printf("DefineNumberOfLines not implemented\n");
         } break;
     }
+    *data = ptr;
+    return error;
+}
+
+bool decode_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    BitStream bs = {0};
+    bs.data = *data;
+    u8 bit;
+
+    u8 n_components = jpeg->fh.src_components;
+    u8 maxHSample = 0;
+    u8 maxVSample = 0;
+    for (u8 c=0; c<n_components; c++) {
+        maxHSample = maxHSample>jpeg->fh.H_sample[c] ? maxHSample:jpeg->fh.H_sample[c];
+        maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
+    }
+
+    for (u8 c=0; c<n_components; c++) {
+        // Assume the components are in the same order in frame header and scan header!
+        u8 component_id = jpeg->fh.component_id[c];
+        u8 qt = jpeg->fh.QT_selector[c];
+        u8 component_id_from_scan = jpeg->sh.component_selector[c];
+        if (component_id_from_scan != component_id) {
+            printf("Components are not in the same order in Scan Header and Frame Header!\n");
+        }
+        u8 dc_table_id = jpeg->sh.dc_selector[c];
+        u8 ac_table_id = jpeg->sh.ac_selector[c];
+        // TODO(alex): change once the ht struct is changed to separate dc and ac
+        dc_table_id = 2*dc_table_id + 0;
+        ac_table_id = 2*ac_table_id + 1;
+        HuffmanNode* dc_root = jpeg->ht.root[dc_table_id];
+        HuffmanNode* ac_root = jpeg->ht.root[ac_table_id];
+
+        for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
+            for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
+                HuffmanNode* node = dc_root;
+
+                // TODO(alex): Need to remove 0x00 after 0xFF
+
+                // Process 1 DC
+                while(!node->is_leaf) {
+                    next_bit(&bs, &bit);
+                    if (bit) {
+                        node = node->right;
+                    } else {
+                        node = node->left;
+                    }
+                }
+                u8 dc_code = node->value;
+
+                u8 n_ac = 0;
+                // Process 63 AC
+                for (u8 i=0; i<63; i++) {
+                    while(!node->is_leaf) {
+                        next_bit(&bs, &bit);
+                        if (bit) {
+                            node = node->right;
+                        } else {
+                            node = node->left;
+                        }
+                    }
+                    u8 ac_code = node->value;
+                }
+            }
+        }
+    } // FOR end of components
+    return error;
+}
+
+bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
+    bool error = false;
+    u8* ptr = *data;
+
+    if (jpeg->restart_interval != 0) {
+        u16 n = 0;
+        s8 restart_id = -1;
+        while (get_marker(ptr) != EndOfImage) {
+            ptr++;
+        }
+
+        // restart_interval segments
+    } else {
+        printf("Encoding without restart not implemented!\n");
+        u16 marker = get_marker(ptr);
+        while (marker != EndOfImage) {
+            ptr++;
+        }
+        // while ... not table/misc/scanheader/EOI
+    }
+
+    // parse_MCU();
+
+    *data = ptr;
+    return error;
+}
+
+bool parse_Scan(Arena* persist_arena, Arena* local_arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
+    bool error = false;
+    u8* ptr = *data;
+
+
+    u16 marker = get_marker(ptr);
+    while (is_interpret_marker(marker) && ptr<end_of_data) {
+        error = interpret_marker(local_arena, &ptr, jpeg);
+        if (error) {
+            break;
+        }
+        marker = get_marker(ptr);
+    }
+
+    if (!error && (marker == StartOfScan)) {
+        ptr += 2;
+        error = parse_StartOfScan(&ptr, jpeg);
+    } else {
+        error = true;
+        printf("Error or did not find StartOfScan!\n");
+    }
+
+    if (!error) {
+        s8 restart_id = -1;
+        do {
+            error = parse_EntropySegment(persist_arena, &ptr, jpeg);
+            if (error) {
+                // TODO(alex): Here could check and move forward until next restart marker?
+                printf("Error while decoding entropy segment!\n");
+                break;
+            }
+        } while (is_restart(&ptr, &restart_id));
+    }
+    *data = ptr;
+    return error;
+}
+
+bool decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
+    LocalArena* local_arena = local_arena_alloc_create();
+    bool error = false;
+    u8* ptr = *data;
+
+    u16 marker = get_marker(ptr);
+    // TODO(alex): Change to is_interpret_marker
+    while (!is_start_of_frame(marker) && (marker != EndOfImage) && ptr<end_of_data) {
+        error = interpret_marker(local_arena->arena, &ptr, jpeg);
+        if (error) {
+            break;
+        }
+        marker = get_marker(ptr);
+    }
+
+    if (!error && is_start_of_frame(marker)) {
+        if (marker == StartOfFrame0) {
+            printf("StartOfFrame0\n");
+            jpeg->algorithm = (Markers)marker;
+            ptr += 2;
+            error = parse_StartOfFrame(&ptr, jpeg);
+        } else {
+            printf("StartOfFrame: 0x%X not implemented!\n", marker);
+        }
+    } else {
+        printf("Error or not finding StartOfFrame marker!.\n");
+    }
+
+    if (!error) {
+        marker = get_marker(ptr);
+        while ((is_interpret_marker(marker) || (marker==StartOfScan)) && ptr<end_of_data) {       // Either DNL between scans or Tables/misc. or Scan header
+            error = parse_Scan(persist_arena, local_arena->arena, &ptr, jpeg, end_of_data);
+            if (error) {
+                break;
+            }
+        }
+    }
+
+    *data = ptr;
+    local_arena_alloc_reset(local_arena);
     return error;
 }
 
 Image decode_jpeg(Arena* persist_arena, string8 data) {
     // Note: Current goal is to support baseline DCT 8 bits
     Image out = {0};
-    LocalArena* local_arena = local_arena_alloc_create();
-    u8* end_of_data = (u8*)(data.buffer + data.size);
     u8* ptr = (u8*)data.buffer;
-    u16 marker = swap_endianness(*(u16*)ptr);
-    u16 end_marker = swap_endianness(*(u16*)(end_of_data-2));
+    u16 marker = get_marker(ptr);
+    u8* end_of_data = (u8*)(data.buffer + data.size);
+    u16 end_marker = get_marker(end_of_data-2);
 
     // Get start marker
     if (marker != StartOfImage) {
@@ -1046,37 +1065,24 @@ Image decode_jpeg(Arena* persist_arena, string8 data) {
     }
     // Get marker after start of image
     ptr += 2;
-    marker = swap_endianness(*(u16*)ptr);
 
     // Decoder_setup
     jpeg_t jpeg = {0};
 
-    //  if SOF -> Decode_frame
-    //  else -> interpret marker (e.g. Huffman, DCT, ...)
-    while (ptr < end_of_data) {
-        // Increase pointer to after the marker
-        ptr += 2;
+    bool error = decode_frame(persist_arena, &ptr, &jpeg, end_of_data);
 
-        if (is_start_of_frame(marker)) {        // DCT baseline
-            if (marker == StartOfFrame0) {
-                printf("StartOfFrame\n");
-                jpeg.algorithm = (Markers)marker;
-                jpeg.fh = parse_StartOfFrame(&ptr);
-            } else {
-                break;
-            }
+    marker = get_marker(ptr);
 
-            // Decode_frame();
-        } else {
-            bool error = interpret_marker(marker, &ptr, &jpeg);
-            if (error) {
-                break;
-            }
-        }
-        marker = swap_endianness(*(u16*)ptr);
+    if (!error && marker == EndOfImage){
+        out.width       = jpeg.fh.src_width;
+        out.height      = jpeg.fh.src_height;
+        out.components  = jpeg.fh.src_components;
+        out.precision   = jpeg.fh.src_precision;
+        out.rgb         = jpeg.rgb;                         // works for anything because its a union
+    } else {
+        printf("Processing of image failed!\n");
     }
 
-    local_arena_alloc_reset(local_arena);
     return out;
 }
 
