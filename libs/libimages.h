@@ -941,29 +941,40 @@ bool decode_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-u8 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
-    u8 value = 0;
+s8 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
+    s8 value = 0;
     HuffmanNode* node = root_node;
 
-    // read 4 bits
-    u8 code_length = 0;
-    for (u8 i=0; i<4; i++) {
+    // Decode the category (code_length) using Huffman tree
+    while (!node->is_leaf) {
         u8 bit = 0;
         next_bit(bs, &bit);
-        code_length = (code_length<<1) | bit;
-    }
 
-    for (u8 i=0; i<code_length; i++) {
-        u8 bit = 0;
-        next_bit(bs, &bit);
         if (bit) {
             node = node->right;
         } else {
             node = node->left;
         }
     }
-    if (node->is_leaf) {
-        value = node->value;
+    u8 code_length = node->value;
+
+    // Read that amount of bits
+    bool positive = false;
+    u8 tmp_value = 0;
+    for (u8 i=0; i<code_length; i++) {
+        u8 bit = 0;
+        next_bit(bs, &bit);
+        if (i == 0 && bit == 1) {
+            positive = true;
+        }
+        tmp_value = (tmp_value<<1) | bit;
+    }
+
+    // Convert to signed value
+    if (positive) {
+        value = (s8)tmp_value;
+    } else {
+        value = -((1<<code_length)-1) + tmp_value;
     }
 
     return value;
@@ -993,14 +1004,14 @@ bool parse_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
 
         u8 dc_table_id = jpeg->sh.dc_selector[c];
         u8 ac_table_id = jpeg->sh.ac_selector[c];
-        dc_table_id = 2*dc_table_id + 0;
-        ac_table_id = 2*ac_table_id + 1;
+        dc_table_id = 0 + dc_table_id;
+        ac_table_id = 2 + ac_table_id;
         HuffmanNode* dc_ht_root = jpeg->ht.root[dc_table_id];
         // HuffmanNode* ac_ht_root = jpeg->ht.root[ac_table_id];
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-                u8 dc_value = parse_DCDataUnit(&bs, dc_ht_root);
+                s8 dc_value = parse_DCDataUnit(&bs, dc_ht_root);
 
                 u8 i = 0;
                 while (i++<63) {        // and not a marker that would indicate something
@@ -1018,6 +1029,7 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
     bool error = false;
     u8* ptr = *data;
 
+    // restart_interval segments
     if (jpeg->restart_interval != 0) {
         u16 n = 0;
         while (n < jpeg->restart_interval) {
@@ -1028,7 +1040,6 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
             n++;
         }
 
-        // restart_interval segments
     } else {
         printf("Encoding without restart not implemented!\n");
         error = true;
