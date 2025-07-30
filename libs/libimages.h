@@ -479,11 +479,13 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
         HuffmanNode* node = 0;
         u16 code = 0;
         u8* symbol = ht.symbols[table_idx];
+
+        node = ht.root[table_class][table_id];
         for (u8 i=0; i<16; i++) {
             u8 l = i+1;
             u8 n_codes = ht.code_lengths[table_idx][i];
 
-            node = ht.root[table_class][table_id];
+            // node = ht.root[table_class][table_id];
             // For each code of length i
             for (u16 j=0; j<n_codes; j++, code++, symbol++) {
                 // Use binary coding to traverse (and create) tree and assign value to node
@@ -869,72 +871,6 @@ bool interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-bool decode_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
-    bool error = false;
-    BitStream bs = {0};
-    bs.data = *data;
-    u8 bit;
-
-    u8 n_components = jpeg->fh.src_components;
-    u8 maxHSample = 0;
-    u8 maxVSample = 0;
-    for (u8 c=0; c<n_components; c++) {
-        maxHSample = maxHSample>jpeg->fh.H_sample[c] ? maxHSample:jpeg->fh.H_sample[c];
-        maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
-    }
-
-    for (u8 c=0; c<n_components; c++) {
-        // Assume the components are in the same order in frame header and scan header!
-        u8 component_id = jpeg->fh.component_id[c];
-        u8 qt = jpeg->fh.QT_selector[c];
-        u8 component_id_from_scan = jpeg->sh.component_selector[c];
-        if (component_id_from_scan != component_id) {
-            printf("Components are not in the same order in Scan Header and Frame Header!\n");
-        }
-        u8 dc_table_id = jpeg->sh.dc_selector[c];
-        u8 ac_table_id = jpeg->sh.ac_selector[c];
-        // TODO(alex): change once the ht struct is changed to separate dc and ac
-        // dc_table_id = dc_table_id;
-        // ac_table_id = ac_table_id;
-        HuffmanNode* dc_root = jpeg->ht.root[0][dc_table_id];
-        HuffmanNode* ac_root = jpeg->ht.root[1][ac_table_id];
-
-        for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
-            for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-                HuffmanNode* node = dc_root;
-
-                // TODO(alex): Need to remove 0x00 after 0xFF
-
-                // Process 1 DC
-                while(!node->is_leaf) {
-                    next_bit(&bs, &bit);
-                    if (bit) {
-                        node = node->right;
-                    } else {
-                        node = node->left;
-                    }
-                }
-                u8 dc_code = node->value;
-
-                u8 n_ac = 0;
-                // Process 63 AC
-                for (u8 i=0; i<63; i++) {
-                    while(!node->is_leaf) {
-                        next_bit(&bs, &bit);
-                        if (bit) {
-                            node = node->right;
-                        } else {
-                            node = node->left;
-                        }
-                    }
-                    u8 ac_code = node->value;
-                }
-            }
-        }
-    } // FOR end of components
-    return error;
-}
-
 // TODO(alex): S16 for DC?
 s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
     s8 value = 0;
@@ -1018,6 +954,9 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     //     maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
     // }
 
+    const u8 DC = 0;
+    const u8 AC = 1;
+
     for (u8 nc=0; nc<n_components; nc++) {
         u8 c = jpeg->sh.component_selector[nc];
 
@@ -1031,8 +970,8 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
         u8 dc_table_id = jpeg->sh.dc_selector[c];
         u8 ac_table_id = jpeg->sh.ac_selector[c];
-        HuffmanNode* dc_ht_root = jpeg->ht.root[0][dc_table_id];
-        HuffmanNode* ac_ht_root = jpeg->ht.root[1][ac_table_id];
+        HuffmanNode* dc_ht_root = jpeg->ht.root[DC][dc_table_id];
+        HuffmanNode* ac_ht_root = jpeg->ht.root[AC][ac_table_id];
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
