@@ -1038,10 +1038,15 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
         printf("Encoding without restart not implemented!\n");
         error = true;
         u16 marker = get_marker(ptr);
-        while (marker != EndOfImage) {
-            ptr++;
-        }
         // while ... not table/misc/scanheader/EOI
+        while (marker != EndOfImage) {
+            error = parse_mcu(arena, &bs, jpeg);
+            if (error) {
+                break;
+            }
+            marker = get_marker(bs.data);
+        }
+        ptr = bs.data;
     }
 
     *data = ptr;
