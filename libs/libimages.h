@@ -209,6 +209,30 @@ void print_fh(FrameHeader& fh) {
     }
 }
 
+void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
+    if (!node) return;
+
+    // Indentation
+    for (int i = 0; i < depth; i++) {
+        printf("    ");
+    }
+
+    // Print current node
+    if (depth > 0) {
+        printf("%s── ", is_left ? "L" : "R");
+    }
+
+    if (node->is_leaf) {
+        printf("[Leaf: %u]\n", node->value);
+    } else {
+        printf("*\n");
+    }
+
+    // Recurse left and right
+    draw_huffman_tree(node->left, depth + 1, true);
+    draw_huffman_tree(node->right, depth + 1, false);
+}
+
 void print_ht(HuffmanTableSpec& ht) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
@@ -230,6 +254,9 @@ void print_ht(HuffmanTableSpec& ht) {
                 printf("\n");
             }
         }
+
+        printf("    Tree: \n    ");
+        draw_huffman_tree(ht.root[ht.table_class[i]][ht.table_id[i]]);
     }
 }
 
@@ -445,30 +472,6 @@ bool parse_DefineRestartInterval(u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
-    if (!node) return;
-
-    // Indentation
-    for (int i = 0; i < depth; i++) {
-        printf("    ");
-    }
-
-    // Print current node
-    if (depth > 0) {
-        printf("%s── ", is_left ? "L" : "R");
-    }
-
-    if (node->is_leaf) {
-        printf("[Leaf: %u]\n", node->value);
-    } else {
-        printf("*\n");
-    }
-
-    // Recurse left and right
-    draw_huffman_tree(node->left, depth + 1, true);
-    draw_huffman_tree(node->right, depth + 1, false);
-}
-
 bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
     bool error = false;
     HuffmanTableSpec& ht = jpeg->ht;
@@ -637,134 +640,6 @@ void peek_byte(BitStream* bs, u8* byte) {
     *byte = bs->data[bs->byte_pos];
 }
 
-/*
-void parse_EntropyStream(Arena* persist_arena, u8** data, jpeg_t* jpeg) {
-    BitStream bs = {0};
-    bs.data = *data;
-    u8 bit;
-
-    u8 n_components = jpeg->fh.src_components;
-    u8 maxHSample = 0;
-    u8 maxVSample = 0;
-    for (u8 c=0; c<n_components; c++) {
-        maxHSample = maxHSample>jpeg->fh.H_sample[c] ? maxHSample:jpeg->fh.H_sample[c];
-        maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
-    }
-
-
-    // for (u16 vblock = 0; vblock<jpeg->fh.src_height/maxVSample; vblock++) {
-    //     for (u16 hblock = 0; hblock<jpeg->fh.src_width/maxHSample; hblock++) {
-
-    //         for (u8 c=0; c<n_components; c++) {
-    //             // Assume the components are in the same order in frame header and scan header!
-    //             u8 component_id = jpeg->fh.component_id[c];
-    //             u8 qt = jpeg->fh.QT_selector[c];
-    //             u8 component_id_from_scan = jpeg->sh.component_selector[c];
-    //             if (component_id_from_scan != component_id) {
-    //                 printf("Components are not in the same order in Scan Header and Frame Header!\n");
-    //             }
-    //             u8 dc_table_id = jpeg->sh.dc_selector[c];
-    //             u8 ac_table_id = jpeg->sh.ac_selector[c];
-    //             // TODO(alex): change once the ht struct is changed to separate dc and ac
-    //             dc_table_id = 2*dc_table_id + 0;
-    //             ac_table_id = 2*ac_table_id + 1;
-    //             HuffmanNode* dc_root = jpeg->ht.root[dc_table_id];
-    //             HuffmanNode* ac_root = jpeg->ht.root[ac_table_id];
-
-    //             for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
-    //                 for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-    //                     HuffmanNode* node = dc_root;
-
-    //                     // TODO(alex): Need to remove 0x00 after 0xFF
-
-    //                     // Process 1 DC
-    //                     while(!node->is_leaf) {
-    //                         next_bit(&bs, &bit);
-    //                         if (bit) {
-    //                             node = node->right;
-    //                         } else {
-    //                             node = node->left;
-    //                         }
-    //                     }
-    //                     u8 dc_code = node->value;
-
-    //                     u8 n_ac = 0;
-    //                     // Process 63 AC
-    //                     // while (n_ac < 63) {
-    //                     // }
-
-
-    //                 }
-    //             }
-    //             // "un"-quantize
-    //             // to 8x8
-    //             // IDCT
-    //             // Sample up
-    //             // Save to YCbCr
-    //         } // FOR end of components
-    //     } // FOR end of horizontal blocks
-    // } // FOR end of vertical blocks
-
-
-    // TODO(alex): In principle we should be able to remove the peek 2 bytes to check for End Of Images
-    //  Because we should arrive there naturally after we have decoded all the MCUs.
-    //  We know how many CU there are for each components because they are 8x8 and then take into account the sampling factor
-    //  There is also only 1 unique value in the Huffman tree when we decode, we will always get to a leaf and then start a new value.
-    u16 marker;
-    peek_2bytes(&bs, &marker);
-    u32 n = 0;
-    while (marker != EndOfImage) {
-        switch (marker) {
-            case Restart0: {
-                // printf("Restart 0: %d\n", n);
-                n=0;
-            } break;
-            case Restart1: {
-                // printf("Restart 1: %d\n", n);
-                n=0;
-            } break;
-            case Restart2: {
-                // printf("Restart 2: %d\n", n);
-                n=0;
-            } break;
-            case Restart3: {
-                // printf("Restart 3: %d\n", n);
-                n=0;
-            } break;
-            case Restart4: {
-                // printf("Restart 4: %d\n", n);
-                n=0;
-            } break;
-            case Restart5: {
-                // printf("Restart 5: %d\n", n);
-                n=0;
-            } break;
-            case Restart6: {
-                // printf("Restart 6: %d\n", n);
-                n=0;
-            } break;
-            case Restart7: {
-                // printf("Restart 7: %d\n", n);
-                n=0;
-            } break;
-            case 0xFF00: {
-                // printf("0xFF00\n");
-            } break;
-            default: {
-
-            } break;
-        }
-        n++;
-        for (u8 i=0; i<8; i++) {
-            next_bit(&bs, &bit);
-        }
-        peek_2bytes(&bs, &marker);
-    }
-
-    *data = &bs.data[bs.byte_pos];
-}
-*/
-
 bool is_start_of_frame(u16 marker) {
     return marker==StartOfFrame0 ||
            marker==StartOfFrame1 ||
@@ -923,9 +798,9 @@ s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
 
     // Convert to signed value
     if ( tmp_value < (1 << (category-1)) ) {
-        value = tmp_value - (1 << category) + 1;
+        value = (s16)(tmp_value - (1 << category) + 1);
     } else {
-        value = tmp_value;
+        value = (s16)tmp_value;
     }
 
     return value;
@@ -958,7 +833,7 @@ s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length) {
     }
 
     // Convert to signed value
-    if ( tmp_value < (1 << (category-1)) ) {
+    if ( tmp_value < (1 << (category-1)) ) {        // check if first bit set is 0 => negative
         value = (s16)(tmp_value - (1 << category) + 1);
     } else {
         value = (s16)tmp_value;
@@ -983,7 +858,8 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     const u8 AC = 1;
 
     for (u8 nc=0; nc<n_components; nc++) {
-        u8 c = jpeg->sh.component_selector[nc];
+        // u8 c = jpeg->sh.component_selector[nc];
+        u8 c = nc;
 
         // // Assume the components are in the same order in frame header and scan header!
         // u8 component_id = jpeg->fh.component_id[c];
@@ -1000,14 +876,14 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-                s16 dc_value = parse_DCDataUnit(bs, dc_ht_root);
+                s16 DIFF = parse_DCDataUnit(bs, dc_ht_root);
 
                 u8 i = 0;
                 while (i<63) {        // and not a marker that would indicate something
-                    u8 run_length;
-                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &run_length);
-                    i += 1 + run_length;
-                    // printf("TOTAL: %d    Run length: (%d,%d)\n", i, run_length, ac_value);
+                    u8 preceding_zeros;
+                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros);
+                    i += 1 + preceding_zeros;
+                    // printf("TOTAL: %d    Preceding 0: (%d,%d)\n", i, preceding_zeros, ac_value);
                 }
             }
         }
