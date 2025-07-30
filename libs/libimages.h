@@ -158,23 +158,14 @@ struct ScanHeader {
 };
 
 struct HuffmanNode{
-    u16 binary;
     u8 value;
     u8 is_leaf;
     HuffmanNode* left;
     HuffmanNode* right;
-    HuffmanNode* parent;
 };
 
 struct HuffmanTableSpec {
     u8 n_tables;
-
-    // TODO(alex): change struct to split ac and dc
-    // u8 table_class[4][2];
-    // u8 table_id[4][2];
-    // u8 code_lengths[4][2][16];
-    // u8* symbols[4][2];
-    // u16 num_symbols[4][2];
 
     u8 table_class[8];
     u8 table_id[8];
@@ -182,7 +173,8 @@ struct HuffmanTableSpec {
     u8* symbols[8];
     u16 num_symbols[8];
 
-    HuffmanNode* root[8];
+    //             AC/DC  ID
+    HuffmanNode* root[2] [4];
 };
 
 struct QuantizationTables {
@@ -465,8 +457,10 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
     //  see itu-t81.pdf page 40
     u8 table_idx = 0;
     while(ptr < *data+length) {
-        ht.table_class[table_idx] = *ptr >> 4;                 // 0 DC or lossless  --- 1 AC
-        ht.table_id[table_idx] = (*ptr) & 0x0F;
+        u8 table_class = *ptr >> 4;                 // 0 DC or lossless  --- 1 AC
+        ht.table_class[table_idx] = table_class;
+        u8 table_id = (*ptr) & 0x0F;
+        ht.table_id[table_idx] = table_id;
         ptr++;
 
         for (u8 i=0; i<16; i++) {
@@ -480,7 +474,7 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
 
         //==============================
         // Convert table to tree for easier parsing of the entropy stream
-        ht.root[table_idx] = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
+        ht.root[table_class][table_id] = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
 
         HuffmanNode* node = 0;
         u16 code = 0;
@@ -489,7 +483,7 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
             u8 l = i+1;
             u8 n_codes = ht.code_lengths[table_idx][i];
 
-            node = ht.root[table_idx];
+            node = ht.root[table_class][table_id];
             // For each code of length i
             for (u16 j=0; j<n_codes; j++, code++, symbol++) {
                 // Use binary coding to traverse (and create) tree and assign value to node
@@ -900,10 +894,10 @@ bool decode_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
         u8 dc_table_id = jpeg->sh.dc_selector[c];
         u8 ac_table_id = jpeg->sh.ac_selector[c];
         // TODO(alex): change once the ht struct is changed to separate dc and ac
-        dc_table_id = 2*dc_table_id + 0;
-        ac_table_id = 2*ac_table_id + 1;
-        HuffmanNode* dc_root = jpeg->ht.root[dc_table_id];
-        HuffmanNode* ac_root = jpeg->ht.root[ac_table_id];
+        // dc_table_id = dc_table_id;
+        // ac_table_id = ac_table_id;
+        HuffmanNode* dc_root = jpeg->ht.root[0][dc_table_id];
+        HuffmanNode* ac_root = jpeg->ht.root[1][ac_table_id];
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
@@ -976,7 +970,7 @@ s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
     return value;
 }
 
-s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node) {
+s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length) {
     s8 value = 0;
     HuffmanNode* node = root_node;
 
@@ -987,7 +981,7 @@ s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node) {
         node = bit ? node->right : node->left;
     }
     u8 symbol = node->value;
-    u8 SSSS = symbol >> 4;
+    *run_length = symbol >> 4;
     u8 category = symbol & 0x0F;
 
     if (category == 0) {
@@ -1027,21 +1021,29 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     for (u8 nc=0; nc<n_components; nc++) {
         u8 c = jpeg->sh.component_selector[nc];
 
+        // // Assume the components are in the same order in frame header and scan header!
+        // u8 component_id = jpeg->fh.component_id[c];
+        // u8 qt = jpeg->fh.QT_selector[c];
+        // u8 component_id_from_scan = jpeg->sh.component_selector[c];
+        // if (component_id_from_scan != component_id) {
+        //     printf("Components are not in the same order in Scan Header and Frame Header!\n");
+        // }
+
         u8 dc_table_id = jpeg->sh.dc_selector[c];
         u8 ac_table_id = jpeg->sh.ac_selector[c];
-        dc_table_id = 0 + dc_table_id;
-        ac_table_id = 2 + ac_table_id;
-        HuffmanNode* dc_ht_root = jpeg->ht.root[dc_table_id];
-        HuffmanNode* ac_ht_root = jpeg->ht.root[ac_table_id];
+        HuffmanNode* dc_ht_root = jpeg->ht.root[0][dc_table_id];
+        HuffmanNode* ac_ht_root = jpeg->ht.root[1][ac_table_id];
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
                 s16 dc_value = parse_DCDataUnit(bs, dc_ht_root);
 
                 u8 i = 0;
-                while (i++<63) {        // and not a marker that would indicate something
-                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root);
-                    printf("AC: %d\n", ac_value);
+                while (i<63) {        // and not a marker that would indicate something
+                    u8 run_length;
+                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &run_length);
+                    i += 1 + run_length;
+                    printf("TOTAL: %d    Run length: (%d,%d)\n", i, run_length, ac_value);
                 }
             }
         }
