@@ -445,6 +445,30 @@ bool parse_DefineRestartInterval(u8** data, jpeg_t* jpeg) {
     return error;
 }
 
+void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
+    if (!node) return;
+
+    // Indentation
+    for (int i = 0; i < depth; i++) {
+        printf("    ");
+    }
+
+    // Print current node
+    if (depth > 0) {
+        printf("%s── ", is_left ? "L" : "R");
+    }
+
+    if (node->is_leaf) {
+        printf("[Leaf: %u]\n", node->value);
+    } else {
+        printf("*\n");
+    }
+
+    // Recurse left and right
+    draw_huffman_tree(node->left, depth + 1, true);
+    draw_huffman_tree(node->right, depth + 1, false);
+}
+
 bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
     bool error = false;
     HuffmanTableSpec& ht = jpeg->ht;
@@ -463,6 +487,7 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
         ht.table_id[table_idx] = table_id;
         ptr++;
 
+        ht.num_symbols[table_idx] = 0;
         for (u8 i=0; i<16; i++) {
             ht.code_lengths[table_idx][i] = *ptr;
             ht.num_symbols[table_idx] += *ptr;
@@ -480,27 +505,27 @@ bool parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg) {
         u16 code = 0;
         u8* symbol = ht.symbols[table_idx];
 
-        node = ht.root[table_class][table_id];
         for (u8 i=0; i<16; i++) {
             u8 l = i+1;
             u8 n_codes = ht.code_lengths[table_idx][i];
 
-            // node = ht.root[table_class][table_id];
             // For each code of length i
             for (u16 j=0; j<n_codes; j++, code++, symbol++) {
+                node = ht.root[table_class][table_id];
+
                 // Use binary coding to traverse (and create) tree and assign value to node
-                for (u16 c=l-1; c<=0; c++) {
-                    u8 bit = code >> c;
-                    if (bit & 1) { // right
+                for (s16 c=l-1; c>=0; --c) {
+                    u8 bit = (code >> c) & 1;
+                    if (bit) { // right
                         if (!node->right) {
                             node->right = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
-                            node = node->right;
                         }
+                        node = node->right;
                     } else {    // left
                         if (!node->left) {
                             node->left = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
-                            node = node->left;
                         }
+                        node = node->left;
                     }
                 }
                 node->is_leaf = 1;
@@ -982,7 +1007,7 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                     u8 run_length;
                     s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &run_length);
                     i += 1 + run_length;
-                    printf("TOTAL: %d    Run length: (%d,%d)\n", i, run_length, ac_value);
+                    // printf("TOTAL: %d    Run length: (%d,%d)\n", i, run_length, ac_value);
                 }
             }
         }
