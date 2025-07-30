@@ -941,54 +941,79 @@ bool decode_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-s8 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
+// TODO(alex): S16 for DC?
+s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
     s8 value = 0;
     HuffmanNode* node = root_node;
 
-    // Decode the category (code_length) using Huffman tree
+    // Decode the category (code length) using Huffman tree
     while (!node->is_leaf) {
         u8 bit = 0;
         next_bit(bs, &bit);
-
-        if (bit) {
-            node = node->right;
-        } else {
-            node = node->left;
-        }
+        node = bit ? node->right : node->left;
     }
-    u8 code_length = node->value;
+    u8 category = node->value;
+
+    if (category == 0) {
+        return 0;
+    }
 
     // Read that amount of bits
-    bool positive = false;
-    u8 tmp_value = 0;
-    for (u8 i=0; i<code_length; i++) {
+    u16 tmp_value = 0;
+    for (u8 i=0; i<category; i++) {
         u8 bit = 0;
         next_bit(bs, &bit);
-        if (i == 0 && bit == 1) {
-            positive = true;
-        }
         tmp_value = (tmp_value<<1) | bit;
     }
 
     // Convert to signed value
-    if (positive) {
-        value = (s8)tmp_value;
+    if ( tmp_value < (1 << (category-1)) ) {
+        value = tmp_value - (1 << category) + 1;
     } else {
-        value = -((1<<code_length)-1) + tmp_value;
+        value = tmp_value;
     }
 
     return value;
 }
 
-bool parse_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
-    bool error = false;
-    u8* ptr = *data;
+s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node) {
+    s8 value = 0;
+    HuffmanNode* node = root_node;
 
-    BitStream bs = {
-        ptr,
-        0,
-        0,
-    };
+    // Huffman decode a byte which contains run length + category
+    while (!node->is_leaf) {
+        u8 bit = 0;
+        next_bit(bs, &bit);
+        node = bit ? node->right : node->left;
+    }
+    u8 symbol = node->value;
+    u8 SSSS = symbol >> 4;
+    u8 category = symbol & 0x0F;
+
+    if (category == 0) {
+        return 0;
+    }
+
+    // Read that amount of bits
+    u16 tmp_value = 0;
+    for (u8 i=0; i<category; i++) {
+        u8 bit = 0;
+        next_bit(bs, &bit);
+        tmp_value = (tmp_value<<1) | bit;
+    }
+
+    // Convert to signed value
+    if ( tmp_value < (1 << (category-1)) ) {
+        value = (s16)(tmp_value - (1 << category) + 1);
+    } else {
+        value = (s16)tmp_value;
+    }
+
+    return value;
+}
+
+bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
+    bool error = false;
 
     u8 n_components = jpeg->sh.n_components;
     // u8 maxHSample = 0;
@@ -1007,39 +1032,42 @@ bool parse_mcu(Arena* arena, u8** data, jpeg_t* jpeg) {
         dc_table_id = 0 + dc_table_id;
         ac_table_id = 2 + ac_table_id;
         HuffmanNode* dc_ht_root = jpeg->ht.root[dc_table_id];
-        // HuffmanNode* ac_ht_root = jpeg->ht.root[ac_table_id];
+        HuffmanNode* ac_ht_root = jpeg->ht.root[ac_table_id];
 
         for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
             for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
-                s8 dc_value = parse_DCDataUnit(&bs, dc_ht_root);
+                s16 dc_value = parse_DCDataUnit(bs, dc_ht_root);
 
                 u8 i = 0;
                 while (i++<63) {        // and not a marker that would indicate something
-                    // parse_ACDataUnit();
+                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root);
+                    printf("AC: %d\n", ac_value);
                 }
             }
         }
     }
 
-    *data = bs.data;
     return error;
 }
 
 bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
     bool error = false;
+
     u8* ptr = *data;
+    BitStream bs = {*data, 0, 0};
 
     // restart_interval segments
     if (jpeg->restart_interval != 0) {
         u16 n = 0;
         while (n < jpeg->restart_interval) {
-            error = parse_mcu(arena, &ptr, jpeg);
+            error = parse_mcu(arena, &bs, jpeg);
             if (error) {
                 break;
             }
             n++;
         }
-
+        // TODO(alex): Maybe this needs to be moved 1 byte forward if not finished exactly the byte?
+        ptr = bs.data;
     } else {
         printf("Encoding without restart not implemented!\n");
         error = true;
@@ -1057,7 +1085,6 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
 bool parse_Scan(Arena* persist_arena, Arena* local_arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
     bool error = false;
     u8* ptr = *data;
-
 
     u16 marker = get_marker(ptr);
     while (is_interpret_marker(marker) && ptr<end_of_data) {
