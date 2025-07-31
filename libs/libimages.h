@@ -155,6 +155,9 @@ struct ScanHeader {
     u8 end_spectral;                // Not used
     u8 approx_high;                 // Not used
     u8 approx_low;                  // Not used
+
+    // TODO(alex): For simplicity, additional fields
+    // u8 id_component_fh[4];
 };
 
 struct HuffmanNode{
@@ -615,29 +618,33 @@ bool parse_ScanHeader(u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-void next_bit(BitStream* bs, u8* bit_out) {
-    // if (bs->byte_pos >= bs->size) {
-    //     return false
-    // }
-
-    u8 byte = bs->data[bs->byte_pos];
-    *bit_out = (byte >> (7-bs->bit_pos)) & 0b1;
-
-    // Update
-    bs->bit_pos++;
-    if (bs->bit_pos==8) {
-        bs->bit_pos = 0;
-        bs->byte_pos++;
-    }
-    // return true;
-}
-
 void peek_2bytes(BitStream* bs, u16* data) {
     *data = get_marker(&(bs->data[bs->byte_pos]));
 }
 
 void peek_byte(BitStream* bs, u8* byte) {
     *byte = bs->data[bs->byte_pos];
+}
+
+void next_bit(BitStream* bs, u8* bit_out) {
+    u8 byte = bs->data[bs->byte_pos];
+
+    *bit_out = (byte >> (7-bs->bit_pos)) & 1;
+
+    // printf("0x%02X%02X %02X%02X \t Byte: %d \t bit: %d\n", byte, bs->data[bs->byte_pos+1], bs->data[bs->byte_pos+2], bs->data[bs->byte_pos+3], bs->byte_pos, bs->bit_pos);
+
+    // Update
+    bs->bit_pos++;
+    if (bs->bit_pos==8) {
+        bs->bit_pos = 0;
+        bs->byte_pos++;
+
+        // Skip 0xFF00
+        if (byte == 0xFF && bs->data[bs->byte_pos] == 0x00) {
+            // printf("    0x%02X%02X\n", byte, bs->data[bs->byte_pos]);
+            bs->byte_pos++;
+        }
+    }
 }
 
 bool is_start_of_frame(u16 marker) {
@@ -846,45 +853,52 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     bool error = false;
 
     u8 n_components = jpeg->sh.n_components;
-    // u8 maxHSample = 0;
-    // u8 maxVSample = 0;
-    // for (u8 nc=0; nc<n_components; nc++) {
-    //     u8 c = jpeg->sh.component_selector[nc];
-    //     maxHSample = maxHSample>jpeg->fh.H_sample[c] ? maxHSample:jpeg->fh.H_sample[c];
-    //     maxVSample = maxVSample>jpeg->fh.V_sample[c] ? maxVSample:jpeg->fh.V_sample[c];
-    // }
+
+    static u64 N = 0;
+    // printf("MCU: %d\n", ++N);
 
     const u8 DC = 0;
     const u8 AC = 1;
 
-    for (u8 nc=0; nc<n_components; nc++) {
-        // u8 c = jpeg->sh.component_selector[nc];
-        u8 c = nc;
+    for (u8 cs=0; cs<n_components; cs++) {              // cs: component scan
+        // printf("  cs: %d", cs);
+        // Get the correct component index in the frame header
+        u8 c_id = jpeg->sh.component_selector[cs];
+        u8 cf;
+        for (u8 i=0; i<jpeg->fh.src_components; i++) {
+            if (jpeg->fh.component_id[i] == c_id) {
+                cf = i;
+                break;
+            }
+        }
 
-        // // Assume the components are in the same order in frame header and scan header!
-        // u8 component_id = jpeg->fh.component_id[c];
-        // u8 qt = jpeg->fh.QT_selector[c];
-        // u8 component_id_from_scan = jpeg->sh.component_selector[c];
-        // if (component_id_from_scan != component_id) {
-        //     printf("Components are not in the same order in Scan Header and Frame Header!\n");
-        // }
+        // u8 qt = jpeg->fh.QT_selector[cf];
 
-        u8 dc_table_id = jpeg->sh.dc_selector[c];
-        u8 ac_table_id = jpeg->sh.ac_selector[c];
+        u8 dc_table_id = jpeg->sh.dc_selector[cs];
+        u8 ac_table_id = jpeg->sh.ac_selector[cs];
         HuffmanNode* dc_ht_root = jpeg->ht.root[DC][dc_table_id];
         HuffmanNode* ac_ht_root = jpeg->ht.root[AC][ac_table_id];
 
-        for (u8 v=0; v<jpeg->fh.V_sample[c]; v++) {
-            for (u8 h=0; h<jpeg->fh.H_sample[c]; h++) {
+        for (u8 v=0; v<jpeg->fh.V_sample[cf]; v++) {
+            for (u8 h=0; h<jpeg->fh.H_sample[cf]; h++) {
                 s16 DIFF = parse_DCDataUnit(bs, dc_ht_root);
 
+                // printf(" v: %d h: %d\n", v, h);
+                // printf("    diff: %d\n", DIFF);
+                // printf("    AC: ");
                 u8 i = 0;
                 while (i<63) {        // and not a marker that would indicate something
                     u8 preceding_zeros;
                     s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros);
+                    // Rest are zeros
+                    // printf("(%d,%d) ", preceding_zeros, ac_value);
+                    if (ac_value==0 && preceding_zeros==0) {
+                        i=63;
+                    }
                     i += 1 + preceding_zeros;
                     // printf("TOTAL: %d    Preceding 0: (%d,%d)\n", i, preceding_zeros, ac_value);
                 }
+                // printf("\n");
             }
         }
     }
@@ -908,8 +922,15 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
             }
             n++;
         }
-        // TODO(alex): Maybe this needs to be moved 1 byte forward if not finished exactly the byte?
-        ptr = bs.data;
+        if (bs.bit_pos == 0) {
+            ptr = &bs.data[bs.byte_pos];
+        } else {
+            ptr = &bs.data[bs.byte_pos+1];
+        }
+        if (n==512) {
+            printf("ptr: %p\n", ptr);
+            print_mk(get_marker(ptr));
+        }
     } else {
         printf("Encoding without restart not implemented!\n");
         error = true;
