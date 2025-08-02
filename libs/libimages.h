@@ -51,6 +51,17 @@ Image read_image_file(Arena* arena, string8 filename);
  *
  */
 
+// TODO(alex): Have real errors
+typedef enum {
+    JPEG_SUCCESS = 0,
+} JpegError;
+
+typedef struct {
+    JpegError error;
+    // TODO(alex): Make this string8?
+    const char* error_message;
+} JpegParsingResult;
+
 // itu-t81.pdf page 32
 enum Markers {
     StartOfFrame0 = 0xFFC0,             // Baseline DCT
@@ -189,7 +200,7 @@ struct QuantizationTables {
 
 typedef struct {
     u8* data;
-    // u64 size;
+    u8* end;
     u64 byte_pos;
     u8 bit_pos;
 } BitStream;
@@ -240,6 +251,7 @@ void print_ht(HuffmanTableSpec& ht) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
+    printf("Number tables: %d\n", ht.n_tables);
     for (u8 i=0; i<ht.n_tables; i++) {
         printf("Table %d:\n", i);
         printf("    class: %d\n", ht.table_class[i]);
@@ -328,34 +340,12 @@ typedef struct {
 
     u16 restart_interval;
     u8 dc_pred[4];              // dc_prediction NOTE(alex): move to Quantization Table struct?
-    u16 mcu_processed;
 
     union {
         u32* rgba;
         u32* rgb;
         u8* grey;
     };
-    // jpeg_component_t components[3];
-
-    // uint8_t quant_tables[4][64];
-    // uint8_t quant_table_set[4];
-
-    // huffman_table_t huffman_tables[2][4];
-    // uint8_t huffman_table_set[2][4];
-
-    // scan_component_t scan_components[3];
-    // uint8_t num_scan_components;
-
-    // uint8_t max_h_sampling;
-    // uint8_t max_v_sampling;
-    // uint16_t mcu_width;
-    // uint16_t mcu_height;
-
-    // uint8_t* entropy_data;
-    // size_t   entropy_size;
-
-    // int16_t* mcu_blocks;
-    // uint8_t* image_data; // final RGB or YCbCr
 } jpeg_t;
 
 u16 swap_endianness(u16 v) {
@@ -470,6 +460,7 @@ bool parse_DefineRestartInterval(u8** data, jpeg_t* jpeg) {
 
     // Specifies the number of MCU in the restart interval
     jpeg->restart_interval = get_marker(ptr);
+    printf("Restart interval: %d\n", jpeg->restart_interval);
 
     *data += length;
     return error;
@@ -626,12 +617,21 @@ void peek_byte(BitStream* bs, u8* byte) {
     *byte = bs->data[bs->byte_pos];
 }
 
-void next_bit(BitStream* bs, u8* bit_out) {
+bool next_bit(BitStream* bs, u8* bit_out) {
+    bool error = false;
+    if (&bs->data[bs->byte_pos] >= bs->end) {
+        printf("Next bit went beyond the bit stream data\n");
+        error = true;
+        return error;
+    }
     u8 byte = bs->data[bs->byte_pos];
 
     *bit_out = (byte >> (7-bs->bit_pos)) & 1;
 
-    // printf("0x%02X%02X %02X%02X \t Byte: %d \t bit: %d\n", byte, bs->data[bs->byte_pos+1], bs->data[bs->byte_pos+2], bs->data[bs->byte_pos+3], bs->byte_pos, bs->bit_pos);
+    if (bs->bit_pos == 0 && byte == 0xFF) {
+        u8 next_byte = bs->data[bs->byte_pos+1];
+        // printf("0x%02X%02X\n", byte, next_byte);
+    }
 
     // Update
     bs->bit_pos++;
@@ -641,10 +641,10 @@ void next_bit(BitStream* bs, u8* bit_out) {
 
         // Skip 0xFF00
         if (byte == 0xFF && bs->data[bs->byte_pos] == 0x00) {
-            // printf("    0x%02X%02X\n", byte, bs->data[bs->byte_pos]);
             bs->byte_pos++;
         }
     }
+    return error;
 }
 
 bool is_start_of_frame(u16 marker) {
@@ -764,6 +764,7 @@ bool interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
         case DefineHuffmanTable: {
             printf("DefineHuffmanTable\n");
             error = parse_DefineHuffmanTable(arena, &ptr, jpeg);
+            print_ht(jpeg->ht);
         } break;
         case Comment: {
             printf("Comment not implemented\n");
@@ -778,16 +779,35 @@ bool interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
     return error;
 }
 
-// TODO(alex): S16 for DC?
 s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
     s8 value = 0;
     HuffmanNode* node = root_node;
 
     // Decode the category (code length) using Huffman tree
+    u16 code = 0;
+    u16 count = 0;
     while (!node->is_leaf) {
         u8 bit = 0;
         next_bit(bs, &bit);
-        node = bit ? node->right : node->left;
+        count++;
+        code = (code<<1)|bit;
+        if (bit) {
+            node = node->right;
+            if (node == nullptr){
+                printf("CODE: %b %d\n", code, count);
+                printf("The new node DC (at right) is nullptr!\n");
+            }
+        } else {
+            node = node->left;
+            if (node == nullptr){
+                printf("CODE: %b %d\n", code, count);
+                printf("The new node DC (at left) is nullptr!\n");
+            }
+        }
+        // node = bit ? node->right : node->left;
+    }
+    if (node == nullptr) {
+        printf("DC node when trying to get value is the null pointer!\n");
     }
     u8 category = node->value;
 
@@ -821,7 +841,17 @@ s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length) {
     while (!node->is_leaf) {
         u8 bit = 0;
         next_bit(bs, &bit);
-        node = bit ? node->right : node->left;
+        if (bit) {
+            node = node->right;
+            if (node == nullptr) printf("The new node AC (at right) is nullptr!\n");
+        } else {
+            node = node->left;
+            if (node == nullptr) printf("The new node AC (at left) is nullptr!\n");
+        }
+        // node = bit ? node->right : node->left;
+    }
+    if (node == nullptr) {
+        printf("DC node when trying to get value is the null pointer!\n");
     }
     u8 symbol = node->value;
     *run_length = symbol >> 4;
@@ -854,9 +884,7 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
     u8 n_components = jpeg->sh.n_components;
 
-    static u64 N = 0;
     // printf("MCU: %d\n", ++N);
-
     const u8 DC = 0;
     const u8 AC = 1;
 
@@ -883,20 +911,20 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
             for (u8 h=0; h<jpeg->fh.H_sample[cf]; h++) {
                 s16 DIFF = parse_DCDataUnit(bs, dc_ht_root);
 
-                // printf(" v: %d h: %d\n", v, h);
-                // printf("    diff: %d\n", DIFF);
+                // printf("    v: %d h: %d\n", v, h);
+                // printf("%d  diff: %d\n", N, DIFF);
                 // printf("    AC: ");
                 u8 i = 0;
                 while (i<63) {        // and not a marker that would indicate something
                     u8 preceding_zeros;
                     s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros);
                     // Rest are zeros
-                    // printf("(%d,%d) ", preceding_zeros, ac_value);
                     if (ac_value==0 && preceding_zeros==0) {
                         i=63;
+                    } else {
+                        i += 1 + preceding_zeros;
                     }
-                    i += 1 + preceding_zeros;
-                    // printf("TOTAL: %d    Preceding 0: (%d,%d)\n", i, preceding_zeros, ac_value);
+                    // printf("(%d,%d,(%d)) ", preceding_zeros, ac_value, i);
                 }
                 // printf("\n");
             }
@@ -906,11 +934,11 @@ bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     return error;
 }
 
-bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
+bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
     bool error = false;
 
     u8* ptr = *data;
-    BitStream bs = {*data, 0, 0};
+    BitStream bs = {*data, end_of_data-2, 0, 0};
 
     // restart_interval segments
     if (jpeg->restart_interval != 0) {
@@ -927,13 +955,9 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
         } else {
             ptr = &bs.data[bs.byte_pos+1];
         }
-        if (n==512) {
-            printf("ptr: %p\n", ptr);
-            print_mk(get_marker(ptr));
-        }
+        print_mk(get_marker(ptr));
     } else {
-        printf("Encoding without restart not implemented!\n");
-        error = true;
+        // printf("Encoding without restart not implemented!\n");
         u16 marker = get_marker(ptr);
         // while ... not table/misc/scanheader/EOI
         while (marker != EndOfImage) {
@@ -941,9 +965,18 @@ bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg) {
             if (error) {
                 break;
             }
-            marker = get_marker(bs.data);
+            if (bs.bit_pos == 0) {
+                marker = get_marker(&bs.data[bs.byte_pos]);
+            } else {
+                marker = get_marker(&bs.data[bs.byte_pos+1]);
+            }
+            // printf("marker: 0x%04X  ptr: %p  end: %p\n", marker, &bs.data[bs.byte_pos], end_of_data);
         }
-        ptr = bs.data;
+        if (bs.bit_pos == 0) {
+            ptr = &bs.data[bs.byte_pos];
+        } else {
+            ptr = &bs.data[bs.byte_pos+1];
+        }
     }
 
     *data = ptr;
@@ -970,11 +1003,12 @@ bool parse_Scan(Arena* persist_arena, Arena* local_arena, u8** data, jpeg_t* jpe
         error = true;
         printf("Error or did not find ScanHeader!\n");
     }
+    // print_ht(jpeg->ht);
 
     if (!error) {
         s8 restart_id = -1;
         do {
-            error = parse_EntropySegment(persist_arena, &ptr, jpeg);
+            error = parse_EntropySegment(persist_arena, &ptr, jpeg, end_of_data);
             if (error) {
                 // TODO(alex): Here could check and move forward until next restart marker?
                 printf("Error while decoding entropy segment!\n");
@@ -1031,23 +1065,22 @@ bool decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8* end_of_data
     return error;
 }
 
-Image decode_jpeg(Arena* persist_arena, string8 data) {
+void decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Note: Current goal is to support baseline DCT 8 bits
-    Image out = {0};
-    u8* ptr = (u8*)data.buffer;
+    u8* ptr = data.buffer;
     u16 marker = get_marker(ptr);
-    u8* end_of_data = (u8*)(data.buffer + data.size);
+    u8* end_of_data = data.buffer + data.size;
     u16 end_marker = get_marker(end_of_data-2);
 
     // Get start marker
     if (marker != StartOfImage) {
         printf("First marker is not StartOfImage! Found: 0x%X\n", marker);
-        return out;
+        return; // error
     } else if (end_marker != EndOfImage) {
         printf("Last 2 bytes are not EndOfImage! Found: 0x%X\n", end_marker);
-        return out;
+        return; // error
     }
-    // Get marker after start of image
+    // Move to after start of image
     ptr += 2;
 
     // Decoder_setup
@@ -1058,16 +1091,17 @@ Image decode_jpeg(Arena* persist_arena, string8 data) {
     marker = get_marker(ptr);
 
     if (!error && marker == EndOfImage){
-        out.width       = jpeg.fh.src_width;
-        out.height      = jpeg.fh.src_height;
-        out.components  = jpeg.fh.src_components;
-        out.precision   = jpeg.fh.src_precision;
-        out.rgb         = jpeg.rgb;                         // works for anything because its a union
+        out->width       = jpeg.fh.src_width;
+        out->height      = jpeg.fh.src_height;
+        out->components  = jpeg.fh.src_components;
+        out->precision   = jpeg.fh.src_precision;
+        out->rgb         = jpeg.rgb;                         // works for anything because its a union
     } else {
         printf("Processing of image failed!\n");
+        return; // Error
     }
 
-    return out;
+    return; // Success
 }
 
 Image create_missing_image(Arena* arena) {
@@ -1101,9 +1135,9 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
 
     string8 extension = string_get_file_extension(filename);
     if (extension == ".jpg" || extension == ".jpeg") {
-        out = decode_jpeg(persist_arena, data);
+        decode_jpeg(persist_arena, data, &out);
     } else if (extension == ".png"){
-        // out = decode_png(data);
+        // decode_png(persist_arena, data, &out);
     } else {
         printf("File format not supported: extension = ");
         string_print(extension);
