@@ -67,6 +67,9 @@ typedef struct {
 
 // itu-t81.pdf page 32
 enum Markers {
+    Temporary = 0xFF01,
+    Reserved0 = 0xFF02,                 // 0xFF02 to 0xFFBF is reserved
+
     StartOfFrame0 = 0xFFC0,             // Baseline DCT
     StartOfFrame1 = 0xFFC1,             // Extended Sequential DCT
     StartOfFrame2 = 0xFFC2,             // Progressive DCT
@@ -142,8 +145,6 @@ enum Markers {
     JpegExtension13 = 0xFFFD,
 
     Comment = 0xFFFE,
-    Temporary = 0xFF01,
-    Reserved0 = 0xFF02,                 // 0xFF02 to 0xFFBF is reserved
 };
 
 struct FrameHeader {
@@ -212,10 +213,10 @@ void print_fh(FrameHeader& fh) {
     printf("Frame Header: \n");
     printf("------------  \n");
     printf("Source image: \n");
-    printf("    Precision: %d\n", fh.src_precision);
-    printf("    Height: %d\n", fh.src_height);
-    printf("    Width: %d\n", fh.src_width);
-    printf("    Components: %d\n", fh.src_components);
+    printf("  Precision: %d bits\n", fh.src_precision);
+    printf("  Height: %d\n", fh.src_height);
+    printf("  Width: %d\n", fh.src_width);
+    printf("  Components: %d\n", fh.src_components);
 
     for (u8 i=0;i<fh.src_components; i++) {
         printf("Component %d:\n", i);
@@ -250,7 +251,7 @@ void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
     draw_huffman_tree(node->right, depth + 1, false);
 }
 
-void print_ht(HuffmanTableSpec& ht) {
+void print_ht(HuffmanTableSpec& ht, bool include_tree=false) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
@@ -267,14 +268,16 @@ void print_ht(HuffmanTableSpec& ht) {
             if (ht.code_lengths[i][j]>0) {
                 printf("            ");
                 for (u8 k=0; k<ht.code_lengths[i][j]; k++) {
-                    printf("%d ", *ptr++);
+                    printf("%x ", *ptr++);
                 }
                 printf("\n");
             }
         }
 
-        printf("    Tree: \n    ");
-        draw_huffman_tree(ht.root[ht.table_class[i]][ht.table_id[i]]);
+        if (include_tree) {
+            printf("    Tree: \n    ");
+            draw_huffman_tree(ht.root[ht.table_class[i]][ht.table_id[i]]);
+        }
     }
 }
 
@@ -313,7 +316,7 @@ void print_sh(ScanHeader& sh) {
 
     for (u8 i=0; i<sh.n_components; i++) {
         printf("Component %d: \n", i);
-        printf("    selector: %d\n", sh.component_selector[i]);
+        printf("    component selector: %d\n", sh.component_selector[i]);
         printf("    dc selector: %d\n", sh.dc_selector[i]);
         printf("    ac selector: %d\n", sh.ac_selector[i]);
     }
@@ -351,34 +354,28 @@ typedef struct {
     };
 } jpeg_t;
 
-u16 swap_endianness(u16 v) {
-    u16 out = v<<8 | v>>8;
-    return out;
-}
-
-u16 get_marker(u8* ptr) {
-    return swap_endianness(*(u16*)ptr);
+u16 peek_2_bytes(u8* v) {
+    return v[0]<<8 | v[1];
 }
 
 JpegParsingResult parse_StartOfFrame(u8** data, jpeg_t* jpeg) {
     FrameHeader& fh = jpeg->fh;
     u8* ptr = *data;
 
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     fh.src_precision = *ptr;
     ptr += 1;
     if (fh.src_precision != 8) {
-        // printf("Bytes per color != 8 is not supported, file using: %d\n", fh.src_precision);
         return (JpegParsingResult){JPEG_FAIL, "Bytes per color != 8 not supported!"};
     }
 
-    fh.src_height = get_marker(ptr);
+    fh.src_height = peek_2_bytes(ptr);
     // if 0 => should be gotten from DNL
     ptr += 2;
 
-    fh.src_width = get_marker(ptr);
+    fh.src_width = peek_2_bytes(ptr);
     ptr += 2;
 
     fh.src_components = *ptr;
@@ -391,9 +388,17 @@ JpegParsingResult parse_StartOfFrame(u8** data, jpeg_t* jpeg) {
         ptr++;
         fh.H_sample[i] = (*ptr)>>4;
         fh.V_sample[i] = (*ptr) & 0x0F;
+        if (fh.H_sample[i] > 4 || fh.H_sample[i] == 0) {
+            return (JpegParsingResult){JPEG_FAIL, "Horizontal sampling factor is not between 1 and 4."};
+        } else if (fh.V_sample[i] > 4 || fh.V_sample[i] == 0) {
+            return (JpegParsingResult){JPEG_FAIL, "Vertical sampling factor is not between 1 and 4."};
+        }
         ptr++;
 
         fh.QT_selector[i] = *ptr;
+        if (fh.QT_selector[i] > 3) {
+            return (JpegParsingResult){JPEG_FAIL, "Quantization table selector is not between 0 and 3."};
+        }
         ptr++;
     }
 
@@ -403,7 +408,7 @@ JpegParsingResult parse_StartOfFrame(u8** data, jpeg_t* jpeg) {
 
 JpegParsingResult parse_ApplicationSegment0(u8** data, jpeg_t* jpeg) {
     u8* ptr = *data;
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
     // string8 content = { .buffer = ptr, .size = length-2 };
 
@@ -413,7 +418,7 @@ JpegParsingResult parse_ApplicationSegment0(u8** data, jpeg_t* jpeg) {
 
 JpegParsingResult parse_ApplicationSegment1(u8** data, jpeg_t* jpeg) {
     u8* ptr = *data;
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
     // string8 content = { .buffer = ptr, .size = length-2 };
 
@@ -422,9 +427,8 @@ JpegParsingResult parse_ApplicationSegment1(u8** data, jpeg_t* jpeg) {
 }
 
 JpegParsingResult parse_ApplicationSegment13(u8** data, jpeg_t* jpeg) {
-    bool error = false;
     u8* ptr = *data;
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
     // string8 content = { .buffer = ptr, .size = length-2 };
 
@@ -436,7 +440,7 @@ JpegParsingResult parse_ApplicationSegment14(u8** data, jpeg_t* jpeg) {
     // This is usually used by adobe encoders
     //
     u8* ptr = *data;
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     // string8 content = { .buffer = ptr, .size = length-2 };
@@ -452,11 +456,11 @@ JpegParsingResult parse_ApplicationSegment14(u8** data, jpeg_t* jpeg) {
 
 JpegParsingResult parse_DefineRestartInterval(u8** data, jpeg_t* jpeg) {
     u8* ptr = *data;
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     // Specifies the number of MCU in the restart interval
-    jpeg->restart_interval = get_marker(ptr);
+    jpeg->restart_interval = peek_2_bytes(ptr);
 
     *data += length;
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -466,7 +470,7 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, u8** data, jpeg_t* jpeg
     HuffmanTableSpec& ht = jpeg->ht;
     u8* ptr = *data;
 
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     // TODO(alex): This has to be done for each huffman table because the segment contains the data for all tables
@@ -545,7 +549,7 @@ JpegParsingResult parse_DefineQuantizationTable(u8** data, jpeg_t* jpeg) {
     QuantizationTables& qt = jpeg->qt;
     u8* ptr = *data;
 
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     u8 table_idx = 0;
@@ -582,16 +586,18 @@ JpegParsingResult parse_DefineQuantizationTable(u8** data, jpeg_t* jpeg) {
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
-bool parse_ScanHeader(u8** data, jpeg_t* jpeg) {
-    bool error = false;
+JpegParsingResult parse_ScanHeader(u8** data, jpeg_t* jpeg) {
     ScanHeader& sh = jpeg->sh;
     u8* ptr = *data;
 
-    u16 length = get_marker(ptr);
+    u16 length = peek_2_bytes(ptr);
     ptr += 2;
 
     // Header
     sh.n_components = *ptr;
+    if (sh.n_components > 4 || sh.n_components == 0) {
+        return (JpegParsingResult){JPEG_FAIL, "Number of components in a scan must be between 1 and 3."};
+    }
     ptr++;
 
     for (u8 i=0; i<sh.n_components; i++) {
@@ -599,25 +605,42 @@ bool parse_ScanHeader(u8** data, jpeg_t* jpeg) {
         ptr++;
         sh.dc_selector[i] = (*ptr) >> 4;
         sh.ac_selector[i] = (*ptr) & 0x0F;
+        if (sh.dc_selector[i] > 1) {
+            return (JpegParsingResult){JPEG_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
+        } else if (sh.ac_selector[i] > 1) {
+            return (JpegParsingResult){JPEG_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
+        }
         ptr++;
     }
 
     sh.start_spectral = *ptr;
+    if (sh.start_spectral != 0) {
+        return (JpegParsingResult){JPEG_FAIL, "Baseline DCT must have start spectral = 0"};
+    }
     ptr++;
 
     sh.end_spectral = *ptr;
+    if (sh.end_spectral != 63) {
+        return (JpegParsingResult){JPEG_FAIL, "Baseline DCT must have end spectral = 0"};
+    }
     ptr++;
 
     sh.approx_high = *ptr >> 4;
+    if (sh.approx_high != 0) {
+        return (JpegParsingResult){JPEG_FAIL, "Baseline DCT must have approximation high = 0"};
+    }
     sh.approx_low  = *ptr & 0x0F;
+    if (sh.approx_low != 0) {
+        return (JpegParsingResult){JPEG_FAIL, "Baseline DCT must have approximation low = 0"};
+    }
     ptr++;
 
     *data = ptr;
-    return error;
+    return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
 }
 
 void peek_2bytes(BitStream* bs, u16* data) {
-    *data = get_marker(&(bs->data[bs->byte_pos]));
+    *data = peek_2_bytes(&(bs->data[bs->byte_pos]));
 }
 
 void peek_byte(BitStream* bs, u8* byte) {
@@ -626,19 +649,15 @@ void peek_byte(BitStream* bs, u8* byte) {
 
 bool next_bit(BitStream* bs, u8* bit_out) {
     bool error = false;
+
     if (&bs->data[bs->byte_pos] >= bs->end) {
         printf("Next bit went beyond the bit stream data\n");
         error = true;
         return error;
     }
+
     u8 byte = bs->data[bs->byte_pos];
-
     *bit_out = (byte >> (7-bs->bit_pos)) & 1;
-
-    if (bs->bit_pos == 0 && byte == 0xFF) {
-        u8 next_byte = bs->data[bs->byte_pos+1];
-        // printf("0x%02X%02X\n", byte, next_byte);
-    }
 
     // Update
     bs->bit_pos++;
@@ -664,9 +683,7 @@ bool is_start_of_frame(u16 marker) {
            marker==StartOfFrame7;
 }
 
-bool is_restart_marker(u8** data, s8* idx) {
-    u8* ptr = *data;
-    u16 marker = get_marker(ptr);
+bool is_restart_marker(u16 marker, s8* idx) {
     bool out = true;
     switch (marker) {
         case Restart0: {
@@ -697,10 +714,6 @@ bool is_restart_marker(u8** data, s8* idx) {
             out = false;
         } break;
     }
-    if (out) {
-        ptr += 2;
-    }
-    *data = ptr;
     return out;
 }
 
@@ -737,7 +750,7 @@ bool is_interpret_marker(u16 marker) {
 
 JpegParsingResult interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
     u8* ptr = *data;
-    u16 marker = get_marker(ptr);
+    u16 marker = peek_2_bytes(ptr);
     ptr += 2;
     // Note(alex): ptr automatically moved to the end of the data by each functions
     JpegParsingResult result;
@@ -771,7 +784,6 @@ JpegParsingResult interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
         case DefineHuffmanTable: {
             printf("DefineHuffmanTable\n");
             result = parse_DefineHuffmanTable(arena, &ptr, jpeg);
-            // print_ht(jpeg->ht);
         } break;
         case Comment: {
             result = {JPEG_FAIL, "Comment not implemented"};
@@ -788,243 +800,236 @@ JpegParsingResult interpret_marker(Arena* arena, u8** data, jpeg_t* jpeg) {
     return result;
 }
 
-s16 parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node) {
-    s8 value = 0;
+JpegParsingResult parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node, s16* out) {
     HuffmanNode* node = root_node;
 
     // Decode the category (code length) using Huffman tree
     u16 code = 0;
     u16 count = 0;
+    u8 bit = 0;
+
     while (!node->is_leaf) {
-        u8 bit = 0;
         next_bit(bs, &bit);
         count++;
         code = (code<<1)|bit;
         if (bit) {
             node = node->right;
             if (node == nullptr){
-                printf("CODE: %b %d\n", code, count);
-                printf("The new node DC (at right) is nullptr!\n");
+                printf("CODE: %b  read: %d bits\n", code, count);
+                return (JpegParsingResult){JPEG_FAIL, "Failed decoding DC node going right."};
             }
         } else {
             node = node->left;
             if (node == nullptr){
-                printf("CODE: %b %d\n", code, count);
-                printf("The new node DC (at left) is nullptr!\n");
+                printf("CODE: %b read: %d bits\n", code, count);
+                return (JpegParsingResult){JPEG_FAIL, "Failed decoding DC node going left."};
             }
         }
-        // node = bit ? node->right : node->left;
     }
-    if (node == nullptr) {
-        printf("DC node when trying to get value is the null pointer!\n");
-    }
+
     u8 category = node->value;
 
+    // If category 0 => value = 0 => early exit
     if (category == 0) {
-        return 0;
+        *out = 0;
+        return (JpegParsingResult){JPEG_SUCCESS, 0};
     }
 
     // Read that amount of bits
     u16 tmp_value = 0;
     for (u8 i=0; i<category; i++) {
-        u8 bit = 0;
         next_bit(bs, &bit);
         tmp_value = (tmp_value<<1) | bit;
     }
 
     // Convert to signed value
     if ( tmp_value < (1 << (category-1)) ) {
-        value = (s16)(tmp_value - (1 << category) + 1);
+        *out = (s16)(tmp_value - (1 << category) + 1);
     } else {
-        value = (s16)tmp_value;
+        *out = (s16)tmp_value;
     }
 
-    return value;
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
-s16 parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length) {
-    s8 value = 0;
+JpegParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length, s16* out) {
+    // s8 value = 0;
     HuffmanNode* node = root_node;
 
     // Huffman decode a byte which contains run length + category
+    u16 code = 0;
+    u16 count = 0;
+    u8 bit = 0;
     while (!node->is_leaf) {
-        u8 bit = 0;
         next_bit(bs, &bit);
+        count++;
+        code = (code<<1)|bit;
         if (bit) {
             node = node->right;
-            if (node == nullptr) printf("The new node AC (at right) is nullptr!\n");
+            if (node == nullptr){
+                printf("CODE: %b  read: %d bits\n", code, count);
+                return (JpegParsingResult){JPEG_FAIL, "Failed decoding AC node going right."};
+            }
         } else {
             node = node->left;
-            if (node == nullptr) printf("The new node AC (at left) is nullptr!\n");
+            if (node == nullptr){
+                printf("CODE: %b read: %d bits\n", code, count);
+                return (JpegParsingResult){JPEG_FAIL, "Failed decoding AC node going left."};
+            }
         }
-        // node = bit ? node->right : node->left;
-    }
-    if (node == nullptr) {
-        printf("DC node when trying to get value is the null pointer!\n");
     }
     u8 symbol = node->value;
     *run_length = symbol >> 4;
     u8 category = symbol & 0x0F;
 
     if (category == 0) {
-        return 0;
+        *out = 0;
+        return (JpegParsingResult){JPEG_SUCCESS, 0};
     }
 
     // Read that amount of bits
     u16 tmp_value = 0;
     for (u8 i=0; i<category; i++) {
-        u8 bit = 0;
         next_bit(bs, &bit);
         tmp_value = (tmp_value<<1) | bit;
     }
 
     // Convert to signed value
     if ( tmp_value < (1 << (category-1)) ) {        // check if first bit set is 0 => negative
-        value = (s16)(tmp_value - (1 << category) + 1);
+        *out = (s16)(tmp_value - (1 << category) + 1);
     } else {
-        value = (s16)tmp_value;
+        *out = (s16)tmp_value;
     }
 
-    return value;
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
-bool parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    bool error = false;
-
+JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     u8 n_components = jpeg->sh.n_components;
 
-    // printf("MCU: %d\n", ++N);
     const u8 DC = 0;
     const u8 AC = 1;
 
-    for (u8 cs=0; cs<n_components; cs++) {              // cs: component scan
-        // printf("  cs: %d", cs);
-        // Get the correct component index in the frame header
-        u8 c_id = jpeg->sh.component_selector[cs];
-        u8 cf;
+    u8 component_idx[4] = {0};
+    for (u8 j=0; j<n_components; j++) {
+        u8 cs_j = jpeg->sh.component_selector[j];
+
         for (u8 i=0; i<jpeg->fh.src_components; i++) {
-            if (jpeg->fh.component_id[i] == c_id) {
-                cf = i;
+            u8 c_i = jpeg->fh.component_id[i];
+            if (c_i == cs_j) {
+                component_idx[j] = i;
                 break;
             }
         }
+    }
 
-        // u8 qt = jpeg->fh.QT_selector[cf];
+    s16 DIFF[4] = {0};
+    for (u8 i=0; i<n_components; i++) {
+        // Get the correct component index in the frame header
+        u8 idx = component_idx[i];
 
-        u8 dc_table_id = jpeg->sh.dc_selector[cs];
-        u8 ac_table_id = jpeg->sh.ac_selector[cs];
+        // u8 qt = jpeg->fh.QT_selector[idx];
+
+        u8 dc_table_id = jpeg->sh.dc_selector[i];
+        u8 ac_table_id = jpeg->sh.ac_selector[i];
         HuffmanNode* dc_ht_root = jpeg->ht.root[DC][dc_table_id];
         HuffmanNode* ac_ht_root = jpeg->ht.root[AC][ac_table_id];
 
-        for (u8 v=0; v<jpeg->fh.V_sample[cf]; v++) {
-            for (u8 h=0; h<jpeg->fh.H_sample[cf]; h++) {
-                s16 DIFF = parse_DCDataUnit(bs, dc_ht_root);
+        for (u8 v=0; v<jpeg->fh.V_sample[idx]; v++) {
+            for (u8 h=0; h<jpeg->fh.H_sample[idx]; h++) {
+                s16 value;
+                JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
+                if (result.status != JPEG_SUCCESS) { return result; }
+                s16 dc = value;
 
-                // printf("    v: %d h: %d\n", v, h);
-                // printf("%d  diff: %d\n", N, DIFF);
-                // printf("    AC: ");
-                u8 i = 0;
-                while (i<63) {        // and not a marker that would indicate something
-                    u8 preceding_zeros;
-                    s16 ac_value = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros);
+                u8 j = 0;
+                while (j<63) {        // and not a marker that would indicate something
+                    u8 preceding_zeros = 0;
+                    JpegParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
+                    s16 ac = value;
                     // Rest are zeros
-                    if (ac_value==0 && preceding_zeros==0) {
-                        i=63;
+                    if (ac==0 && preceding_zeros==0) {
+                        j=63;
                     } else {
-                        i += 1 + preceding_zeros;
+                        j += 1 + preceding_zeros;
                     }
-                    // printf("(%d,%d,(%d)) ", preceding_zeros, ac_value, i);
                 }
-                // printf("\n");
             }
         }
     }
 
-    return error;
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
-bool parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
-    bool error = false;
-
+JpegParsingResult parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
     u8* ptr = *data;
     BitStream bs = {*data, end_of_data-2, 0, 0};
+    u16 marker = peek_2_bytes(ptr);
 
-    // restart_interval segments
-    if (jpeg->restart_interval != 0) {
-        u16 n = 0;
-        while (n < jpeg->restart_interval) {
-            error = parse_mcu(arena, &bs, jpeg);
-            if (error) {
-                break;
-            }
-            n++;
-        }
-        if (bs.bit_pos == 0) {
-            ptr = &bs.data[bs.byte_pos];
-        } else {
-            ptr = &bs.data[bs.byte_pos+1];
-        }
-        // print_mk(get_marker(ptr));
-    } else {
-        // printf("Encoding without restart not implemented!\n");
-        u16 marker = get_marker(ptr);
-        // while ... not table/misc/scanheader/EOI
-        while (marker != EndOfImage) {
-            error = parse_mcu(arena, &bs, jpeg);
-            if (error) {
-                break;
-            }
-            if (bs.bit_pos == 0) {
-                marker = get_marker(&bs.data[bs.byte_pos]);
-            } else {
-                marker = get_marker(&bs.data[bs.byte_pos+1]);
-            }
-            // printf("marker: 0x%04X  ptr: %p  end: %p\n", marker, &bs.data[bs.byte_pos], end_of_data);
-        }
-        if (bs.bit_pos == 0) {
-            ptr = &bs.data[bs.byte_pos];
-        } else {
-            ptr = &bs.data[bs.byte_pos+1];
-        }
+    if (jpeg->restart_interval == 0) {
+        return (JpegParsingResult){JPEG_FAIL, "No restart interval is currently unsupported."};
+    }
+
+    s8 tmp;
+    u16 n = 0;
+    while (n++ < jpeg->restart_interval) {
+        JpegParsingResult result = parse_mcu(arena, &bs, jpeg);
+        if (result.status != JPEG_SUCCESS) { return result; }
+    }
+
+    // Go through all the last bits until byte aligned
+    u8 bit;
+    while (bs.bit_pos != 0) {
+        next_bit(&bs, &bit);
+    }
+
+    ptr = &bs.data[bs.byte_pos];
+
+    marker = peek_2_bytes(ptr);
+    if (!is_restart_marker(marker, &tmp) && !is_interpret_marker(marker) && marker != StartOfScan && marker != EndOfImage) {
+        return (JpegParsingResult){JPEG_FAIL, "Invalid marker encountered."};
     }
 
     *data = ptr;
-    return error;
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult parse_Scan(Arena* persist_arena, Arena* local_arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
-    bool error = false;
     u8* ptr = *data;
 
-    u16 marker = get_marker(ptr);
+    u16 marker = peek_2_bytes(ptr);
     while (is_interpret_marker(marker) && ptr<end_of_data) {
         JpegParsingResult result = interpret_marker(local_arena, &ptr, jpeg);
         if (result.status != JPEG_SUCCESS) { return result; }
-        marker = get_marker(ptr);
+        marker = peek_2_bytes(ptr);
     }
 
     if (marker != StartOfScan) {
         return (JpegParsingResult){JPEG_FAIL, "Did not find Start of Scan header marker!"};
     }
 
-    // ptr += 2;
-    error = parse_ScanHeader(&ptr, jpeg);
-    if (error) {
-        return (JpegParsingResult){JPEG_FAIL, "Failed parsing scan header!"};
-    }
+    ptr += 2;
+    JpegParsingResult result = parse_ScanHeader(&ptr, jpeg);
+    if (result.status != JPEG_SUCCESS) { return result; }
 
     s8 restart_id = -1;
-    do {
-        error = parse_EntropySegment(persist_arena, &ptr, jpeg, end_of_data);
-        if (error) {
+    while (true) {
+        JpegParsingResult result = parse_EntropySegment(persist_arena, &ptr, jpeg, end_of_data);
+        if (result.status != JPEG_SUCCESS) {
             // TODO(alex): Here could check and move forward until next restart marker?
-            return (JpegParsingResult){JPEG_FAIL, "Error while decoding entropy segment!"};
-            // break;
+            return result;
         }
-    } while (is_restart_marker(&ptr, &restart_id));
+        marker = peek_2_bytes(ptr);
+        if (is_restart_marker(marker, &restart_id)) {
+            ptr += 2;
+            continue;
+        } else {
+            break;
+        }
+    }
 
     *data = ptr;
-    return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8* end_of_data) {
@@ -1032,12 +1037,12 @@ JpegParsingResult decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8
     u8* ptr = *data;
 
     // Parse [Tables/misc.] of the frame
-    u16 marker = get_marker(ptr);
+    u16 marker = peek_2_bytes(ptr);
     while (is_interpret_marker(marker) && ptr<end_of_data) {
         JpegParsingResult result = interpret_marker(local_arena->arena, &ptr, jpeg);
 
         if (result.status != JPEG_SUCCESS) { return result; }
-        marker = get_marker(ptr);
+        marker = peek_2_bytes(ptr);
     }
 
     if (ptr>=end_of_data) {
@@ -1049,35 +1054,40 @@ JpegParsingResult decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8
     }
 
     // Parse Frame header
-    ptr += 2;
+    ptr += 2;   // Advance from the read marker
     if (marker == StartOfFrame0) {
         jpeg->algorithm = (Markers)marker;
         printf("Parse start of frame!\n");
         JpegParsingResult result = parse_StartOfFrame(&ptr, jpeg);
+
         if (result.status != JPEG_SUCCESS) { return result; }
     } else {
         return (JpegParsingResult){JPEG_FAIL, "Only StartOfFrame0 marker implemented!"};
     }
 
-    marker = get_marker(ptr);
+    marker = peek_2_bytes(ptr);
     while ((is_interpret_marker(marker) || (marker==StartOfScan)) && ptr<end_of_data) {       // Either DNL between scans or Tables/misc. or Scan header
         JpegParsingResult result = parse_Scan(persist_arena, local_arena->arena, &ptr, jpeg, end_of_data);
 
         if (result.status != JPEG_SUCCESS) { return result; }
-        marker = get_marker(ptr);
+        marker = peek_2_bytes(ptr);
+    }
+
+    if (ptr>=end_of_data) {
+        return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
     }
 
     *data = ptr;
     local_arena_alloc_reset(local_arena);
-    return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Note: Current goal is to support baseline DCT 8 bits
     u8* ptr = data.buffer;
-    u16 marker = get_marker(ptr);
+    u16 marker = peek_2_bytes(ptr);
     u8* end_of_data = data.buffer + data.size;
-    u16 end_marker = get_marker(end_of_data-2);
+    u16 end_marker = peek_2_bytes(end_of_data-2);
 
     // Get start marker
     if (marker != StartOfImage) {
@@ -1097,7 +1107,7 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
     if (result.status != JPEG_SUCCESS) { return result; }
 
-    marker = get_marker(ptr);
+    marker = peek_2_bytes(ptr);
     if (marker != EndOfImage) {
         return (JpegParsingResult){JPEG_FAIL, "Did not find End Of Image marker!"};
     }
@@ -1147,7 +1157,7 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
         if (result.status != JPEG_SUCCESS) {
             printf("Failed parsing jpeg file: ");
             string_print(filename);
-            printf(" with error: (%d, %s)\n", result.status, result.error_message);
+            printf(" with error: %s\n", result.error_message);
 
         }
     } else if (extension == ".png"){
