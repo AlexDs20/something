@@ -34,9 +34,9 @@ with open(os.path.join(os.path.dirname(__file__), "..", "libs", filename), "w") 
             for y in Y:
                 f.write("            ");
                 for x in X:
-                    if IDCT[v, u, y, u]>=0:
+                    if IDCT[v, u, y, x]>=0:
                         f.write(" ")
-                    f.write(f"{IDCT[v, u, y, u]:.15f},")
+                    f.write(f"{IDCT[v, u, y, x]:.15f},")
                     if (x!=7):
                         f.write("    ")
                 f.write("\n")
