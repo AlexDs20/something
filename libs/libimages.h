@@ -5,7 +5,8 @@
 #include "utils/types.h"
 #include "platform/io.h"
 // #include "libs/libmath.h"
-#include <math.h>
+// #include <math.h>
+
 
 Image read_image_file(Arena* arena, string8 filename);
 #endif // _LIBIMAGES_H
@@ -53,6 +54,7 @@ Image read_image_file(Arena* arena, string8 filename);
  *
  */
 
+#include "libs/IDCT_Weights.txt"
 // TODO(alex): Have real errors
 typedef enum {
     JPEG_SUCCESS = 0,
@@ -927,14 +929,14 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     const u8 AC = 1;
     const u32 PI = 3.1415926535;
     const u8 zigzag[8][8] = {
-        { 0,  1,  5,  6, 14, 15, 27, 28},
-        { 2,  4,  7, 13, 16, 26, 29, 42},
-        { 3,  8, 12, 17, 25, 30, 41, 43},
-        { 9, 11, 18, 24, 31, 40, 44, 53},
-        {10, 19, 23, 32, 39, 45, 52, 54},
-        {20, 22, 33, 38, 46, 51, 55, 60},
-        {21, 34, 37, 47, 50, 56, 59, 61},
-        {35, 36, 48, 49, 57, 58, 62, 63}
+        {0,   1,  8, 16,  9,  2,  3, 10},
+        {17, 24, 32, 25, 18, 11,  4,  5},
+        {12, 19, 26, 33, 40, 48, 41, 34},
+        {27, 20, 13,  6,  7, 14, 21, 28},
+        {35, 42, 49, 56, 57, 50, 43, 36},
+        {29, 22, 15, 23, 30, 37, 44, 51},
+        {58, 59, 52, 45, 38, 31, 39, 46},
+        {53, 60, 61, 54, 47, 55, 62, 63}
     };
 
     // This is valid for the whole scan!
@@ -994,26 +996,32 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 }
 
                 // Dequantize
-                for (u8 i=0; i<64; i++) {
-                    mcu[idx][i] *= Q[i];
+                for (u8 y=0; y<8; y++) {
+                    for (u8 x=0; x<8; x++) {
+                        u8 l = x+y*8;
+                        mcu[idx][l] *= Q[l];
+                    }
                 }
 
                 // IDCT
-                // TODO(alex): ZigZag to put at correct indices
                 for (u8 y=0; y<8; y++) {
                     for (u8 x=0; x<8; x++) {
-                        u8 l = zigzag[y][x];
-                        printf("%d ", l);
-                        for (u8 u=0; u<8; u++) {
-                            f32 Cu = u==0 ? 0.7071067811 : 1;
-                            for (u8 v=0; v<8; v++) {
-                                f32 Cv = v==0 ? 0.7071067811 : 1;
-                                u8 mcu_idx = zigzag[v][u];
-                                idct[idx][l] += Cu * Cv * mcu[idx][mcu_idx] * cos((2*x+1)*u*PI*0.0625f) * cos((2*y+1)*v*PI*0.0625f);
+                        u8 l = x+y*8;
+
+                        for (u8 v=0; v<8; v++) {
+                            f32 Cv = v==0 ? 0.7071067811 : 1;
+                            for (u8 u=0; u<8; u++) {
+                                f32 Cu = u==0 ? 0.7071067811 : 1;
+                                u8 normal_order = zigzag[v][u];
+                                u8 unzig_v = normal_order/8;
+                                u8 unzig_u = normal_order%8;
+                                u8 mcu_idx = u+v*8;
+
+                                idct[idx][l] += Cu * Cv * mcu[idx][mcu_idx] * IDCT_Weights[unzig_v][unzig_u][l];
                             }
                         }
 
-                        s16 a = idct[idx][l];
+                        s16 a = 0.25f*idct[idx][l]+128;
                         s16 low = 0;
                         s16 high = 255;
                         s16 t = a < low ? low : a;
@@ -1031,12 +1039,14 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     for (u8 y=0; y<8; y++) {
         for (u8 x=0; x<8; x++) {
             u8 l = x + y * 8;
-            rgb[l][0] = idct[0][l]                        + 1.402   * idct[2][l];
-            rgb[l][1] = idct[0][l] - 0.34414 * idct[1][l] - 0.71414 * idct[2][l];
-            rgb[l][2] = idct[0][l] + 1.772   * idct[1][l];
+            rgb[l][0] = (u8)idct[0][l];
+            rgb[l][1] = (u8)idct[1][l];
+            rgb[l][2] = (u8)idct[2][l];
+            // rgb[l][0] = idct[0][l]                        + 1.402   * idct[2][l];
+            // rgb[l][1] = idct[0][l] - 0.34414 * idct[1][l] - 0.71414 * idct[2][l];
+            // rgb[l][2] = idct[0][l] + 1.772   * idct[1][l];
         }
     }
-
     printf("HERE\n");
 
     // Save
