@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 filename = "IDCT_Weights.txt"
 
-
 U = np.arange(0, 8)
 V = np.arange(0, 8)
 
@@ -22,17 +21,18 @@ for v in V:
         IDCT[v, u] = np.outer(np.cos((2*Y+1)*v*np.pi/16), np.cos((2*X+1)*u*np.pi/16))
 
 
-with open(os.path.join(os.path.dirname(__file__), filename), "w") as f:
+with open(os.path.join(os.path.dirname(__file__), "..", "libs", filename), "w") as f:
     f.write(f"//      [v][u][x+y*8]\n")
-    f.write(f"f32 IDCT[8][8][64] = {{\n")
+    f.write(f"const f32 IDCT_Weights[8][8][64] = {{\n")
 
     for v in V:
+        f.write("    {\n")
         for u in U:
-            f.write(f"    // (v, u)=({v},{u})\n")
-            f.write(f"    {{\n")
+            f.write(f"        // (v, u)=({v},{u})\n")
+            f.write(f"        {{\n")
 
             for y in Y:
-                f.write("        ");
+                f.write("            ");
                 for x in X:
                     if IDCT[v, u, y, u]>=0:
                         f.write(" ")
@@ -46,6 +46,7 @@ with open(os.path.join(os.path.dirname(__file__), filename), "w") as f:
             else:
                 f.write(f"    }},\n")
 
+        f.write("    },\n")
     f.write("};\n")
 
 # fig, ax = plt.subplots(1)
