@@ -14,6 +14,62 @@ u8
 min(u8 a, u8 b) {
     return a < b ? a : b;
 }
+u8
+clamp(u8 a, u8 low, u8 high) {
+    u8 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
+//====================
+//      s8
+//====================
+s8
+max(s8 a, s8 b) {
+    return a > b ? a : b;
+}
+s8
+min(s8 a, s8 b) {
+    return a < b ? a : b;
+}
+s8
+clamp(s8 a, s8 low, s8 high) {
+    s8 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
+//====================
+//      u16
+//====================
+u16
+max(u16 a, u16 b) {
+    return a > b ? a : b;
+}
+u16
+min(u16 a, u16 b) {
+    return a < b ? a : b;
+}
+u16
+clamp(u16 a, u16 low, u16 high) {
+    u16 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
+//====================
+//      s16
+//====================
+s16
+max(s16 a, s8 b) {
+    return a > b ? a : b;
+}
+s16
+min(s16 a, s8 b) {
+    return a < b ? a : b;
+}
+s16
+clamp(s16 a, s8 low, s8 high) {
+    s16 t = a < low ? low : a;
+    return t > high ? high : t;
+}
 
 //====================
 //      u32
@@ -25,6 +81,11 @@ max(u32 a, u32 b) {
 u32
 min(u32 a, u32 b) {
     return a < b ? a : b;
+}
+u32
+clamp(u32 a, u32 low, u32 high) {
+    u32 t = a < low ? low : a;
+    return t > high ? high : t;
 }
 
 //====================
@@ -38,6 +99,11 @@ s32
 min(s32 a, s32 b) {
     return a < b ? a : b;
 }
+s32
+clamp(s32 a, s32 low, s32 high) {
+    s32 t = a < low ? low : a;
+    return t > high ? high : t;
+}
 
 //====================
 //      f32
@@ -49,6 +115,11 @@ max(f32 a, f32 b) {
 f32
 min(f32 a, f32 b) {
     return a < b ? a : b;
+}
+f32
+clamp(f32 a, f32 low, f32 high) {
+    f32 t = a < low ? low : a;
+    return t > high ? high : t;
 }
 
 //====================
