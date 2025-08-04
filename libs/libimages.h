@@ -310,6 +310,27 @@ void print_qt(QuantizationTables& qt) {
     }
 }
 
+void print_zz(s16* d) {
+    u8 zigzag[8][8] = {
+        { 0,  1,  5,  6, 14, 15, 27, 28},
+        { 2,  4,  7, 13, 16, 26, 29, 42},
+        { 3,  8, 12, 17, 25, 30, 41, 43},
+        { 9, 11, 18, 24, 31, 40, 44, 53},
+        {10, 19, 23, 32, 39, 45, 52, 54},
+        {20, 22, 33, 38, 46, 51, 55, 60},
+        {21, 34, 37, 47, 50, 56, 59, 61},
+        {35, 36, 48, 49, 57, 58, 62, 63}
+    };
+
+    for (u8 k=0;k<8; k++) {
+        for (u8 j=0;j<8;j++) {
+            printf("%d ", d[zigzag[j][k]]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
 void print_sh(ScanHeader& sh) {
     printf("Scan Header: \n");
     printf("-----------  \n");
@@ -853,27 +874,20 @@ JpegParsingResult parse_DCDataUnit(BitStream* bs, HuffmanNode* root_node, s16* o
 }
 
 JpegParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* run_length, s16* out) {
-    // s8 value = 0;
     HuffmanNode* node = root_node;
 
     // Huffman decode a byte which contains run length + category
-    u16 code = 0;
-    u16 count = 0;
     u8 bit = 0;
     while (!node->is_leaf) {
         next_bit(bs, &bit);
-        count++;
-        code = (code<<1)|bit;
         if (bit) {
             node = node->right;
             if (node == nullptr){
-                printf("CODE: %b  read: %d bits\n", code, count);
                 return (JpegParsingResult){JPEG_FAIL, "Failed decoding AC node going right."};
             }
         } else {
             node = node->left;
             if (node == nullptr){
-                printf("CODE: %b read: %d bits\n", code, count);
                 return (JpegParsingResult){JPEG_FAIL, "Failed decoding AC node going left."};
             }
         }
@@ -923,7 +937,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         }
     }
 
+    // TODO(alex): reset after restart index
     s16 DIFF[4] = {0};
+    s16 mcu[64] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
@@ -940,20 +956,28 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
                 if (result.status != JPEG_SUCCESS) { return result; }
-                s16 dc = value;
+                s16 dc = DIFF[idx] + value;
+                DIFF[idx] = dc;
+                mcu[0] = dc;
 
-                u8 j = 0;
-                while (j<63) {        // and not a marker that would indicate something
+                u8 j = 1;
+                while (j<64) {        // and not a marker that would indicate something
                     u8 preceding_zeros = 0;
                     JpegParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
                     s16 ac = value;
-                    // Rest are zeros
-                    if (ac==0 && preceding_zeros==0) {
-                        j=63;
+
+                    if (ac == 0 && preceding_zeros == 0) {
+                        while (j<64) {
+                            mcu[j++] = 0;
+                        }
                     } else {
-                        j += 1 + preceding_zeros;
+                        for (u8 k=0; k<preceding_zeros; k++, j++) {
+                            mcu[j] = 0;
+                        }
+                        mcu[j++] = ac;
                     }
                 }
+                // print_zz(mcu);
             }
         }
     }
