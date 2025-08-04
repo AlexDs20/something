@@ -4,6 +4,7 @@
 #include "libstring.h"
 #include "utils/types.h"
 #include "platform/io.h"
+#include <math.h>
 
 Image read_image_file(Arena* arena, string8 filename);
 #endif // _LIBIMAGES_H
@@ -923,7 +924,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
     const u8 DC = 0;
     const u8 AC = 1;
+    const u32 PI = 3.1415926535;
 
+    // This is valid for the whole scan!
     u8 component_idx[4] = {0};
     for (u8 j=0; j<n_components; j++) {
         u8 cs_j = jpeg->sh.component_selector[j];
@@ -941,9 +944,11 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
 
-        s16 mcu[64] = {0};
+        s16 mcu[4][64] = {0};
+        s16 idct[4][64] = {0};
 
-        // u8 qt = jpeg->fh.QT_selector[idx];
+        u8 qt_idx = jpeg->fh.QT_selector[idx];
+        u8* Q = jpeg->qt.Q[qt_idx];
 
         u8 dc_table_id = jpeg->sh.dc_selector[i];
         u8 ac_table_id = jpeg->sh.ac_selector[i];
@@ -957,7 +962,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 if (result.status != JPEG_SUCCESS) { return result; }
                 s16 dc = jpeg->dc_pred[idx] + value;
                 jpeg->dc_pred[idx] = dc;
-                mcu[0] = dc;
+                mcu[idx][0] = dc;
 
                 u8 j = 1;
                 while (j<64) {        // and not a marker that would indicate something
@@ -967,25 +972,48 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                     if (ac == 0 && preceding_zeros == 0) {
                         while (j<64) {
-                            mcu[j++] = 0;
+                            mcu[idx][j++] = 0;
                         }
                     } else {
                         for (u8 k=0; k<preceding_zeros; k++) {
-                            mcu[j++] = 0;
+                            mcu[idx][j++] = 0;
                         }
-                        mcu[j++] = ac;
+                        mcu[idx][j++] = ac;
                     }
                 }
-                // print_zz(mcu);
-
-                // IDFT
 
                 // Dequantize
+                for (u8 i=0; i<64; i++) {
+                    mcu[idx][i] *= Q[i];
+                }
 
-                // Convert to RGB
+                // IDCT
+                // TODO(alex): ZigZag to put at correct indices
+                for (u8 y=0; y<8; y++) {
+                    for (u8 x=0; x<8; x++) {
+                        u8 l = x + y*8;
+                        for (u8 u=0; u<8; u++) {
+                            f32 Cu = u==0 ? 0.7071067811 : 1;
+                            for (u8 v=0; v<8; v++) {
+                                f32 Cv = v==0 ? 0.7071067811 : 1;
+                                u8 mcu_idx = u + v*8;
+                                idct[idx][l] += Cu * Cv * mcu[idx][mcu_idx] * cos((2*x+1)*u*PI*0.0625f) * cos((2*y+1)*v*PI*0.0625f);
+                            }
+                        }
+                        idct[idx][l] *= 0.25f;
+                    }
+                }
             }
         }
     }
+    // Convert to RGB
+    for (u8 y=0; y<8; y++) {
+        for (u8 x=0; x<8; x++) {
+        }
+    }
+
+
+    // Save
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
