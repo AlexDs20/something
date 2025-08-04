@@ -372,6 +372,8 @@ typedef struct {
     u16 restart_interval;
     u8 dc_pred[4];              // dc_prediction NOTE(alex): move to Quantization Table struct?
 
+    u32 current_mcu;
+
     union {
         u32* rgba;
         u32* rgb;
@@ -922,6 +924,11 @@ JpegParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* ru
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
+f64 clampf64(f64 a, f64 low=0, f64 high=255){
+    f64 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
 s16 clamp(s16 a, s16 low=0, s16 high=255){
     s16 t = a < low ? low : a;
     return t > high ? high : t;
@@ -960,7 +967,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
 
     s16 mcu[4][64] = {0};
-    s16 idct[4][64] = {0};
+    f64 idct[4][64] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
@@ -1026,9 +1033,8 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                             }
                         }
 
-                        s16 a = 0.25f*idct[idx][l]+128;
-                        idct[idx][l] = clamp(a);
-                        // idct[idx][l] = (u8)clamp((s16)(0.25f*)+128, 0, 255);
+                        f64 a = 0.25f*idct[idx][l] + 128;
+                        idct[idx][l] = clamp(a+0.5);
                     }
                 }
             }
@@ -1038,24 +1044,45 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
     // Assume YCbCr
     // Convert to RGB
-    for (u8 y=0; y<8; y++) {
-        for (u8 x=0; x<8; x++) {
-            u8 l = x + y * 8;
-            // rgb[l][0] = (u8)idct[0][l];
-            // rgb[l][1] = (u8)idct[1][l];
-            // rgb[l][2] = (u8)idct[2][l];
-            s16 r = idct[0][l]                                + 1.402   * (idct[2][l] - 128);
-            s16 g = idct[0][l] - 0.34414 * (idct[1][l] - 128) - 0.71414 * (idct[2][l] - 128);
-            s16 b = idct[0][l] + 1.772   * (idct[1][l] - 128);
+    if (n_components==3) {
 
-            rgb[l][0] = (u8)clamp(r);
-            rgb[l][1] = (u8)clamp(g);
-            rgb[l][2] = (u8)clamp(b);
+        // (0,0)
+        u16 n_blocks_x = (u16)((jpeg->fh.src_width  + 7) / 8.0f);
+        u16 n_blocks_y = (u16)((jpeg->fh.src_height + 7) / 8.0f);
+        u16 start_x = jpeg->current_mcu % n_blocks_x;
+        u16 start_y = (u16)(jpeg->current_mcu / n_blocks_x);
+        // printf("n blocks: (%d, %d)  start: (%d, %d)\n", n_blocks_y, n_blocks_x, start_y, start_x);
+        for (u8 y=0; y<8; y++) {
+            for (u8 x=0; x<8; x++) {
+                u8 l = x + y * 8;
+                f64 r = idct[0][l]                                 + 1.402    * (idct[2][l] - 128);
+                f64 g = idct[0][l] - 0.344136 * (idct[1][l] - 128) - 0.714136 * (idct[2][l] - 128);
+                f64 b = idct[0][l] + 1.772    * (idct[1][l] - 128);
+
+                // BGRA
+                rgb[l][2] = (u8)clamp(r+0.5);
+                rgb[l][1] = (u8)clamp(g+0.5);
+                rgb[l][0] = (u8)clamp(b+0.5);
+
+                // TODO check not going over edge
+                u32 NX = (start_x*8 + x);
+                u32 NY = (start_y*8 + y);
+                u32 linear = NX + NY*jpeg->fh.src_width;
+                jpeg->grey[linear*4 + 0] = rgb[l][0];
+                jpeg->grey[linear*4 + 1] = rgb[l][1];
+                jpeg->grey[linear*4 + 2] = rgb[l][2];
+            }
+        }
+    } else {
+        for (u8 y=0; y<8; y++) {
+            for (u8 x=0; x<8; x++) {
+                u8 l = x + y * 8;
+                s16 grey = idct[0][l];
+                rgb[l][0] = (u8)clamp(grey);
+            }
         }
     }
-    printf("HERE\n");
-
-    // Save
+    jpeg->current_mcu++;
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
@@ -1167,15 +1194,19 @@ JpegParsingResult decode_frame(Arena* persist_arena, u8** data, jpeg_t* jpeg, u8
         return (JpegParsingResult){JPEG_FAIL, "Only StartOfFrame0 marker implemented!"};
     }
 
+    u64 checkpoint = arena_alloc_checkpoint(persist_arena);
+    jpeg->grey = (u8*)arena_alloc_push(persist_arena, jpeg->fh.src_width*jpeg->fh.src_height*4*sizeof(u8));
+
     marker = peek_2_bytes(ptr);
     while ((is_interpret_marker(marker) || (marker==StartOfScan)) && ptr<end_of_data) {       // Either DNL between scans or Tables/misc. or Scan header
         JpegParsingResult result = parse_Scan(persist_arena, local_arena->arena, &ptr, jpeg, end_of_data);
 
-        if (result.status != JPEG_SUCCESS) { return result; }
+        if (result.status != JPEG_SUCCESS) { arena_alloc_restore(persist_arena, checkpoint); return result; }
         marker = peek_2_bytes(ptr);
     }
 
     if (ptr>=end_of_data) {
+        arena_alloc_restore(persist_arena, checkpoint);
         return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
     }
 

@@ -14,7 +14,7 @@ V = np.arange(0, 8)
 X = np.arange(0, 8)
 Y = np.arange(0, 8)
 
-IDCT = np.empty((V.size, U.size, Y.size, X.size))
+IDCT = np.empty((V.size, U.size, Y.size, X.size), dtype=np.float64)
 
 for v in V:
     for u in U:
@@ -36,7 +36,7 @@ with open(os.path.join(os.path.dirname(__file__), "..", "libs", filename), "w") 
                 for x in X:
                     if IDCT[v, u, y, x]>=0:
                         f.write(" ")
-                    f.write(f"{IDCT[v, u, y, x]:.15f},")
+                    f.write(f"{IDCT[v, u, y, x]:.32f},")
                     if (x!=7):
                         f.write("    ")
                 f.write("\n")
