@@ -937,12 +937,11 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         }
     }
 
-    // TODO(alex): reset after restart index
-    s16 DIFF[4] = {0};
-    s16 mcu[64] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
+
+        s16 mcu[64] = {0};
 
         // u8 qt = jpeg->fh.QT_selector[idx];
 
@@ -956,8 +955,8 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
                 if (result.status != JPEG_SUCCESS) { return result; }
-                s16 dc = DIFF[idx] + value;
-                DIFF[idx] = dc;
+                s16 dc = jpeg->dc_pred[idx] + value;
+                jpeg->dc_pred[idx] = dc;
                 mcu[0] = dc;
 
                 u8 j = 1;
@@ -971,13 +970,19 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                             mcu[j++] = 0;
                         }
                     } else {
-                        for (u8 k=0; k<preceding_zeros; k++, j++) {
-                            mcu[j] = 0;
+                        for (u8 k=0; k<preceding_zeros; k++) {
+                            mcu[j++] = 0;
                         }
                         mcu[j++] = ac;
                     }
                 }
                 // print_zz(mcu);
+
+                // IDFT
+
+                // Dequantize
+
+                // Convert to RGB
             }
         }
     }
@@ -997,6 +1002,9 @@ JpegParsingResult parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8
     s8 tmp;
     u16 n = 0;
     while (n++ < jpeg->restart_interval) {
+        // Hack to reset all 4 u8 values to 0
+        *(u32*)jpeg->dc_pred = 0;
+
         JpegParsingResult result = parse_mcu(arena, &bs, jpeg);
         if (result.status != JPEG_SUCCESS) { return result; }
     }
