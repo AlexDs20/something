@@ -922,6 +922,11 @@ JpegParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* ru
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
+s16 clamp(s16 a, s16 low=0, s16 high=255){
+    s16 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
 JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     u8 n_components = jpeg->sh.n_components;
 
@@ -1022,10 +1027,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         }
 
                         s16 a = 0.25f*idct[idx][l]+128;
-                        s16 low = 0;
-                        s16 high = 255;
-                        s16 t = a < low ? low : a;
-                        idct[idx][l] =  t > high ? high : t;
+                        idct[idx][l] = clamp(a);
                         // idct[idx][l] = (u8)clamp((s16)(0.25f*)+128, 0, 255);
                     }
                 }
@@ -1039,12 +1041,16 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     for (u8 y=0; y<8; y++) {
         for (u8 x=0; x<8; x++) {
             u8 l = x + y * 8;
-            rgb[l][0] = (u8)idct[0][l];
-            rgb[l][1] = (u8)idct[1][l];
-            rgb[l][2] = (u8)idct[2][l];
-            // rgb[l][0] = idct[0][l]                        + 1.402   * idct[2][l];
-            // rgb[l][1] = idct[0][l] - 0.34414 * idct[1][l] - 0.71414 * idct[2][l];
-            // rgb[l][2] = idct[0][l] + 1.772   * idct[1][l];
+            // rgb[l][0] = (u8)idct[0][l];
+            // rgb[l][1] = (u8)idct[1][l];
+            // rgb[l][2] = (u8)idct[2][l];
+            s16 r = idct[0][l]                                + 1.402   * (idct[2][l] - 128);
+            s16 g = idct[0][l] - 0.34414 * (idct[1][l] - 128) - 0.71414 * (idct[2][l] - 128);
+            s16 b = idct[0][l] + 1.772   * (idct[1][l] - 128);
+
+            rgb[l][0] = (u8)clamp(r);
+            rgb[l][1] = (u8)clamp(g);
+            rgb[l][2] = (u8)clamp(b);
         }
     }
     printf("HERE\n");
