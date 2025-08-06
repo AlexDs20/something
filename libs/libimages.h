@@ -940,15 +940,26 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     const u8 DC = 0;
     const u8 AC = 1;
     const u32 PI = 3.1415926535;
+    // To go from flat elements in zigzag order to flat in unzigzag order
     const u8 zigzag[8][8] = {
-        {0,   1,  8, 16,  9,  2,  3, 10},
-        {17, 24, 32, 25, 18, 11,  4,  5},
-        {12, 19, 26, 33, 40, 48, 41, 34},
-        {27, 20, 13,  6,  7, 14, 21, 28},
-        {35, 42, 49, 56, 57, 50, 43, 36},
-        {29, 22, 15, 23, 30, 37, 44, 51},
-        {58, 59, 52, 45, 38, 31, 39, 46},
-        {53, 60, 61, 54, 47, 55, 62, 63}
+        { 0,  1,  5,  6, 14, 15, 27, 28},
+        { 2,  4,  7, 13, 16, 26, 29, 42},
+        { 3,  8, 12, 17, 25, 30, 41, 43},
+        { 9, 11, 18, 24, 31, 40, 44, 53},
+        {10, 19, 23, 32, 39, 45, 52, 54},
+        {20, 22, 33, 38, 46, 51, 55, 60},
+        {21, 34, 37, 47, 50, 56, 59, 61},
+        {35, 36, 48, 49, 57, 58, 62, 63}
+    };
+    const u8 unzigzag[64] = {
+        0,   1,  8, 16,  9,  2,  3, 10,
+        17, 24, 32, 25, 18, 11,  4,  5,
+        12, 19, 26, 33, 40, 48, 41, 34,
+        27, 20, 13,  6,  7, 14, 21, 28,
+        35, 42, 49, 56, 57, 50, 43, 36,
+        29, 22, 15, 23, 30, 37, 44, 51,
+        58, 59, 52, 45, 38, 31, 39, 46,
+        53, 60, 61, 54, 47, 55, 62, 63
     };
 
     // This is valid for the whole scan!
@@ -966,8 +977,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     }
 
 
-    s16 mcu[4][64] = {0};
-    f64 idct[4][64] = {0};
+    s16 zz_mcu[64][4] = {0};
+    s16 mcu[64][4] = {0};
+    f64 idct[64][4] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
@@ -987,7 +999,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 if (result.status != JPEG_SUCCESS) { return result; }
                 s16 dc = jpeg->dc_pred[idx] + value;
                 jpeg->dc_pred[idx] = dc;
-                mcu[idx][0] = dc;
+                zz_mcu[0][idx] = dc;
 
                 u8 j = 1;
                 while (j<64) {        // and not a marker that would indicate something
@@ -997,22 +1009,24 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                     if (ac == 0 && preceding_zeros == 0) {
                         while (j<64) {
-                            mcu[idx][j++] = 0;
+                            zz_mcu[j++][idx] = 0;
                         }
                     } else {
                         for (u8 k=0; k<preceding_zeros; k++) {
-                            mcu[idx][j++] = 0;
+                            zz_mcu[j++][idx] = 0;
                         }
-                        mcu[idx][j++] = ac;
+                        zz_mcu[j++][idx] = ac;
                     }
                 }
 
                 // Dequantize
-                for (u8 y=0; y<8; y++) {
-                    for (u8 x=0; x<8; x++) {
-                        u8 l = x+y*8;
-                        mcu[idx][l] *= Q[l];
-                    }
+                for (u8 l=0; l<64; l++) {
+                    zz_mcu[l][idx] *= Q[l];
+                }
+
+                // Unzigzag
+                for (u8 l=0; l<64; l++) {
+                    mcu[unzigzag[l]][idx] = zz_mcu[l][idx];
                 }
 
                 // IDCT
@@ -1024,17 +1038,14 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                             f32 Cv = v==0 ? 0.7071067811 : 1;
                             for (u8 u=0; u<8; u++) {
                                 f32 Cu = u==0 ? 0.7071067811 : 1;
-                                u8 normal_order = zigzag[v][u];
-                                u8 unzig_v = normal_order/8;
-                                u8 unzig_u = normal_order%8;
-                                u8 mcu_idx = u+v*8;
 
-                                idct[idx][l] += Cu * Cv * mcu[idx][mcu_idx] * IDCT_Weights[unzig_v][unzig_u][l];
+                                u8 l_vu = u + v*8;
+                                idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[v][u][l]);
                             }
                         }
 
-                        f64 a = 0.25f*idct[idx][l] + 128;
-                        idct[idx][l] = clamp(a+0.5);
+                        f64 a = (f64)(0.25f*idct[l][idx] + 128);
+                        idct[l][idx] = clamp(a+0.5);
                     }
                 }
             }
@@ -1055,11 +1066,10 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         for (u8 y=0; y<8; y++) {
             for (u8 x=0; x<8; x++) {
                 u8 l = x + y * 8;
-                f64 r = idct[0][l]                                 + 1.402    * (idct[2][l] - 128);
-                f64 g = idct[0][l] - 0.344136 * (idct[1][l] - 128) - 0.714136 * (idct[2][l] - 128);
-                f64 b = idct[0][l] + 1.772    * (idct[1][l] - 128);
+                f64 r = idct[l][0]                                + 1.402   * (idct[l][2] - 128);
+                f64 g = idct[l][0] - 0.34414 * (idct[l][1] - 128) - 0.71414 * (idct[l][2] - 128);
+                f64 b = idct[l][0] + 1.772   * (idct[l][1] - 128);
 
-                // BGRA
                 rgb[l][2] = (u8)clamp(r+0.5);
                 rgb[l][1] = (u8)clamp(g+0.5);
                 rgb[l][0] = (u8)clamp(b+0.5);
@@ -1077,7 +1087,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         for (u8 y=0; y<8; y++) {
             for (u8 x=0; x<8; x++) {
                 u8 l = x + y * 8;
-                s16 grey = idct[0][l];
+                s16 grey = idct[l][0];
                 rgb[l][0] = (u8)clamp(grey);
             }
         }
@@ -1099,10 +1109,11 @@ JpegParsingResult parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8
     s8 tmp;
     u16 n = 0;
 
-    // Hack to reset all 4 u8 values to 0
-    *(u32*)jpeg->dc_pred = 0;
+    // Reset all 4 u8 values to 0
+    for (u8 i=0; i<4; i++) {
+        jpeg->dc_pred[i] = 0;
+    }
     while (n++ < jpeg->restart_interval) {
-
         JpegParsingResult result = parse_mcu(arena, &bs, jpeg);
         if (result.status != JPEG_SUCCESS) { return result; }
     }
