@@ -370,7 +370,7 @@ typedef struct {
     HuffmanTableSpec ht;
 
     u16 restart_interval;
-    u8 dc_pred[4];              // dc_prediction NOTE(alex): move to Quantization Table struct?
+    s16 dc_pred[4];              // dc_prediction NOTE(alex): move to Quantization Table struct?
 
     u32 current_mcu;
 
@@ -1098,9 +1098,10 @@ JpegParsingResult parse_EntropySegment(Arena* arena, u8** data, jpeg_t* jpeg, u8
 
     s8 tmp;
     u16 n = 0;
+
+    // Hack to reset all 4 u8 values to 0
+    *(u32*)jpeg->dc_pred = 0;
     while (n++ < jpeg->restart_interval) {
-        // Hack to reset all 4 u8 values to 0
-        *(u32*)jpeg->dc_pred = 0;
 
         JpegParsingResult result = parse_mcu(arena, &bs, jpeg);
         if (result.status != JPEG_SUCCESS) { return result; }

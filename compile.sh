@@ -2,7 +2,7 @@
 
 BIN="./build/main"
 
-FLAGS="-g -ggdb -pg -O2 -Wall" # -finstrument-functions -fsanitize=address"
+FLAGS="-g -ggdb -pg -O0 -Wall" # -finstrument-functions -fsanitize=address"
 DEFINES=-D_DEBUG
 LINKS="-lc"
 LINKSDIR=
