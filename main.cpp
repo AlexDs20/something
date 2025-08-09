@@ -33,6 +33,7 @@ int main() {
     if (string_get_file_extension(file_path) == ".obj") {
         model = read_obj_model_file(scene_arena, file_path);
     }
+    return 0;
 
     const u32 w = 1024;
     const u32 h = 768;

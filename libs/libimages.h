@@ -8,7 +8,12 @@
 // #include <math.h>
 
 
+// TODO(alex):
+// ImageInfo read_image_info(string8 filename);
+
+// TODO(alex): Maybe request a pointer where there is enough space instead?
 Image read_image_file(Arena* arena, string8 filename);
+
 #endif // _LIBIMAGES_H
 
 #ifdef LIB_IMAGES_IMPLEMENTATION
@@ -940,17 +945,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     const u8 DC = 0;
     const u8 AC = 1;
     const u32 PI = 3.1415926535;
-    // To go from flat elements in zigzag order to flat in unzigzag order
-    const u8 zigzag[8][8] = {
-        { 0,  1,  5,  6, 14, 15, 27, 28},
-        { 2,  4,  7, 13, 16, 26, 29, 42},
-        { 3,  8, 12, 17, 25, 30, 41, 43},
-        { 9, 11, 18, 24, 31, 40, 44, 53},
-        {10, 19, 23, 32, 39, 45, 52, 54},
-        {20, 22, 33, 38, 46, 51, 55, 60},
-        {21, 34, 37, 47, 50, 56, 59, 61},
-        {35, 36, 48, 49, 57, 58, 62, 63}
-    };
+    // To go from flat zigzag order to flat unzigzag order
     const u8 unzigzag[64] = {
         0,   1,  8, 16,  9,  2,  3, 10,
         17, 24, 32, 25, 18, 11,  4,  5,
@@ -1040,7 +1035,8 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                                 f32 Cu = u==0 ? 0.7071067811 : 1;
 
                                 u8 l_vu = u + v*8;
-                                idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[v][u][l]);
+                                // idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[v][u][l]);
+                                idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[y][x][l_vu]);
                             }
                         }
 
