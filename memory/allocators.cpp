@@ -255,6 +255,13 @@ void arena_alloc_restore(Arena* arena, u64 checkpoint) {
     }
 }
 
+void arena_alloc_restore_zero(Arena* arena, u64 checkpoint) {
+    if (arena && arena->buffer && checkpoint < arena->top) {
+        memset(arena->buffer + checkpoint, 0, arena->top - checkpoint);
+        arena->top = checkpoint;
+    }
+}
+
 void* arena_alloc_align(Arena* arena) {
     if (!arena || !arena->buffer) {
         return 0;

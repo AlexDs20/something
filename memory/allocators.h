@@ -45,6 +45,7 @@ void arena_alloc_reset_zero(Arena* arena);
 void* arena_alloc_copy(Arena* dest, Arena* src);
 u64 arena_alloc_checkpoint(Arena* arena);
 void arena_alloc_restore(Arena* arena, u64 checkpoint);
+void arena_alloc_restore_zero(Arena* arena, u64 checkpoint);
 
 void* arena_alloc_align(Arena* arena);
 void arena_debug_map(Arena* arena, u64 width);
