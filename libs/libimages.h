@@ -7,12 +7,48 @@
 // #include "libs/libmath.h"
 // #include <math.h>
 
+typedef struct ImageInfo ImageInfo;
+struct ImageInfo {
+    u32 width;
+    u32 height;
+    u8 channels;
+    u8 precision;
+};
+
+typedef struct Image Image;
+struct Image {
+    union {
+        u32* data;
+        u32* buffer;
+        u8* gray;
+        u32* rgb;
+        u32* rgba;
+    };
+    u32 width;
+    u32 height;
+    u8 components;
+    u8 precision;
+};
+
+// TODO(alex): Have real errors
+typedef enum {
+    JPEG_SUCCESS = 0,
+    JPEG_FAIL,
+} JpegError;
+
+typedef struct {
+    JpegError status;
+    // TODO(alex): Make this string8?
+    const char* error_message;
+} JpegParsingResult;
 
 // TODO(alex):
 // ImageInfo read_image_info(string8 filename);
 
 // TODO(alex): Maybe request a pointer where there is enough space instead?
 Image read_image_file(Arena* arena, string8 filename);
+
+JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out);
 
 #endif // _LIBIMAGES_H
 
@@ -60,19 +96,6 @@ Image read_image_file(Arena* arena, string8 filename);
  */
 
 #include "libs/IDCT_Weights.txt"
-// TODO(alex): Have real errors
-typedef enum {
-    JPEG_SUCCESS = 0,
-    JPEG_INVALID_HEADER,
-    JPEG_MISSING_MARKER,
-    JPEG_FAIL,
-} JpegError;
-
-typedef struct {
-    JpegError status;
-    // TODO(alex): Make this string8?
-    const char* error_message;
-} JpegParsingResult;
 
 // itu-t81.pdf page 32
 enum Markers {
@@ -156,6 +179,10 @@ enum Markers {
     Comment = 0xFFFE,
 };
 
+void print_mk(u16 marker) {
+    printf("Marker: 0x%X\n", marker);
+}
+
 struct FrameHeader {
     u8  src_precision;
     u16 src_height;
@@ -167,6 +194,24 @@ struct FrameHeader {
     u8 V_sample[4];
     u8 QT_selector[4];
 };
+
+void print_fh(FrameHeader& fh) {
+    printf("Frame Header: \n");
+    printf("------------  \n");
+    printf("Source image: \n");
+    printf("  Precision: %d bits\n", fh.src_precision);
+    printf("  Height: %d\n", fh.src_height);
+    printf("  Width: %d\n", fh.src_width);
+    printf("  Components: %d\n", fh.src_components);
+
+    for (u8 i=0;i<fh.src_components; i++) {
+        printf("Component %d:\n", i);
+        printf("  id: %d\n", fh.component_id[i]);
+        printf("  H sample: %d\n", fh.H_sample[i]);
+        printf("  V sample: %d\n", fh.V_sample[i]);
+        printf("  QT selector: %d\n", fh.QT_selector[i]);
+    }
+}
 
 struct ScanHeader {
     u8 n_components;
@@ -183,6 +228,22 @@ struct ScanHeader {
     // TODO(alex): For simplicity, additional fields
     // u8 id_component_fh[4];
 };
+
+void print_sh(ScanHeader& sh) {
+    printf("Scan Header: \n");
+    printf("-----------  \n");
+
+    for (u8 i=0; i<sh.n_components; i++) {
+        printf("Component %d: \n", i);
+        printf("    component selector: %d\n", sh.component_selector[i]);
+        printf("    dc selector: %d\n", sh.dc_selector[i]);
+        printf("    ac selector: %d\n", sh.ac_selector[i]);
+    }
+    printf("Start spectral: %d\n", sh.start_spectral);
+    printf("End spectral: %d\n", sh.end_spectral);
+    printf("Approx high: %d\n", sh.approx_high);
+    printf("Approx low: %d\n", sh.approx_low);
+}
 
 struct HuffmanNode{
     u8 value;
@@ -203,38 +264,6 @@ struct HuffmanTableSpec {
     //             AC/DC  ID
     HuffmanNode* root[2] [4];
 };
-
-struct QuantizationTables {
-    u8 n;
-    u8 precision[4];                   // Precision of the Qk: 0 => 8bit, 1 => 16 bit
-    u8 id[4];                          // Specifies where the quantization table to be used in the decoder
-    u8 Q[4][64];                       // element in the zigzag ordering of the dct coefficients
-};
-
-typedef struct {
-    u8* data;
-    u8* end;
-    u64 byte_pos;
-    u8 bit_pos;
-} BitStream;
-
-void print_fh(FrameHeader& fh) {
-    printf("Frame Header: \n");
-    printf("------------  \n");
-    printf("Source image: \n");
-    printf("  Precision: %d bits\n", fh.src_precision);
-    printf("  Height: %d\n", fh.src_height);
-    printf("  Width: %d\n", fh.src_width);
-    printf("  Components: %d\n", fh.src_components);
-
-    for (u8 i=0;i<fh.src_components; i++) {
-        printf("Component %d:\n", i);
-        printf("  id: %d\n", fh.component_id[i]);
-        printf("  H sample: %d\n", fh.H_sample[i]);
-        printf("  V sample: %d\n", fh.V_sample[i]);
-        printf("  QT selector: %d\n", fh.QT_selector[i]);
-    }
-}
 
 void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
     if (!node) return;
@@ -290,6 +319,13 @@ void print_ht(HuffmanTableSpec& ht, bool include_tree=false) {
     }
 }
 
+struct QuantizationTables {
+    u8 n;
+    u8 precision[4];                   // Precision of the Qk: 0 => 8bit, 1 => 16 bit
+    u8 id[4];                          // Specifies where the quantization table to be used in the decoder
+    u8 Q[4][64];                       // element in the zigzag ordering of the dct coefficients
+};
+
 void print_qt(QuantizationTables& qt) {
     u8 zigzag[8][8] = {
         { 0,  1,  5,  6, 14, 15, 27, 28},
@@ -340,25 +376,12 @@ void print_zz(s16* d) {
     printf("\n");
 }
 
-void print_sh(ScanHeader& sh) {
-    printf("Scan Header: \n");
-    printf("-----------  \n");
-
-    for (u8 i=0; i<sh.n_components; i++) {
-        printf("Component %d: \n", i);
-        printf("    component selector: %d\n", sh.component_selector[i]);
-        printf("    dc selector: %d\n", sh.dc_selector[i]);
-        printf("    ac selector: %d\n", sh.ac_selector[i]);
-    }
-    printf("Start spectral: %d\n", sh.start_spectral);
-    printf("End spectral: %d\n", sh.end_spectral);
-    printf("Approx high: %d\n", sh.approx_high);
-    printf("Approx low: %d\n", sh.approx_low);
-}
-
-void print_mk(u16 marker) {
-    printf("Marker: 0x%X\n", marker);
-}
+typedef struct {
+    u8* data;
+    u8* end;
+    u64 byte_pos;
+    u8 bit_pos;
+} BitStream;
 
 typedef struct {
     u16 width;
@@ -929,11 +952,6 @@ JpegParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root_node, u8* ru
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
-f64 clampf64(f64 a, f64 low=0, f64 high=255){
-    f64 t = a < low ? low : a;
-    return t > high ? high : t;
-}
-
 s16 clamp(s16 a, s16 low=0, s16 high=255){
     s16 t = a < low ? low : a;
     return t > high ? high : t;
@@ -972,9 +990,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     }
 
 
-    s16 zz_mcu[64][4] = {0};
-    s16 mcu[64][4] = {0};
-    f64 idct[64][4] = {0};
+    s16 zz_mcu[4][64] = {0};
+    s16 mcu[4][64] = {0};
+    f32 idct[4][64] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
         u8 idx = component_idx[i];
@@ -994,7 +1012,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 if (result.status != JPEG_SUCCESS) { return result; }
                 s16 dc = jpeg->dc_pred[idx] + value;
                 jpeg->dc_pred[idx] = dc;
-                zz_mcu[0][idx] = dc;
+                zz_mcu[idx][0] = dc;
 
                 u8 j = 1;
                 while (j<64) {        // and not a marker that would indicate something
@@ -1004,87 +1022,84 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                     if (ac == 0 && preceding_zeros == 0) {
                         while (j<64) {
-                            zz_mcu[j++][idx] = 0;
+                            zz_mcu[idx][j++] = 0;
                         }
                     } else {
                         for (u8 k=0; k<preceding_zeros; k++) {
-                            zz_mcu[j++][idx] = 0;
+                            zz_mcu[idx][j++] = 0;
                         }
-                        zz_mcu[j++][idx] = ac;
-                    }
-                }
-
-                // Dequantize
-                for (u8 l=0; l<64; l++) {
-                    zz_mcu[l][idx] *= Q[l];
-                }
-
-                // Unzigzag
-                for (u8 l=0; l<64; l++) {
-                    mcu[unzigzag[l]][idx] = zz_mcu[l][idx];
-                }
-
-                // IDCT
-                for (u8 y=0; y<8; y++) {
-                    for (u8 x=0; x<8; x++) {
-                        u8 l = x+y*8;
-
-                        for (u8 v=0; v<8; v++) {
-                            f32 Cv = v==0 ? 0.7071067811 : 1;
-                            for (u8 u=0; u<8; u++) {
-                                f32 Cu = u==0 ? 0.7071067811 : 1;
-
-                                u8 l_vu = u + v*8;
-                                // idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[v][u][l]);
-                                idct[l][idx] += (f64)(Cu * Cv * mcu[l_vu][idx] * IDCT_Weights[y][x][l_vu]);
-                            }
-                        }
-
-                        f64 a = (f64)(0.25f*idct[l][idx] + 128);
-                        idct[l][idx] = clamp(a+0.5);
+                        zz_mcu[idx][j++] = ac;
                     }
                 }
             }
         }
+
+        // Dequantize
+        for (u8 l=0; l<64; l++) {
+            zz_mcu[idx][l] *= Q[l];
+        }
+
+        // Unzigzag
+        for (u8 l=0; l<64; l++) {
+            mcu[idx][unzigzag[l]] = zz_mcu[idx][l];
+        }
+
+        // IDCT
+        for (u8 y=0; y<8; y++) {
+            for (u8 x=0; x<8; x++) {
+                u8 l = x+y*8;
+
+                for (u8 v=0; v<8; v++) {
+                    f32 Cv = v==0 ? 0.7071067811 : 1;
+                    for (u8 u=0; u<8; u++) {
+                        f32 Cu = u==0 ? 0.7071067811 : 1;
+
+                        u8 l_vu = u + v*8;
+                        idct[idx][l] += (f64)(Cu * Cv * mcu[idx][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                    }
+                }
+
+                f32 a = (f32)(0.25f*idct[idx][l] + 128);
+                idct[idx][l] = clamp(a+0.5);
+            }
+        }
     }
-    u8 rgb[64][4] = {0};
 
     // Assume YCbCr
     // Convert to RGB
+    // (0,0)
+    u16 n_blocks_x = (u16)((jpeg->fh.src_width  + 7) / 8.0f);
+    u16 n_blocks_y = (u16)((jpeg->fh.src_height + 7) / 8.0f);
+    u16 start_x = jpeg->current_mcu % n_blocks_x;
+    u16 start_y = (u16)(jpeg->current_mcu / n_blocks_x);
     if (n_components==3) {
-
-        // (0,0)
-        u16 n_blocks_x = (u16)((jpeg->fh.src_width  + 7) / 8.0f);
-        u16 n_blocks_y = (u16)((jpeg->fh.src_height + 7) / 8.0f);
-        u16 start_x = jpeg->current_mcu % n_blocks_x;
-        u16 start_y = (u16)(jpeg->current_mcu / n_blocks_x);
         // printf("n blocks: (%d, %d)  start: (%d, %d)\n", n_blocks_y, n_blocks_x, start_y, start_x);
         for (u8 y=0; y<8; y++) {
             for (u8 x=0; x<8; x++) {
                 u8 l = x + y * 8;
-                f64 r = idct[l][0]                                + 1.402   * (idct[l][2] - 128);
-                f64 g = idct[l][0] - 0.34414 * (idct[l][1] - 128) - 0.71414 * (idct[l][2] - 128);
-                f64 b = idct[l][0] + 1.772   * (idct[l][1] - 128);
-
-                rgb[l][2] = (u8)clamp(r+0.5);
-                rgb[l][1] = (u8)clamp(g+0.5);
-                rgb[l][0] = (u8)clamp(b+0.5);
+                f32 r = idct[0][l]                                + 1.402   * (idct[2][l] - 128);
+                f32 g = idct[0][l] - 0.34414 * (idct[1][l] - 128) - 0.71414 * (idct[2][l] - 128);
+                f32 b = idct[0][l] + 1.772   * (idct[1][l] - 128);
 
                 // TODO check not going over edge
                 u32 NX = (start_x*8 + x);
                 u32 NY = (start_y*8 + y);
                 u32 linear = NX + NY*jpeg->fh.src_width;
-                jpeg->grey[linear*4 + 0] = rgb[l][0];
-                jpeg->grey[linear*4 + 1] = rgb[l][1];
-                jpeg->grey[linear*4 + 2] = rgb[l][2];
+                jpeg->grey[linear*4 + 0] = (u8)clamp(b+0.5);
+                jpeg->grey[linear*4 + 1] = (u8)clamp(g+0.5);
+                jpeg->grey[linear*4 + 2] = (u8)clamp(r+0.5);
             }
         }
     } else {
         for (u8 y=0; y<8; y++) {
             for (u8 x=0; x<8; x++) {
                 u8 l = x + y * 8;
-                s16 grey = idct[l][0];
-                rgb[l][0] = (u8)clamp(grey);
+
+                u32 NX = (start_x*8 + x);
+                u32 NY = (start_y*8 + y);
+                u32 linear = NX + NY*jpeg->fh.src_width;
+
+                jpeg->grey[linear] = (u8)clamp(idct[0][l] + 0.5f);
             }
         }
     }
@@ -1233,10 +1248,10 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Get start marker
     if (marker != StartOfImage) {
         printf("First marker is not StartOfImage! Found: 0x%X\n", marker);
-        return (JpegParsingResult){JPEG_MISSING_MARKER, "Missing Start Of Image marker"};
+        return (JpegParsingResult){JPEG_FAIL, "Missing Start Of Image marker"};
     } else if (end_marker != EndOfImage) {
         printf("Last 2 bytes are not EndOfImage! Found: 0x%X\n", end_marker);
-        return (JpegParsingResult){JPEG_MISSING_MARKER, "Missing End Of Image marker"};
+        return (JpegParsingResult){JPEG_FAIL, "Missing End Of Image marker"};
     }
     // Move to after start of image
     ptr += 2;
@@ -1262,24 +1277,23 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
 }
 
-Image create_missing_image(Arena* arena) {
-    Image out = {0};
-    out.width  = 128;
-    out.height = 128;
-    out.data = (u32*)arena_alloc_push(arena, out.width*out.height*sizeof(u32));
+void create_missing_image(Arena* arena, Image* out) {
+    out->width  = 128;
+    out->height = 128;
+    out->data = (u32*)arena_alloc_push(arena, out->width*out->height*sizeof(u32));
 
     const u32 pattern_size = 64;
-    for (u32 j=0; j<out.height; j++) {
-        for (u32 i=0; i<out.width; i++) {
-            u32 linear_index = j*out.width + i;
+    for (u32 j=0; j<out->height; j++) {
+        for (u32 i=0; i<out->width; i++) {
+            u32 linear_index = j*out->width + i;
             u32 color = 0;
             if (((u32)j/pattern_size + (u32)i/pattern_size) % 2 == 1) {
                 color = 0xFF00FF;
             }
-            out.data[linear_index] = color;
+            out->data[linear_index] = color;
         }
     }
-    return out;
+    return;
 }
 
 Image read_image_file(Arena* persist_arena, string8 filename) {
@@ -1309,7 +1323,7 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
     }
 
     if (!out.data) {
-        out = create_missing_image(persist_arena);
+        create_missing_image(persist_arena, &out);
     }
 
     local_arena_alloc_reset(local_arena);

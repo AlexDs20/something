@@ -117,17 +117,4 @@ struct string8 {
     u64 size;
 };
 
-struct Image {
-    union {
-        u32* data;
-        u8* gray;
-        u32* rgb;
-        u32* rgba;
-    };
-    u32 width;
-    u32 height;
-    u8 components;
-    u8 precision;
-};
-
 #endif  // _TYPES_H

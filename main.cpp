@@ -20,27 +20,28 @@
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
-    char msg[] = "Handmade something starts!\n";
+    char msg[] = "Handmade something starts!";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
     Arena* global_arena = arena_alloc_create(1*GiB);
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-#if 1
     string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
     Model* model = {0};
     if (string_get_file_extension(file_path) == ".obj") {
         model = read_obj_model_file(scene_arena, file_path);
     }
-    return 0;
 
-    const u32 w = 1024;
-    const u32 h = 768;
+#if 1
+    const u32 w = 4096;
+    const u32 h = 1024;
 
     const u32 bg_color = 0x777777;
 
     Win win = platform_init_win(w, h, msg);
+    memcpy(win.buffer, model->material->map_Kd.data, w*h*4);
+    // win.buffer = model->material->map_Kd.data;
 
     f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
@@ -52,13 +53,13 @@ int main() {
         // And this is uglier...
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
 
-        for (int i=0; i<win.h*win.w; i++) {
-            win.buffer[i] = bg_color;
-            zbuffer[i] = zdefault.f;
-        }
+        // for (int i=0; i<win.h*win.w; i++) {
+        //     win.buffer[i] = bg_color;
+        //     zbuffer[i] = zdefault.f;
+        // }
 
         // draw_model_wireframe(model, win.w, win.h, win.buffer);
-        draw_model(model, win.w, win.h, win.buffer, zbuffer);
+        // draw_model(model, win.w, win.h, win.buffer, zbuffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         // usleep(16);

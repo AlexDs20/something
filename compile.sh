@@ -2,7 +2,7 @@
 
 BIN="./build/main"
 
-# FLAGS="-g -ggdb -pg -O0 -Wall" # -finstrument-functions -fsanitize=address"
+# FLAGS="-g -ggdb -pg -O0 -Wall" #-finstrument-functions -fsanitize=address"
 FLAGS="-O3"
 DEFINES=-D_DEBUG
 LINKS="-lc"
@@ -48,5 +48,5 @@ duration=$SECONDS
 if [ $SUCCESS -eq 0 ]; then
     echo "Compilation success: $((duration / 60)) min $((duration % 60)) sec elapsed."
     echo "running $BIN"
-    ./$BIN
+    time ./$BIN
 fi
