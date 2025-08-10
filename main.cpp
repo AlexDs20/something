@@ -20,7 +20,7 @@
 int main() {
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
-    char msg[] = "Handmade something starts!";
+    char msg[] = "Handmade something starts!\n";
     syscall(1, STDOUT_FILENO, msg, sizeof(msg)-1);
 
     Arena* global_arena = arena_alloc_create(1*GiB);
