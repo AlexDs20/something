@@ -396,7 +396,7 @@ typedef struct {
     u32 current_mcu;
 
     union {
-        u32* rgba;
+        u32* buffer;
         u32* rgb;
         u8* grey;
     };
@@ -416,6 +416,20 @@ void print_bs(BitStream* bs) {
     printf("  size: %p\n", bs->size);
     printf("  byte: %d\n", bs->byte_pos);
     printf("  bit: %d\n", bs->bit_pos);
+}
+
+u8* current_ptr(BitStream* bs) {
+    return bs->data + bs->byte_pos;
+}
+
+inline
+bool overflow(BitStream* bs) {
+    return bs->byte_pos >= bs->size;
+}
+
+inline
+void skip_nbytes(BitStream* bs, u64 n) {
+    bs->byte_pos += n;
 }
 
 u8 read_byte(BitStream* bs) {
@@ -459,11 +473,6 @@ u16 peek_2bytes(BitStream* bs) {
     return bs->data[bs->byte_pos]<<8 | bs->data[bs->byte_pos+1];
 }
 // u8 peek_bit(BitStream* bs);
-
-inline
-bool overflow(BitStream* bs) {
-    return bs->byte_pos >= bs->size;
-}
 
 u16 peek_2_bytes(u8* v) {
     return v[0]<<8 | v[1];
@@ -526,19 +535,19 @@ JpegParsingResult parse_StartOfFrame(BitStream* bs, jpeg_t* jpeg) {
 
 JpegParsingResult parse_ApplicationSegment0(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
-    bs->byte_pos += length;
+    skip_nbytes(bs, length);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult parse_ApplicationSegment1(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
-    bs->byte_pos += length;
+    skip_nbytes(bs, length);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult parse_ApplicationSegment13(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
-    bs->byte_pos += length;
+    skip_nbytes(bs, length);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
@@ -551,7 +560,13 @@ JpegParsingResult parse_ApplicationSegment14(BitStream* bs, jpeg_t* jpeg) {
     //  value: 0=>RGB, 1=>YCbCr(default), 2=>YCCK
 
     u16 length = peek_2bytes(bs);
-    bs->byte_pos += length;
+    skip_nbytes(bs, length);
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
+}
+
+JpegParsingResult parse_Comment(BitStream* bs, jpeg_t* jpeg) {
+    u16 length = peek_2bytes(bs);
+    skip_nbytes(bs, length);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
@@ -565,6 +580,25 @@ JpegParsingResult parse_DefineRestartInterval(BitStream* bs, jpeg_t* jpeg) {
 
     if (bytes_read != length) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of DefineRestartInterval and read data do not match."};
+    }
+
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
+}
+
+JpegParsingResult parse_DefineNumberOfLines(BitStream* bs, jpeg_t* jpeg) {
+    u16 length = read_2bytes(bs);
+    u16 bytes_read = 2;
+
+    // Specifies the number of MCU in the restart interval
+    jpeg->height = read_2bytes(bs);
+    bytes_read += 2;
+
+    if (jpeg->height == 0) {
+        return (JpegParsingResult){JPEG_FAIL, "Assigned number of lines to 0 in DefineNumberOfLines."};
+    }
+
+    if (bytes_read != length) {
+        return (JpegParsingResult){JPEG_FAIL, "Expected length of DefineNumberOfLines and read data do not match."};
     }
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -598,8 +632,8 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
             ht.num_symbols[table_idx] += v;
         }
 
-        ht.symbols[table_idx] = (u8*)arena_alloc_push_struct(arena, &bs->data[bs->byte_pos], ht.num_symbols[table_idx]*sizeof(u8));
-        bs->byte_pos += ht.num_symbols[table_idx];
+        ht.symbols[table_idx] = (u8*)arena_alloc_push_struct(arena, current_ptr(bs), ht.num_symbols[table_idx]*sizeof(u8));
+        skip_nbytes(bs, ht.num_symbols[table_idx]);
         bytes_read += ht.num_symbols[table_idx];
 
         //==============================
@@ -863,10 +897,12 @@ JpegParsingResult interpret_marker(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
             result = parse_DefineHuffmanTable(arena, bs, jpeg);
         } break;
         case Comment: {
-            result = {JPEG_FAIL, "Comment not implemented"};
+            printf("Comment\n");
+            result = parse_Comment(bs, jpeg);
         } break;
         case DefineNumberOfLines: {
-            result = {JPEG_FAIL, "DefineNumberOfLines not implemented"};
+            printf("DefineNumberOfLines\n");
+            result = parse_DefineNumberOfLines(bs, jpeg);
         } break;
     }
 
@@ -1174,7 +1210,7 @@ JpegParsingResult parse_Scan(Arena* persist_arena, Arena* local_arena, BitStream
         return (JpegParsingResult){JPEG_FAIL, "Did not find Start of Scan header marker!"};
     }
 
-    bs->byte_pos += 2;
+    skip_nbytes(bs, 2);
     JpegParsingResult result = parse_ScanHeader(bs, jpeg);
     if (result.status != JPEG_SUCCESS) { return result; }
 
@@ -1187,7 +1223,7 @@ JpegParsingResult parse_Scan(Arena* persist_arena, Arena* local_arena, BitStream
         }
         marker = peek_2bytes(bs);
         if (is_restart_marker(marker, &restart_id)) {
-            bs->byte_pos += 2;
+            skip_nbytes(bs, 2);
             continue;
         } else {
             break;
@@ -1218,7 +1254,7 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
     }
 
     // Parse Frame header
-    bs->byte_pos += 2;   // Advance from the read marker
+    skip_nbytes(bs, 2);
     if (marker == StartOfFrame0) {
         jpeg->encoding = (Markers)marker;
         printf("Parse start of frame!\n");
@@ -1229,19 +1265,17 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
         return (JpegParsingResult){JPEG_FAIL, "Only StartOfFrame0 marker implemented!"};
     }
 
-    u64 checkpoint = arena_alloc_checkpoint(persist_arena);
     jpeg->grey = (u8*)arena_alloc_push(persist_arena, jpeg->fh.src_width*jpeg->fh.src_height*4*sizeof(u8));
 
     marker = peek_2bytes(bs);
     while ((is_interpret_marker(marker) || (marker==StartOfScan)) && !overflow(bs)) {       // Either DNL between scans or Tables/misc. or Scan header
         JpegParsingResult result = parse_Scan(persist_arena, local_arena->arena, bs, jpeg);
 
-        if (result.status != JPEG_SUCCESS) { arena_alloc_restore(persist_arena, checkpoint); return result; }
+        if (result.status != JPEG_SUCCESS) { return result; }
         marker = peek_2bytes(bs);
     }
 
     if (overflow(bs)) {
-        arena_alloc_restore(persist_arena, checkpoint);
         return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
     }
 
@@ -1283,7 +1317,7 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     out->height      = jpeg.fh.src_height;
     out->components  = jpeg.fh.src_components;
     out->precision   = jpeg.fh.src_precision;
-    out->rgb         = jpeg.rgb;                         // works for anything because its a union
+    out->buffer      = jpeg.rgb;
 
     return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
 }
@@ -1318,13 +1352,14 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
 
     string8 extension = string_get_file_extension(filename);
     if (extension == ".jpg" || extension == ".jpeg") {
+        u64 checkpoint = arena_alloc_checkpoint(persist_arena);
         JpegParsingResult result = decode_jpeg(persist_arena, data, &out);
 
         if (result.status != JPEG_SUCCESS) {
+            arena_alloc_restore(persist_arena, checkpoint);
             printf("Failed parsing jpeg file: ");
             string_print(filename);
             printf(" with error: %s\n", result.error_message);
-
         }
     } else if (extension == ".png"){
         // decode_png(persist_arena, data, &out);
