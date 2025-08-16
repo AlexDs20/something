@@ -187,10 +187,13 @@ void print_mk(u16 marker) {
 
 typedef struct FrameHeader FrameHeader;
 struct FrameHeader {
-    u8  src_precision;
     u16 src_height;
     u16 src_width;
+    u8  src_precision;
     u8  src_components;
+
+    u8 Hmax;
+    u8 Vmax;
 
     u8 component_id[4];
     u8 H_sample[4];
@@ -214,39 +217,6 @@ void print_fh(FrameHeader& fh) {
         printf("  V sample: %d\n", fh.V_sample[i]);
         printf("  QT selector: %d\n", fh.QT_selector[i]);
     }
-}
-
-typedef struct ScanHeader ScanHeader;
-struct ScanHeader {
-    u8 n_components;
-
-    u8 component_selector[4];
-    u8 dc_selector[4];
-    u8 ac_selector[4];
-
-    u8 start_spectral;              // Not used for baseline
-    u8 end_spectral;                // Not used
-    u8 approx_high;                 // Not used
-    u8 approx_low;                  // Not used
-
-    // TODO(alex): For simplicity, additional fields
-    // u8 id_component_fh[4];
-};
-
-void print_sh(ScanHeader& sh) {
-    printf("Scan Header: \n");
-    printf("-----------  \n");
-
-    for (u8 i=0; i<sh.n_components; i++) {
-        printf("Component %d: \n", i);
-        printf("    component selector: %d\n", sh.component_selector[i]);
-        printf("    dc selector: %d\n", sh.dc_selector[i]);
-        printf("    ac selector: %d\n", sh.ac_selector[i]);
-    }
-    printf("Start spectral: %d\n", sh.start_spectral);
-    printf("End spectral: %d\n", sh.end_spectral);
-    printf("Approx high: %d\n", sh.approx_high);
-    printf("Approx low: %d\n", sh.approx_low);
 }
 
 typedef struct HuffmanNode HuffmanNode;
@@ -295,7 +265,7 @@ void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
     draw_huffman_tree(node->right, depth + 1, false);
 }
 
-void print_ht(HuffmanTableSpec& ht, bool include_tree=false) {
+void print_ht(HuffmanTableSpec& ht, bool include_table=false, bool include_tree=false) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
@@ -305,16 +275,18 @@ void print_ht(HuffmanTableSpec& ht, bool include_tree=false) {
         printf("    class: %d\n", ht.table_class[i]);
         printf("    id: %d\n", ht.table_id[i]);
 
-        printf("    code lengths:\n");
-        u8* ptr = ht.symbols[i];
-        for (u8 j=0; j<16; j++) {
-            printf("        %d: %d\n", j+1, ht.code_lengths[i][j]);
-            if (ht.code_lengths[i][j]>0) {
-                printf("            ");
-                for (u8 k=0; k<ht.code_lengths[i][j]; k++) {
-                    printf("%x ", *ptr++);
+        if (include_table) {
+            printf("    code lengths:\n");
+            u8* ptr = ht.symbols[i];
+            for (u8 j=0; j<16; j++) {
+                printf("        %d: %d\n", j+1, ht.code_lengths[i][j]);
+                if (ht.code_lengths[i][j]>0) {
+                    printf("            ");
+                    for (u8 k=0; k<ht.code_lengths[i][j]; k++) {
+                        printf("%x ", *ptr++);
+                    }
+                    printf("\n");
                 }
-                printf("\n");
             }
         }
 
@@ -387,11 +359,46 @@ typedef struct ComponentInfo ComponentInfo;
 struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
-    u8 QTable[64];
+    u8* QTable;
+    u32 xi;
+    u32 yi;
     u8 id;
-    u8 vertical_sample;
-    u8 horizontal_sample;
+    u8 Vi;          // Vertical sampling factor
+    u8 Hi;          // Horizontal sapmling factor
 };
+
+typedef struct ScanHeader ScanHeader;
+struct ScanHeader {
+    u8 n_components;
+
+    u8 id_selector[4];
+    u8 dc_selector[4];
+    u8 ac_selector[4];
+
+    u8 start_spectral;              // Not used for baseline
+    u8 end_spectral;                // Not used
+    u8 approx_high;                 // Not used
+    u8 approx_low;                  // Not used
+
+    // TODO(alex): For simplicity, additional fields
+    ComponentInfo components[4];
+};
+
+void print_sh(ScanHeader& sh) {
+    printf("Scan Header: \n");
+    printf("-----------  \n");
+
+    for (u8 i=0; i<sh.n_components; i++) {
+        printf("Component %d: \n", i);
+        printf("    id selector: %d\n", sh.id_selector[i]);
+        printf("    dc selector: %d\n", sh.dc_selector[i]);
+        printf("    ac selector: %d\n", sh.ac_selector[i]);
+    }
+    printf("Start spectral: %d\n", sh.start_spectral);
+    printf("End spectral: %d\n", sh.end_spectral);
+    printf("Approx high: %d\n", sh.approx_high);
+    printf("Approx low: %d\n", sh.approx_low);
+}
 
 typedef struct jpeg_t jpeg_t;
 struct jpeg_t {
@@ -548,6 +555,8 @@ JpegParsingResult parse_StartOfFrame(BitStream* bs, jpeg_t* jpeg) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of Start of Frame header and read data does not match."};
     }
 
+    // Set and compute information for each components
+
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
@@ -566,7 +575,7 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
 
     u8 v;
     for (u8 i=0; i<sh.n_components; i++) {
-        sh.component_selector[i] = read_byte(bs);
+        sh.id_selector[i] = read_byte(bs);
         length--;
 
         v = read_byte(bs);
@@ -606,6 +615,63 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
     if (length != 0) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of Start of Scan header and read data do not match."};
     }
+
+    FrameHeader& fh = jpeg->fh;
+    for (u8 i=0; i<sh.n_components; i++) {
+        ComponentInfo& comp = sh.components[i];
+
+        // Get the component Huffman tables
+        u8 dc_id = sh.dc_selector[i];
+        u8 ac_id = sh.ac_selector[i];
+
+        HuffmanTableSpec& ht = jpeg->ht;
+        for (u8 j=0; j<jpeg->ht.n_tables; j++) {
+            // TODO: Fix Huffman Table spec!
+            if (dc_id == (ht.table_id[j]/2)) {
+                comp.DCHuffmanTable = ht.root[0][j];
+            }
+            if (ac_id == (ht.table_id[j]/2)) {
+                comp.ACHuffmanTable = ht.root[1][j];
+            }
+        }
+
+
+        // Get the matching frame component to get the QT and sampling factors, ...
+        u8 comp_id = sh.id_selector[i];
+        for (u8 j=0; j<jpeg->fh.src_components; j++) {
+            // Get the huffman tables to use for the component
+
+            if (fh.component_id[j] == comp_id) {
+                // Get the quantization table to use for the component
+                u8 qt_id = fh.QT_selector[j];
+                for (u8 k=0; k<jpeg->qt.n; k++) {
+                    if (jpeg->qt.id[k] == qt_id) {
+                        comp.QTable = &jpeg->qt.Q[k][0];
+                        break;
+                    }
+                }
+
+                // Get the component size as it is encoded
+                // This should be in the frame header
+                    comp.Vi = fh.V_sample[j];
+                    comp.Hi = fh.H_sample[j];
+                    // TODO(alex): Compute xi and yi here
+                    fh.Hmax = 1;
+                    fh.Vmax = 1;
+                    f32 tmp = fh.src_width * ((f32)comp.Hi / fh.Hmax);
+                    if ((f32)((u32)tmp) == tmp) {
+                        comp.xi = (u32)tmp;
+                    } else if (tmp > 0){
+                        comp.xi = (u32)tmp+1;
+                    } else {
+                        comp.xi = (u32)tmp;
+                    }
+
+                break;
+            }
+        }
+    }
+
 
     return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
 }
@@ -1029,7 +1095,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     // This is valid for the whole scan!
     u8 component_idx[4] = {0};
     for (u8 j=0; j<n_components; j++) {
-        u8 cs_j = jpeg->sh.component_selector[j];
+        u8 cs_j = jpeg->sh.id_selector[j];
 
         for (u8 i=0; i<jpeg->fh.src_components; i++) {
             u8 c_i = jpeg->fh.component_id[i];
