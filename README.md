@@ -1,7 +1,8 @@
 
 # Platform
-## window
+## Window
 
+### Linux
 - [ ] Xlib
     - [x] Windowing
     - [ ] keyboard events
@@ -12,14 +13,28 @@
 
 - [ ] Xlib + opengl? [eg](https://alexvia.com/post/002_initializing_opengl_on_x11/)
 - [ ] Wayland
-- [ ] xcb
-- [ ] without xlib [here](https://hereket.com/posts/from-scratch-x11-windowing/#writing-text)
+- [ ] X11 without xlib [here](https://hereket.com/posts/from-scratch-x11-windowing/#writing-text)
+
+- [ ] Support for any buffer type: RGB, RGBA, GREY
+- [ ] Support for multiple windows
 
 X11 info:
 - [pdf reference xlib](https://www.x.org/docs/X11/xlib.pdf)
 - [Event masks](https://tronche.com/gui/x/xlib/events/mask.html)
 - [Event masks and event types](https://tronche.com/gui/x/xlib/events/processing-overview.html#ExposureMask)
 - [Handmade network X11](https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies)
+
+### Windows
+
+## Math
+- [ ] Make a more complete math library with all basic functions like ceil, cos, sin, acos, ...
+
+## Image
+- [ ] Finish a good, simple and fast implementation to decode jpeg:
+    - [ ] Baseline DCT
+    - [ ] chroma subsampling
+    - [ ] Progressive DCT
+- [ ] Add decoding of png
 
 ## Audio
 - [ ] [linux](https://handmade.network/forums/articles/t/8544-implementing_copy_paste_in_x11)
@@ -38,4 +53,3 @@ X11 info:
 
 # Allocators
 - [ ] [general arena](https://muit.xyz/posts/memory-implementing-a-general-arena/)
-- [ ]

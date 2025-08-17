@@ -193,13 +193,11 @@ struct HuffmanNode {
     HuffmanNode* right;
 };
 
-typedef struct HuffmanTableSpec HuffmanTableSpec;
-struct HuffmanTableSpec {
-    u8 n_tables;
-
+typedef struct HuffmanTable HuffmanTable;
+struct HuffmanTable {
+    u8 n;
     u8 id[4];   // map index to id
-
-    //                 Index
+    //                index
     HuffmanNode* DCroot[4];
     HuffmanNode* ACroot[4];
 };
@@ -228,12 +226,12 @@ void draw_huffman_tree(HuffmanNode* node, int depth = 0, bool is_left = true) {
     draw_huffman_tree(node->right, depth + 1, false);
 }
 
-void print_ht(HuffmanTableSpec& ht, bool include_tree=false) {
+void print_ht(HuffmanTable& ht, bool include_tree=false) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
-    printf("Number tables: %d\n", ht.n_tables);
-    for (u8 i=0; i<ht.n_tables; i++) {
+    printf("Number tables: %d\n", ht.n);
+    for (u8 i=0; i<ht.n; i++) {
         printf("Table %d:\n", i);
         printf("    id: %d\n", ht.id[i]);
 
@@ -382,16 +380,13 @@ typedef struct ScanHeader ScanHeader;
 struct ScanHeader {
     u8 n_components;
 
-    u8 id_selector[4];
-    u8 dc_selector[4];
-    u8 ac_selector[4];
-
     u8 start_spectral;              // Not used for baseline
     u8 end_spectral;                // Not used
     u8 approx_high;                 // Not used
     u8 approx_low;                  // Not used
 
-    // TODO(alex): For simplicity, additional fields
+    // Array of pointer to the components initially created in the FrameHeader
+    // The correct DC/AC tables and Quantization tables are set as part of parsing the ScanHeader
     ComponentInfo* components[4];    // Do pointer to component info that is in the frame header
 };
 
@@ -401,9 +396,9 @@ void print_sh(ScanHeader& sh) {
 
     for (u8 i=0; i<sh.n_components; i++) {
         printf("Component %d: \n", i);
-        printf("    id selector: %d\n", sh.id_selector[i]);
-        printf("    dc selector: %d\n", sh.dc_selector[i]);
-        printf("    ac selector: %d\n", sh.ac_selector[i]);
+        // printf("    id selector: %d\n", sh.id_selector[i]);
+        // printf("    dc selector: %d\n", sh.dc_selector[i]);
+        // printf("    ac selector: %d\n", sh.ac_selector[i]);
     }
     printf("Start spectral: %d\n", sh.start_spectral);
     printf("End spectral: %d\n", sh.end_spectral);
@@ -416,7 +411,7 @@ struct jpeg_t {
     QuantizationTables qt;
     FrameHeader fh;
     ScanHeader sh;
-    HuffmanTableSpec ht;
+    HuffmanTable ht;
 
     ComponentInfo component_info[4];
     u8 scan_components_index[4];        // Indices in the ComponentInfo for the current scan and its components (in order)
@@ -521,7 +516,7 @@ u32 ceilf32(f32 a) {
     return aint;
 }
 
-JpegParsingResult parse_FrameHeader(BitStream* bs, jpeg_t* jpeg) {
+JpegParsingResult parse_FrameHeader(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     FrameHeader& fh = jpeg->fh;
 
     u16 length = read_2bytes(bs);
@@ -535,12 +530,14 @@ JpegParsingResult parse_FrameHeader(BitStream* bs, jpeg_t* jpeg) {
     }
 
     fh.src_height = read_2bytes(bs);
-    // if 0 => should be gotten from DNL
     length -= 2;
+    if (fh.src_height == 0) {
+        // TODO(alex): Go through file until DNL and set the src_height directly here.
+        return (JpegParsingResult){JPEG_FAIL, "NOT IMPLEMENTED: Got src_height of 0 but no support for using DefineNumberOfLines marker yet."};
+    }
 
     fh.src_width = read_2bytes(bs);
     length -= 2;
-
     if (fh.src_width == 0) {
         return (JpegParsingResult){JPEG_FAIL, "Missing image with data."};
     }
@@ -588,11 +585,12 @@ JpegParsingResult parse_FrameHeader(BitStream* bs, jpeg_t* jpeg) {
     fh.n_mcu_width  = ceilf32((f32)fh.X / (8*(u16)fh.Hmax));
     fh.n_mcu_height = ceilf32((f32)fh.Y / (8*(u16)fh.Vmax));
 
-    // TODO(alex): I should also allocate temporary memory for these to hold the actual component values after decoding
     for (u8 i=0; i<fh.src_components; i++) {
         fh.components[i].xi = fh.n_mcu_width  * (8*fh.components[i].Hi);
         fh.components[i].yi = fh.n_mcu_height * (8*fh.components[i].Vi);
-        print_ci(&fh.components[i]);
+
+        // Note: Only support of 8 bits components
+        fh.components[i].buffer = (u8*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof(u8));
     }
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -608,39 +606,40 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
     sh.n_components = read_byte(bs);
     length--;
     if (sh.n_components > 4 || sh.n_components == 0) {
-        return (JpegParsingResult){JPEG_FAIL, "Number of components in a scan must be between 1 and 3."};
+        return (JpegParsingResult){JPEG_FAIL, "Number of components in a scan must be between 1 and 4."};
     }
 
     u8 v;
     for (u8 i=0; i<sh.n_components; i++) {
-        sh.id_selector[i] = read_byte(bs);
+        u8 id_selector = read_byte(bs);
         length--;
 
         v = read_byte(bs);
         length--;
-        sh.dc_selector[i] = v >> 4;
-        sh.ac_selector[i] = v & 0x0F;
-        if (sh.dc_selector[i] > 1) {
+        u8 dc_selector = v >> 4;
+        u8 ac_selector = v & 0x0F;
+        if (dc_selector > 1) {
             return (JpegParsingResult){JPEG_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
-        } else if (sh.ac_selector[i] > 1) {
+        } else if (ac_selector > 1) {
             return (JpegParsingResult){JPEG_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
         }
 
         // Setup the component informations so that it's complete with QT and AC/DC tables
         for (u8 j=0; j<jpeg->fh.N; j++) {
-            if (sh.id_selector[i] == jpeg->fh.components[j].id) {
-
+            if (id_selector == jpeg->fh.components[j].id) {
                 sh.components[i] = &jpeg->fh.components[j];
 
-                for (u8 k=0; k<jpeg->ht.n_tables; k++) {
-                    if (sh.dc_selector[i] == jpeg->ht.id[k]) {
+                // Set the components DC/AC tables
+                for (u8 k=0; k<jpeg->ht.n; k++) {
+                    if (dc_selector == jpeg->ht.id[k]) {
                         sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[k];
                     }
-                    if (sh.ac_selector[i] == jpeg->ht.id[k]) {
+                    if (ac_selector == jpeg->ht.id[k]) {
                         sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[k];
                     }
                 }
 
+                // Set the correct Quantization table
                 u8 qt_id_selector = jpeg->fh.QT_selector[j];
                 for (u8 k=0; k<jpeg->qt.n; k++){
                     if (jpeg->qt.id[k] == qt_id_selector) {
@@ -681,7 +680,7 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of Start of Scan header and read data do not match."};
     }
 
-    return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult parse_ApplicationSegmentN(BitStream* bs, jpeg_t* jpeg) {
@@ -733,7 +732,7 @@ JpegParsingResult parse_DefineNumberOfLines(BitStream* bs, jpeg_t* jpeg) {
     length -= 2;
 
     if (jpeg->fh.src_height == 0) {
-        return (JpegParsingResult){JPEG_FAIL, "Assigned number of lines to 0 in DefineNumberOfLines."};
+        return (JpegParsingResult){JPEG_FAIL, "NOT IMPLEMENTED: setting the number of lines from the DefineNumberOfLines marker."};
     }
 
     if (length != 0) {
@@ -744,12 +743,11 @@ JpegParsingResult parse_DefineNumberOfLines(BitStream* bs, jpeg_t* jpeg) {
 }
 
 JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    HuffmanTableSpec& ht = jpeg->ht;
+    HuffmanTable& ht = jpeg->ht;
 
     s32 length = (s32)read_2bytes(bs);
     length -= 2;
 
-    u8 n_tables = 0;
     u8 v;
     while (length > 0) {
         v = read_byte(bs);
@@ -759,21 +757,30 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
         u8 table_class = v >> 4;                 // 0 DC or lossless  --- 1 AC
         u8 table_id = v & 0x0F;
 
+        if (table_class > 1) {
+            return (JpegParsingResult){JPEG_FAIL, "Huffman table class must be 0 for DC or 1 flor AC."};
+        }
+        if (table_id > 1) {
+            return (JpegParsingResult){JPEG_FAIL, "Huffman table id must either be 0 or 1."};
+        }
+
         // Check if we already have the id (because same id for DC and AC)
-        u8 idx = n_tables;
-        for (u8 i=0; i<n_tables; i++) {
-            if (table_id == ht.id[i]) {
-                idx = i;
-                break;
+        u8 idx = ht.n;
+        {
+            for (u8 i=0; i<ht.n; i++) {
+                if (table_id == ht.id[i]) {
+                    idx = i;
+                    break;
+                }
+            }
+            // If we don't have the id, increase number of tables
+            if (idx == ht.n) {
+                ht.n++;
             }
         }
-        // If we don't have the id, increase number of tables
-        if (idx == n_tables) {
-            n_tables++;
-        }
-
         ht.id[idx] = table_id;
 
+        // Read actual huffman table code lengths and associated symbols
         // For each length of symbols save that length and count the total number of symbols
         u16 num_symbols = 0;
         u16 code_lengths[16];
@@ -833,46 +840,60 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
         }
     }
 
-    ht.n_tables = n_tables;
-
     if (length != 0) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of DHT and read data does not match."};
     }
 
-    return (JpegParsingResult){JPEG_SUCCESS, "DHT"};
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 JpegParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
     QuantizationTables& qt = jpeg->qt;
 
-    u16 length = read_2bytes(bs);
+    s32 length = (s32)read_2bytes(bs);
     length -= 2;
 
-    u8 table_idx = 0;
-    qt.n = 0;
     while (length > 0) {
-        qt.n++;
-
         u8 v = read_byte(bs);
         length--;
-        qt.precision[table_idx] = v >> 4;
-        qt.id[table_idx]  = v & 0x0F;
 
-        if (qt.precision[table_idx] == 1) {
-            return (JpegParsingResult){JPEG_FAIL, "Quantization table precision == 16 bits not supported!"};
-        } else if (qt.precision[table_idx] > 1) {
-            return (JpegParsingResult){JPEG_FAIL, "Quantization table precision value not supported!"};
+        u8 precision = v >> 4;
+        u8 id = v & 0x0F;
+
+        // Check if the quantization table and its id already exists
+        // otherwise add an entry
+        u8 idx = jpeg->qt.n;
+        {
+            for (u8 i=0; i<jpeg->qt.n; i++) {
+                if (id == jpeg->qt.id[i]) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx == jpeg->qt.n) {
+                jpeg->qt.n++;
+            }
         }
 
-        if (qt.id[table_idx]>3) {
-            return (JpegParsingResult){JPEG_FAIL, "Quantization table identifier should be between 0 and 3!"};
+        qt.precision[idx] = precision;
+        qt.id[idx] = id;
+
+        if (qt.precision[idx] != 0) {
+            return (JpegParsingResult){JPEG_FAIL, "Quantization table precision != 8 bits not supported (yet)."};
+        }
+
+        if (qt.id[idx]>3) {
+            return (JpegParsingResult){JPEG_FAIL, "Quantization table identifier should be between 0 and 3."};
         }
 
         for (u8 i=0; i<64; i++) {
-            qt.Q[table_idx][i] = read_byte(bs);
+            qt.Q[idx][i] = read_byte(bs);
             length--;
+
+            if (qt.Q[idx][i] == 0) {
+                return (JpegParsingResult){JPEG_FAIL, "Quantization value of 0 not supported (of course)."};
+            }
         }
-        table_idx++;
     }
 
     if (length != 0) {
@@ -1126,36 +1147,56 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         zz_mcu[i][j++] = ac;
                     }
                 }
-            }
-        }
 
-        // Dequantize
-        for (u8 l=0; l<64; l++) {
-            zz_mcu[i][l] *= Q[l];
-        }
+                // Dequantize
+                for (u8 l=0; l<64; l++) {
+                    zz_mcu[i][l] *= Q[l];
+                }
 
-        // Unzigzag
-        for (u8 l=0; l<64; l++) {
-            mcu[i][unzigzag[l]] = zz_mcu[i][l];
-        }
+                // Unzigzag
+                for (u8 l=0; l<64; l++) {
+                    mcu[i][unzigzag[l]] = zz_mcu[i][l];
+                }
 
-        // IDCT
-        for (u8 y=0; y<8; y++) {
-            for (u8 x=0; x<8; x++) {
-                u8 l = x+y*8;
+                // IDCT
+                for (u8 y=0; y<8; y++) {
+                    for (u8 x=0; x<8; x++) {
+                        u8 l = x+y*8;
 
-                for (u8 v=0; v<8; v++) {
-                    f32 Cv = v==0 ? 0.7071067811 : 1;
-                    for (u8 u=0; u<8; u++) {
-                        f32 Cu = u==0 ? 0.7071067811 : 1;
+                        for (u8 v=0; v<8; v++) {
+                            f32 Cv = v==0 ? 0.7071067811 : 1;
+                            for (u8 u=0; u<8; u++) {
+                                f32 Cu = u==0 ? 0.7071067811 : 1;
 
-                        u8 l_vu = u + v*8;
-                        idct[i][l] += (f64)(Cu * Cv * mcu[i][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                                u8 l_vu = u + v*8;
+                                idct[i][l] += (f64)(Cu * Cv * mcu[i][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                            }
+                        }
+
+                        f32 a = (f32)(0.25f*idct[i][l] + 128);
+                        idct[i][l] = clamp(a+0.5);
                     }
                 }
 
-                f32 a = (f32)(0.25f*idct[i][l] + 128);
-                idct[i][l] = clamp(a+0.5);
+                // TODO(alex): Assign the value at the correct component buffer position
+                u32 start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
+                u32 start_y = (u16)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
+                for (u8 y=0; y<8; y++) {
+                    for (u8 x=0; x<8; x++) {
+
+                        /*
+                            u32 start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
+                            u32 start_y = (u16)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
+
+                            // TODO check not going over edge
+                            u32 NX = (start_x*8 + x);
+                            u32 NY = (start_y*8 + y);
+                            u32 linear = NX + NY*jpeg->fh.src_width;
+                            jpeg->buffer[linear*4 + 0] = (u8)clamp(b+0.5);
+                        */
+
+                    }
+                }
             }
         }
     }
@@ -1297,7 +1338,7 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
     if (marker == StartOfFrame0) {
         jpeg->encoding = (Markers)marker;
         printf("Parse start of frame!\n");
-        JpegParsingResult result = parse_FrameHeader(bs, jpeg);
+        JpegParsingResult result = parse_FrameHeader(local_arena->arena, bs, jpeg);
 
         if (result.status != JPEG_SUCCESS) { return result; }
     } else {
@@ -1305,7 +1346,6 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
     }
 
     // TODO(alex): Allocate precisely the right amount and use u8* regardless
-    // Maybe we should alloc in a local arena for an image of the size that is a multiple of the number of blocks one actually needs because of padding
     // jpeg->buffer = (u8*)arena_alloc_push(persist_arena, jpeg->fh.src_width*jpeg->fh.src_height*jpeg->fh.src_components);
     jpeg->buffer = (u8*)arena_alloc_push(persist_arena, jpeg->fh.src_width*jpeg->fh.src_height*4*sizeof(u8));
 
@@ -1320,6 +1360,8 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
     if (overflow(bs)) {
         return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
     }
+
+    // TODO(alex): Convert from components to RGB here and assign the values to the correct buffer with at high res.
 
     local_arena_alloc_reset(local_arena);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -1361,7 +1403,7 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     out->precision   = jpeg.fh.src_precision;
     out->buffer      = (u32*)jpeg.buffer;
 
-    return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
+    return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
 void create_missing_image(Arena* arena, Image* out) {
