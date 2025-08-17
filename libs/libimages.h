@@ -309,7 +309,7 @@ struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
     u8* buffer;     // decoded data
-    u8* QT;
+    u8* QT;         // TODO
     u32 xi;
     u32 yi;
     u8 id;
@@ -626,26 +626,22 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
             return (JpegParsingResult){JPEG_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
         }
 
-        // // Setup the component informations so that it's complete with QT and AC/DC tables
-        // for (u8 j=0; j<jpeg->fh.N, j++) {
-        //     if (sh.id_selector[i] == jpeg->fh.components[j].id) {
-        //         sh.components[i] = &jpeg->fh.components[j];
+        // Setup the component informations so that it's complete with QT and AC/DC tables
+        for (u8 j=0; j<jpeg->fh.N; j++) {
+            if (sh.id_selector[i] == jpeg->fh.components[j].id) {
+                sh.components[i] = &jpeg->fh.components[j];
 
-        //         for (u8 k=0; k<jpeg->ht.n_tables; k++) {
-        //             // TODO
-        //             if (sh.dc_selector[i] == XXX) {
-        //                 // TODO: remove [0/1][0...3] to have different ones for AC and DC
-        //                 sh.components[i]->DCHuffmanTable = jpeg->ht.root[0][k];
-        //             }
-        //             if (sh.ac_selector[i] == XXX) {
-        //                 sh.components[i]->ACHuffmanTable = jpeg->ht.root[1][k];
-        //             }
-        //         }
-        //         break;
-        //     }
-        // }
-
-
+                for (u8 k=0; k<jpeg->ht.n_tables; k++) {
+                    if (sh.dc_selector[i] == jpeg->ht.id[k]) {
+                        sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[k];
+                    }
+                    if (sh.ac_selector[i] == jpeg->ht.id[k]) {
+                        sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[k];
+                    }
+                }
+                break;
+            }
+        }
     }
 
     sh.start_spectral = read_byte(bs);
@@ -749,10 +745,11 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
         v = read_byte(bs);
         length--;
 
+        // Get the table type and id
         u8 table_class = v >> 4;                 // 0 DC or lossless  --- 1 AC
         u8 table_id = v & 0x0F;
 
-        // Check if we already have the id
+        // Check if we already have the id (because same id for DC and AC)
         u8 idx = n_tables;
         for (u8 i=0; i<n_tables; i++) {
             if (table_id == ht.id[i]) {
@@ -760,13 +757,14 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
                 break;
             }
         }
-        // If we don't have the idea, increase number of tables
+        // If we don't have the id, increase number of tables
         if (idx == n_tables) {
             n_tables++;
         }
 
         ht.id[idx] = table_id;
 
+        // For each length of symbols save that length and count the total number of symbols
         u16 num_symbols = 0;
         u16 code_lengths[16];
         for (u8 i=0; i<16; i++) {
@@ -777,7 +775,7 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
             num_symbols += v;
         }
 
-        // Allocate space for each symbols
+        // Allocate space for all symbols
         u8* symbols = (u8*)arena_alloc_push_struct(arena, current_ptr(bs), num_symbols*sizeof(u8));
         skip_nbytes(bs, num_symbols);
         length -= num_symbols;
@@ -823,79 +821,8 @@ JpegParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* 
 
             code <<= 1;
         }
-
     }
 
-    // TODO(alex): This has to be done for each huffman table because the segment contains the data for all tables
-    //  see itu-t81.pdf page 40
-    /*
-    u8 table_idx = 0;
-    u8 v;
-    while(length > 0) {
-        v = read_byte(bs);
-        length--;
-
-        u8 table_class = v >> 4;                 // 0 DC or lossless  --- 1 AC
-        u8 table_id = v & 0x0F;
-        ht.table_class[table_idx] = table_class;
-        ht.table_id[table_idx]    = table_id;
-
-        ht.num_symbols[table_idx] = 0;
-        for (u8 i=0; i<16; i++) {
-            v = read_byte(bs);
-            length--;
-
-            ht.code_lengths[table_idx][i] = v;
-            ht.num_symbols[table_idx] += v;
-        }
-
-        ht.symbols[table_idx] = (u8*)arena_alloc_push_struct(arena, current_ptr(bs), ht.num_symbols[table_idx]*sizeof(u8));
-        skip_nbytes(bs, ht.num_symbols[table_idx]);
-        length -= ht.num_symbols[table_idx];
-
-        //==============================
-        // Convert table to tree for easier parsing of the entropy stream
-        ht.root[table_class][table_id] = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
-
-        HuffmanNode* node = 0;
-        u16 code = 0;
-        u8* symbol = ht.symbols[table_idx];
-
-        for (u8 i=0; i<16; i++) {
-            u8 l = i+1;
-            u8 n_codes = ht.code_lengths[table_idx][i];
-
-            // For each code of length i
-            for (u16 j=0; j<n_codes; j++, code++, symbol++) {
-                node = ht.root[table_class][table_id];
-
-                // Use binary coding to traverse (and create) tree and assign value to node
-                for (s16 c=l-1; c>=0; --c) {
-                    u8 bit = (code >> c) & 1;
-                    if (bit) { // right
-                        if (!node->right) {
-                            node->right = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
-                        }
-                        node = node->right;
-                    } else {    // left
-                        if (!node->left) {
-                            node->left = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
-                        }
-                        node = node->left;
-                    }
-                }
-                node->is_leaf = 1;
-                node->value = *symbol;
-            }
-
-            code <<= 1;
-        }
-        // END OF TABLE
-        //==============================
-
-        table_idx++;
-    }
-    */
     ht.n_tables = n_tables;
 
     if (length != 0) {
@@ -931,9 +858,13 @@ JpegParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
             return (JpegParsingResult){JPEG_FAIL, "Quantization table identifier should be between 0 and 3!"};
         }
 
-        // // TODO: Set the qt table to the matching component
-        // for (u8 j=0; j<jpeg->fh.N; j++) {
-        // }
+        // Set the qt table to the matching component
+        for (u8 j=0; j<jpeg->fh.N; j++) {
+            if (qt.id[table_idx] == jpeg->fh.QT_selector[j]) {
+                jpeg->fh.components[j].QT = &qt.Q[table_idx][0];
+                break;
+            }
+        }
 
         for (u8 i=0; i<64; i++) {
             qt.Q[table_idx][i] = read_byte(bs);
