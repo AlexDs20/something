@@ -185,40 +185,6 @@ void print_mk(u16 marker) {
 }
 
 
-typedef struct FrameHeader FrameHeader;
-struct FrameHeader {
-    u16 src_height;
-    u16 src_width;
-    u8  src_precision;
-    u8  src_components;
-
-    u8 Hmax;
-    u8 Vmax;
-
-    u8 component_id[4];
-    u8 H_sample[4];
-    u8 V_sample[4];
-    u8 QT_selector[4];
-};
-
-void print_fh(FrameHeader& fh) {
-    printf("Frame Header: \n");
-    printf("------------  \n");
-    printf("Source image: \n");
-    printf("  Precision: %d bits\n", fh.src_precision);
-    printf("  Height: %d\n", fh.src_height);
-    printf("  Width: %d\n", fh.src_width);
-    printf("  Components: %d\n", fh.src_components);
-
-    for (u8 i=0;i<fh.src_components; i++) {
-        printf("Component %d:\n", i);
-        printf("  id: %d\n", fh.component_id[i]);
-        printf("  H sample: %d\n", fh.H_sample[i]);
-        printf("  V sample: %d\n", fh.V_sample[i]);
-        printf("  QT selector: %d\n", fh.QT_selector[i]);
-    }
-}
-
 typedef struct HuffmanNode HuffmanNode;
 struct HuffmanNode {
     u8 value;
@@ -359,13 +325,74 @@ typedef struct ComponentInfo ComponentInfo;
 struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
-    u8* QTable;
+    u8* buffer;     // decoded data
+    u8* QT;
     u32 xi;
     u32 yi;
     u8 id;
-    u8 Vi;          // Vertical sampling factor
     u8 Hi;          // Horizontal sapmling factor
+    u8 Vi;          // Vertical sampling factor
 };
+
+void print_ci(ComponentInfo* ci) {
+    printf("Component Info:\n");
+    printf("==============\n");
+    printf("  id: %d\n", ci->id);
+    printf("  xi: %d\n", ci->xi);
+    printf("  yi: %d\n", ci->yi);
+    printf("  Hi: %d\n", ci->Hi);
+    printf("  Vi: %d\n", ci->Vi);
+    printf("  QT: %p\n", ci->QT);
+    printf("  DC: %p\n", ci->DCHuffmanTable);
+    printf("  AC: %p\n", ci->ACHuffmanTable);
+}
+
+typedef struct FrameHeader FrameHeader;
+struct FrameHeader {
+    union {
+        u16 src_width;
+        u16 X;
+    };
+    union {
+        u16 src_height;
+        u16 Y;
+    };
+    union {
+        u8 src_precision;
+        u8 P;
+    };
+    union {
+        u8  src_components;
+        u8  N;
+    };
+
+    u8 Hmax;
+    u8 Vmax;
+    u32 n_mcu_width;
+    u32 n_mcu_height;
+
+    u8 QT_selector[4];
+
+    ComponentInfo components[4];
+};
+
+void print_fh(FrameHeader& fh) {
+    printf("Frame Header: \n");
+    printf("------------  \n");
+    printf("Source image: \n");
+    printf("  Precision: %d bits\n", fh.P);
+    printf("  Width: %d\n", fh.X);
+    printf("  Height: %d\n", fh.Y);
+    printf("  Components: %d\n", fh.src_components);
+
+    for (u8 i=0;i<fh.src_components; i++) {
+        printf("Component %d:\n", i);
+        printf("  id: %d\n", fh.components[i].id);
+        printf("  H sample: %d\n", fh.components[i].Hi);
+        printf("  V sample: %d\n", fh.components[i].Vi);
+        printf("  QT selector: %d\n", fh.QT_selector[i]);
+    }
+}
 
 typedef struct ScanHeader ScanHeader;
 struct ScanHeader {
@@ -382,6 +409,7 @@ struct ScanHeader {
 
     // TODO(alex): For simplicity, additional fields
     ComponentInfo components[4];
+    // ComponentInfo* components[4];    // Do pointer to component info that is in the frame header
 };
 
 void print_sh(ScanHeader& sh) {
@@ -495,7 +523,22 @@ u16 peek_2_bytes(u8* v) {
     return v[0]<<8 | v[1];
 }
 
-JpegParsingResult parse_StartOfFrame(BitStream* bs, jpeg_t* jpeg) {
+// TODO(alex): move to libmath.h
+u32 ceilf32(f32 a) {
+    u32 aint = (u32)a;
+
+    // If the value is its own int
+    if (a == (f32)aint) {
+        return aint;
+    }
+
+    if (a>0) {
+        return aint+1;
+    }
+    return aint;
+}
+
+JpegParsingResult parse_FrameHeader(BitStream* bs, jpeg_t* jpeg) {
     FrameHeader& fh = jpeg->fh;
 
     u16 length = read_2bytes(bs);
@@ -530,19 +573,22 @@ JpegParsingResult parse_StartOfFrame(BitStream* bs, jpeg_t* jpeg) {
     for (u8 i=0; i<fh.src_components; i++) {
         // If components id are 1 2 and 3 => usually YCbCr
         //  else if 0x52, 0x47, 0x42 => RGB (very rare)
-        fh.component_id[i] = read_byte(bs);
+        fh.components[i].id = read_byte(bs);
         length--;
 
         v = read_byte(bs);
         length--;
-        fh.H_sample[i] = v >> 4;
-        fh.V_sample[i] = v & 0x0F;
+        fh.components[i].Hi = v >> 4;
+        fh.components[i].Vi = v & 0x0F;
 
-        if (fh.H_sample[i] > 4 || fh.H_sample[i] == 0) {
+        if (fh.components[i].Hi > 4 || fh.components[i].Hi == 0) {
             return (JpegParsingResult){JPEG_FAIL, "Horizontal sampling factor is not between 1 and 4."};
-        } else if (fh.V_sample[i] > 4 || fh.V_sample[i] == 0) {
+        } else if (fh.components[i].Vi > 4 || fh.components[i].Vi == 0) {
             return (JpegParsingResult){JPEG_FAIL, "Vertical sampling factor is not between 1 and 4."};
         }
+
+        fh.Hmax = fh.components[i].Hi > fh.Hmax ? fh.components[i].Hi : fh.Hmax;
+        fh.Vmax = fh.components[i].Vi > fh.Vmax ? fh.components[i].Vi : fh.Vmax;
 
         fh.QT_selector[i] = read_byte(bs);
         length--;
@@ -555,7 +601,14 @@ JpegParsingResult parse_StartOfFrame(BitStream* bs, jpeg_t* jpeg) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of Start of Frame header and read data does not match."};
     }
 
-    // Set and compute information for each components
+    // Compute interesting size info related to mcu and components
+    fh.n_mcu_width  = ceilf32((f32)fh.X / (8*(u16)fh.Hmax));
+    fh.n_mcu_height = ceilf32((f32)fh.Y / (8*(u16)fh.Vmax));
+    for (u8 i=0; i<fh.src_components; i++) {
+        fh.components[i].xi = fh.n_mcu_width  * (8*fh.components[i].Hi);
+        fh.components[i].yi = fh.n_mcu_height * (8*fh.components[i].Vi);
+        print_ci(&fh.components[i]);
+    }
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
@@ -616,79 +669,10 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
         return (JpegParsingResult){JPEG_FAIL, "Expected length of Start of Scan header and read data do not match."};
     }
 
-    FrameHeader& fh = jpeg->fh;
-    for (u8 i=0; i<sh.n_components; i++) {
-        ComponentInfo& comp = sh.components[i];
-
-        // Get the component Huffman tables
-        u8 dc_id = sh.dc_selector[i];
-        u8 ac_id = sh.ac_selector[i];
-
-        HuffmanTableSpec& ht = jpeg->ht;
-        for (u8 j=0; j<jpeg->ht.n_tables; j++) {
-            // TODO: Fix Huffman Table spec!
-            if (dc_id == (ht.table_id[j]/2)) {
-                comp.DCHuffmanTable = ht.root[0][j];
-            }
-            if (ac_id == (ht.table_id[j]/2)) {
-                comp.ACHuffmanTable = ht.root[1][j];
-            }
-        }
-
-
-        // Get the matching frame component to get the QT and sampling factors, ...
-        u8 comp_id = sh.id_selector[i];
-        for (u8 j=0; j<jpeg->fh.src_components; j++) {
-            // Get the huffman tables to use for the component
-
-            if (fh.component_id[j] == comp_id) {
-                // Get the quantization table to use for the component
-                u8 qt_id = fh.QT_selector[j];
-                for (u8 k=0; k<jpeg->qt.n; k++) {
-                    if (jpeg->qt.id[k] == qt_id) {
-                        comp.QTable = &jpeg->qt.Q[k][0];
-                        break;
-                    }
-                }
-
-                // Get the component size as it is encoded
-                // This should be in the frame header
-                    comp.Vi = fh.V_sample[j];
-                    comp.Hi = fh.H_sample[j];
-                    // TODO(alex): Compute xi and yi here
-                    fh.Hmax = 1;
-                    fh.Vmax = 1;
-                    f32 tmp = fh.src_width * ((f32)comp.Hi / fh.Hmax);
-                    if ((f32)((u32)tmp) == tmp) {
-                        comp.xi = (u32)tmp;
-                    } else if (tmp > 0){
-                        comp.xi = (u32)tmp+1;
-                    } else {
-                        comp.xi = (u32)tmp;
-                    }
-
-                break;
-            }
-        }
-    }
-
-
     return (JpegParsingResult){JPEG_SUCCESS, "Successfully read jpeg file!"};
 }
 
-JpegParsingResult parse_ApplicationSegment0(BitStream* bs, jpeg_t* jpeg) {
-    u16 length = peek_2bytes(bs);
-    skip_nbytes(bs, length);
-    return (JpegParsingResult){JPEG_SUCCESS, 0};
-}
-
-JpegParsingResult parse_ApplicationSegment1(BitStream* bs, jpeg_t* jpeg) {
-    u16 length = peek_2bytes(bs);
-    skip_nbytes(bs, length);
-    return (JpegParsingResult){JPEG_SUCCESS, 0};
-}
-
-JpegParsingResult parse_ApplicationSegment13(BitStream* bs, jpeg_t* jpeg) {
+JpegParsingResult parse_ApplicationSegmentN(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
     skip_nbytes(bs, length);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -950,19 +934,10 @@ JpegParsingResult interpret_marker(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     JpegParsingResult result;
 
     switch (marker) {
-        case ApplicationSegment0: {
-            // If contains JFIF => data are YCbCr not RGB (as followinf JFIF standard)
-            printf("ApplicationSegment0\n");
-            result = parse_ApplicationSegment0(bs, jpeg);
-        } break;
-        case ApplicationSegment1: {
-            // Uses EXIF standard
-            printf("ApplicationSegment1\n");
-            result = parse_ApplicationSegment1(bs, jpeg);
-        } break;
+        case ApplicationSegment0:
+        case ApplicationSegment1:
         case ApplicationSegment13: {
-            printf("ApplicationSegment13\n");
-            result = parse_ApplicationSegment13(bs, jpeg);
+            result = parse_ApplicationSegmentN(bs, jpeg);
         } break;
         case ApplicationSegment14: {
             printf("ApplicationSegment14\n");
@@ -1098,7 +1073,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         u8 cs_j = jpeg->sh.id_selector[j];
 
         for (u8 i=0; i<jpeg->fh.src_components; i++) {
-            u8 c_i = jpeg->fh.component_id[i];
+            u8 c_i = jpeg->fh.components[i].id;
             if (c_i == cs_j) {
                 component_idx[j] = i;
                 break;
@@ -1122,8 +1097,8 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         HuffmanNode* dc_ht_root = jpeg->ht.root[DC][dc_table_id];
         HuffmanNode* ac_ht_root = jpeg->ht.root[AC][ac_table_id];
 
-        for (u8 v=0; v<jpeg->fh.V_sample[idx]; v++) {
-            for (u8 h=0; h<jpeg->fh.H_sample[idx]; h++) {
+        for (u8 v=0; v<jpeg->fh.components[idx].Vi; v++) {
+            for (u8 h=0; h<jpeg->fh.components[idx].Hi; h++) {
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
                 if (result.status != JPEG_SUCCESS) { return result; }
@@ -1320,7 +1295,7 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
     if (marker == StartOfFrame0) {
         jpeg->encoding = (Markers)marker;
         printf("Parse start of frame!\n");
-        JpegParsingResult result = parse_StartOfFrame(bs, jpeg);
+        JpegParsingResult result = parse_FrameHeader(bs, jpeg);
 
         if (result.status != JPEG_SUCCESS) { return result; }
     } else {
