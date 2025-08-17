@@ -309,7 +309,7 @@ struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
     u8* buffer;     // decoded data
-    u8* QT;         // TODO
+    u8* QT;
     u32 xi;
     u32 yi;
     u8 id;
@@ -354,6 +354,7 @@ struct FrameHeader {
     u32 n_mcu_width;
     u32 n_mcu_height;
 
+    // Move to inside the component?
     u8 QT_selector[4];
 
     ComponentInfo components[4];
@@ -391,7 +392,6 @@ struct ScanHeader {
     u8 approx_low;                  // Not used
 
     // TODO(alex): For simplicity, additional fields
-    // ComponentInfo components[4];
     ComponentInfo* components[4];    // Do pointer to component info that is in the frame header
 };
 
@@ -629,6 +629,7 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
         // Setup the component informations so that it's complete with QT and AC/DC tables
         for (u8 j=0; j<jpeg->fh.N; j++) {
             if (sh.id_selector[i] == jpeg->fh.components[j].id) {
+
                 sh.components[i] = &jpeg->fh.components[j];
 
                 for (u8 k=0; k<jpeg->ht.n_tables; k++) {
@@ -639,6 +640,23 @@ JpegParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
                         sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[k];
                     }
                 }
+
+                u8 qt_id_selector = jpeg->fh.QT_selector[j];
+                for (u8 k=0; k<jpeg->qt.n; k++){
+                    if (jpeg->qt.id[k] == qt_id_selector) {
+                        sh.components[i]->QT = jpeg->qt.Q[k];
+                        break;
+                    }
+                }
+
+                // if (qt.id[table_idx] == jpeg->fh.QT_selector[j]) {
+                //     printf("ID/idx: %d/%d  --  %d/%d\n", qt.id[table_idx], table_idx, jpeg->fh.QT_selector[j], j);
+                //     jpeg->fh.components[j].QT = &qt.Q[table_idx][0];
+                //     printf("Ref: %p\n", qt.Q[table_idx]);
+                //     printf("assigned QT: %p\n", jpeg->fh.components[j].QT);
+                //     break;
+                // }
+
                 break;
             }
         }
@@ -858,14 +876,6 @@ JpegParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
             return (JpegParsingResult){JPEG_FAIL, "Quantization table identifier should be between 0 and 3!"};
         }
 
-        // Set the qt table to the matching component
-        for (u8 j=0; j<jpeg->fh.N; j++) {
-            if (qt.id[table_idx] == jpeg->fh.QT_selector[j]) {
-                jpeg->fh.components[j].QT = &qt.Q[table_idx][0];
-                break;
-            }
-        }
-
         for (u8 i=0; i<64; i++) {
             qt.Q[table_idx][i] = read_byte(bs);
             length--;
@@ -1078,8 +1088,8 @@ s16 clamp(s16 a, s16 low=0, s16 high=255){
 JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     u8 n_components = jpeg->sh.n_components;
 
-    const u8 DC = 0;
-    const u8 AC = 1;
+    // const u8 DC = 0;
+    // const u8 AC = 1;
     const u32 PI = 3.1415926535;
     // To go from flat zigzag order to flat unzigzag order
     const u8 unzigzag[64] = {
@@ -1093,19 +1103,19 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         53, 60, 61, 54, 47, 55, 62, 63
     };
 
-    // This is valid for the whole scan!
-    u8 component_idx[4] = {0};
-    for (u8 j=0; j<n_components; j++) {
-        u8 cs_j = jpeg->sh.id_selector[j];
+    // // This is valid for the whole scan!
+    // u8 component_idx[4] = {0};
+    // for (u8 j=0; j<n_components; j++) {
+    //     u8 cs_j = jpeg->sh.id_selector[j];
 
-        for (u8 i=0; i<jpeg->fh.src_components; i++) {
-            u8 c_i = jpeg->fh.components[i].id;
-            if (c_i == cs_j) {
-                component_idx[j] = i;
-                break;
-            }
-        }
-    }
+    //     for (u8 i=0; i<jpeg->fh.src_components; i++) {
+    //         u8 c_i = jpeg->fh.components[i].id;
+    //         if (c_i == cs_j) {
+    //             component_idx[j] = i;
+    //             break;
+    //         }
+    //     }
+    // }
 
 
     s16 zz_mcu[4][64] = {0};
@@ -1113,33 +1123,36 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     f32 idct[4][64] = {0};
     for (u8 i=0; i<n_components; i++) {
         // Get the correct component index in the frame header
-        u8 idx = component_idx[i];
+        // u8 idx = component_idx[i];
 
-        u8 qt_idx = jpeg->fh.QT_selector[idx];
-        u8* Q = jpeg->qt.Q[qt_idx];
+        // u8 qt_idx = jpeg->fh.QT_selector[idx];
+        // u8* Q = jpeg->qt.Q[qt_idx];
+        u8* Q = jpeg->sh.components[i]->QT;
 
-        u8 dc_table_id = jpeg->sh.dc_selector[i];
-        u8 ac_table_id = jpeg->sh.ac_selector[i];
+        // u8 dc_table_id = jpeg->sh.dc_selector[i];
+        // u8 ac_table_id = jpeg->sh.ac_selector[i];
 
-        HuffmanNode* dc_ht_root = 0;
-        HuffmanNode* ac_ht_root = 0;
-        for (u8 j=0; j<jpeg->ht.n_tables; j++) {
-            if (dc_table_id == jpeg->ht.id[j]) {
-                dc_ht_root = jpeg->ht.DCroot[j];
-            }
-            if (ac_table_id == jpeg->ht.id[j]) {
-                ac_ht_root = jpeg->ht.ACroot[j];
-            }
-        }
+        // HuffmanNode* dc_ht_root = 0;
+        // HuffmanNode* ac_ht_root = 0;
+        // for (u8 j=0; j<jpeg->ht.n_tables; j++) {
+        //     if (dc_table_id == jpeg->ht.id[j]) {
+        //         dc_ht_root = jpeg->ht.DCroot[j];
+        //     }
+        //     if (ac_table_id == jpeg->ht.id[j]) {
+        //         ac_ht_root = jpeg->ht.ACroot[j];
+        //     }
+        // }
+        HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
+        HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
 
-        for (u8 v=0; v<jpeg->fh.components[idx].Vi; v++) {
-            for (u8 h=0; h<jpeg->fh.components[idx].Hi; h++) {
+        for (u8 v=0; v<jpeg->sh.components[i]->Vi; v++) {
+            for (u8 h=0; h<jpeg->sh.components[i]->Hi; h++) {
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
                 if (result.status != JPEG_SUCCESS) { return result; }
-                s16 dc = jpeg->dc_pred[idx] + value;
-                jpeg->dc_pred[idx] = dc;
-                zz_mcu[idx][0] = dc;
+                s16 dc = jpeg->dc_pred[i] + value;
+                jpeg->dc_pred[i] = dc;
+                zz_mcu[i][0] = dc;
 
                 u8 j = 1;
                 while (j<64) {        // and not a marker that would indicate something
@@ -1149,13 +1162,13 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                     if (ac == 0 && preceding_zeros == 0) {
                         while (j<64) {
-                            zz_mcu[idx][j++] = 0;
+                            zz_mcu[i][j++] = 0;
                         }
                     } else {
                         for (u8 k=0; k<preceding_zeros; k++) {
-                            zz_mcu[idx][j++] = 0;
+                            zz_mcu[i][j++] = 0;
                         }
-                        zz_mcu[idx][j++] = ac;
+                        zz_mcu[i][j++] = ac;
                     }
                 }
             }
@@ -1163,12 +1176,12 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
         // Dequantize
         for (u8 l=0; l<64; l++) {
-            zz_mcu[idx][l] *= Q[l];
+            zz_mcu[i][l] *= Q[l];
         }
 
         // Unzigzag
         for (u8 l=0; l<64; l++) {
-            mcu[idx][unzigzag[l]] = zz_mcu[idx][l];
+            mcu[i][unzigzag[l]] = zz_mcu[i][l];
         }
 
         // IDCT
@@ -1182,12 +1195,12 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         f32 Cu = u==0 ? 0.7071067811 : 1;
 
                         u8 l_vu = u + v*8;
-                        idct[idx][l] += (f64)(Cu * Cv * mcu[idx][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                        idct[i][l] += (f64)(Cu * Cv * mcu[i][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
                     }
                 }
 
-                f32 a = (f32)(0.25f*idct[idx][l] + 128);
-                idct[idx][l] = clamp(a+0.5);
+                f32 a = (f32)(0.25f*idct[i][l] + 128);
+                idct[i][l] = clamp(a+0.5);
             }
         }
     }
