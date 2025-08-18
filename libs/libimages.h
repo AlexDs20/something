@@ -1181,19 +1181,18 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                 // TODO(alex): Assign the value at the correct component buffer position
                 u32 start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
                 u32 start_y = (u16)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
+
+                u32 idx_x = ((start_x*jpeg->sh.components[i]->Hi) + h) * 8;
+                u32 idx_y = ((start_y*jpeg->sh.components[i]->Vi) + v) * 8;
+
+                u32 component_width = jpeg->sh.components[i]->xi;
+
                 for (u8 y=0; y<8; y++) {
                     for (u8 x=0; x<8; x++) {
+                        u64 linear_index = (idx_y+y) * component_width + (idx_x+x);
+                        u16 l = x + y*8;
 
-                        /*
-                            u32 start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
-                            u32 start_y = (u16)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
-
-                            // TODO check not going over edge
-                            u32 NX = (start_x*8 + x);
-                            u32 NY = (start_y*8 + y);
-                            u32 linear = NX + NY*jpeg->fh.src_width;
-                            jpeg->buffer[linear*4 + 0] = (u8)clamp(b+0.5);
-                        */
+                        jpeg->sh.components[i]->buffer[linear_index] = (u8)idct[i][l];
 
                     }
                 }
