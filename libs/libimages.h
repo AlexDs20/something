@@ -306,7 +306,7 @@ typedef struct ComponentInfo ComponentInfo;
 struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
-    u8* buffer;     // decoded data
+    f32* buffer;     // decoded data
     u8* QT;
     u32 xi;
     u32 yi;
@@ -590,7 +590,7 @@ JpegParsingResult parse_FrameHeader(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         fh.components[i].yi = fh.n_mcu_height * (8*fh.components[i].Vi);
 
         // Note: Only support of 8 bits components
-        fh.components[i].buffer = (u8*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof(u8));
+        fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof (f32));
     }
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -1111,10 +1111,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         53, 60, 61, 54, 47, 55, 62, 63
     };
 
+    u32 mcu_block_start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
+    u32 mcu_block_start_y = (u32)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
 
-    s16 zz_mcu[4][64] = {0};
-    s16 mcu[4][64] = {0};
-    f32 idct[4][64] = {0};
     u8 n_components = jpeg->sh.n_components;
     for (u8 i=0; i<n_components; i++) {
         u8* Q = jpeg->sh.components[i]->QT;
@@ -1123,9 +1122,14 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
         for (u8 v=0; v<jpeg->sh.components[i]->Vi; v++) {
             for (u8 h=0; h<jpeg->sh.components[i]->Hi; h++) {
+                s16 zz_mcu[4][64] = {0};
+                s16 mcu[4][64] = {0};
+                f32 idct[4][64] = {0};
+
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
                 if (result.status != JPEG_SUCCESS) { return result; }
+
                 s16 dc = jpeg->dc_pred[i] + value;
                 jpeg->dc_pred[i] = dc;
                 zz_mcu[i][0] = dc;
@@ -1164,9 +1168,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         u8 l = x+y*8;
 
                         for (u8 v=0; v<8; v++) {
-                            f32 Cv = v==0 ? 0.7071067811 : 1;
+                            f32 Cv = v==0 ? 0.7071067811f : 1.0f;
                             for (u8 u=0; u<8; u++) {
-                                f32 Cu = u==0 ? 0.7071067811 : 1;
+                                f32 Cu = u==0 ? 0.7071067811f : 1.0f;
 
                                 u8 l_vu = u + v*8;
                                 idct[i][l] += (f64)(Cu * Cv * mcu[i][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
@@ -1174,69 +1178,26 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         }
 
                         f32 a = (f32)(0.25f*idct[i][l] + 128);
-                        idct[i][l] = clamp(a+0.5);
+                        idct[i][l] = a; // clamp(a+0.5);
                     }
                 }
 
-                // TODO(alex): Assign the value at the correct component buffer position
-                u32 start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
-                u32 start_y = (u16)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
-
-                u32 idx_x = ((start_x*jpeg->sh.components[i]->Hi) + h) * 8;
-                u32 idx_y = ((start_y*jpeg->sh.components[i]->Vi) + v) * 8;
-
-                u32 component_width = jpeg->sh.components[i]->xi;
+                // Assign the value at the correct component buffer position
+                u32 idx_x = ((mcu_block_start_x*jpeg->sh.components[i]->Hi) + h) * 8;
+                u32 idx_y = ((mcu_block_start_y*jpeg->sh.components[i]->Vi) + v) * 8;
 
                 for (u8 y=0; y<8; y++) {
                     for (u8 x=0; x<8; x++) {
-                        u64 linear_index = (idx_y+y) * component_width + (idx_x+x);
+                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
                         u16 l = x + y*8;
 
-                        jpeg->sh.components[i]->buffer[linear_index] = (u8)idct[i][l];
-
+                        jpeg->sh.components[i]->buffer[linear_index] = idct[i][l];
                     }
                 }
             }
         }
     }
 
-    // Assume YCbCr
-    // Convert to RGB
-    // (0,0)
-    u16 n_blocks_x = (u16)((jpeg->fh.src_width  + 7) / 8.0f);
-    u16 n_blocks_y = (u16)((jpeg->fh.src_height + 7) / 8.0f);
-    u16 start_x = jpeg->current_mcu % n_blocks_x;
-    u16 start_y = (u16)(jpeg->current_mcu / n_blocks_x);
-    if (n_components==3) {
-        for (u8 y=0; y<8; y++) {
-            for (u8 x=0; x<8; x++) {
-                u8 l = x + y * 8;
-                f32 r = idct[0][l]                                + 1.402   * (idct[2][l] - 128);
-                f32 g = idct[0][l] - 0.34414 * (idct[1][l] - 128) - 0.71414 * (idct[2][l] - 128);
-                f32 b = idct[0][l] + 1.772   * (idct[1][l] - 128);
-
-                // TODO check not going over edge
-                u32 NX = (start_x*8 + x);
-                u32 NY = (start_y*8 + y);
-                u32 linear = NX + NY*jpeg->fh.src_width;
-                jpeg->buffer[linear*4 + 0] = (u8)clamp(b+0.5);
-                jpeg->buffer[linear*4 + 1] = (u8)clamp(g+0.5);
-                jpeg->buffer[linear*4 + 2] = (u8)clamp(r+0.5);
-            }
-        }
-    } else {
-        for (u8 y=0; y<8; y++) {
-            for (u8 x=0; x<8; x++) {
-                u8 l = x + y * 8;
-
-                u32 NX = (start_x*8 + x);
-                u32 NY = (start_y*8 + y);
-                u32 linear = NX + NY*jpeg->fh.src_width;
-
-                jpeg->buffer[linear] = (u8)clamp(idct[0][l] + 0.5f);
-            }
-        }
-    }
     jpeg->current_mcu++;
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -1360,7 +1321,68 @@ JpegParsingResult decode_frame(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg
         return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
     }
 
-    // TODO(alex): Convert from components to RGB here and assign the values to the correct buffer with at high res.
+    // Assume YCbCr
+    // Convert to RGB
+    // TODO(alex): Make this work with various Hi/Vi
+    if (3 == jpeg->fh.src_components) {
+        f32* comp0 = jpeg->sh.components[0]->buffer;
+        f32* comp1 = jpeg->sh.components[1]->buffer;
+        f32* comp2 = jpeg->sh.components[2]->buffer;
+
+        u64 l0, l0_x, l0_y;
+        u64 l1, l1_x, l1_y;
+        u64 l2, l2_x, l2_y;
+
+        u8 l0_x_ratio, l0_y_ratio;
+        u8 l1_x_ratio, l1_y_ratio;
+        u8 l2_x_ratio, l2_y_ratio;
+
+        l0_x_ratio = jpeg->fh.Hmax / jpeg->fh.components[0].Hi;
+        l0_y_ratio = jpeg->fh.Vmax / jpeg->fh.components[0].Vi;
+
+        l1_x_ratio = jpeg->fh.Hmax / jpeg->fh.components[1].Hi;
+        l1_y_ratio = jpeg->fh.Vmax / jpeg->fh.components[1].Vi;
+
+        l2_x_ratio = jpeg->fh.Hmax / jpeg->fh.components[2].Hi;
+        l2_y_ratio = jpeg->fh.Vmax / jpeg->fh.components[2].Vi;
+
+        for (u32 y=0; y<jpeg->fh.src_height; y++) {
+            l0_y = y / l0_y_ratio;
+            l1_y = y / l1_y_ratio;
+            l2_y = y / l2_y_ratio;
+
+            for (u32 x=0; x<jpeg->fh.src_width; x++) {
+                l0_x = x / l0_x_ratio;
+                l1_x = x / l1_x_ratio;
+                l2_x = x / l2_x_ratio;
+
+                u64 l = y * jpeg->fh.src_width + x;
+                l0 = (l0_y*jpeg->fh.components[0].xi) + l0_x;
+                l1 = (l1_y*jpeg->fh.components[1].xi) + l1_x;
+                l2 = (l2_y*jpeg->fh.components[2].xi) + l2_x;
+
+                f32 r = comp0[l0]                                 + 1.402   * (comp2[l2] - 128);
+                f32 g = comp0[l0] - 0.34414 * (comp1[l1] - 128)   - 0.71414 * (comp2[l2] - 128);
+                f32 b = comp0[l0] + 1.772   * (comp1[l1] - 128);
+
+                jpeg->buffer[l*4 + 0] = (u8)clamp(b+0.5);
+                jpeg->buffer[l*4 + 1] = (u8)clamp(g+0.5);
+                jpeg->buffer[l*4 + 2] = (u8)clamp(r+0.5);
+                jpeg->buffer[l*4 + 3] = 255;
+            }
+        }
+    } else if (1 == jpeg->fh.src_components) {
+        f32* comp0 = jpeg->sh.components[0]->buffer;
+        for (u32 y=0; y<jpeg->fh.src_height; y++) {
+            for (u32 x=0; x<jpeg->fh.src_width; x++) {
+                u64 l = y * jpeg->fh.src_width + x;
+                jpeg->buffer[l*4 + 0] = (u8)clamp(comp0[l]);
+                jpeg->buffer[l*4 + 1] = (u8)clamp(comp0[l]);
+                jpeg->buffer[l*4 + 2] = (u8)clamp(comp0[l]);
+                jpeg->buffer[l*4 + 3] = 255;
+            }
+        }
+    }
 
     local_arena_alloc_reset(local_arena);
     return (JpegParsingResult){JPEG_SUCCESS, 0};
