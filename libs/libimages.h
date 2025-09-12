@@ -1122,9 +1122,9 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
         for (u8 v=0; v<jpeg->sh.components[i]->Vi; v++) {
             for (u8 h=0; h<jpeg->sh.components[i]->Hi; h++) {
-                s16 zz_mcu[4][64] = {0};
-                s16 mcu[4][64] = {0};
-                f32 idct[4][64] = {0};
+                s16 zz_mcu[64] = {0};
+                s16 mcu[64] = {0};
+                f32 idct[64] = {0};
 
                 s16 value;
                 JpegParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
@@ -1132,7 +1132,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                 s16 dc = jpeg->dc_pred[i] + value;
                 jpeg->dc_pred[i] = dc;
-                zz_mcu[i][0] = dc;
+                zz_mcu[0] = dc;
 
                 u8 j = 1;
                 while (j<64) {        // and not a marker that would indicate something
@@ -1142,24 +1142,18 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 
                     if (ac == 0 && preceding_zeros == 0) {
                         while (j<64) {
-                            zz_mcu[i][j++] = 0;
+                            zz_mcu[j++] = 0;
                         }
                     } else {
                         for (u8 k=0; k<preceding_zeros; k++) {
-                            zz_mcu[i][j++] = 0;
+                            zz_mcu[j++] = 0;
                         }
-                        zz_mcu[i][j++] = ac;
+                        zz_mcu[j++] = ac;
                     }
                 }
 
-                // Dequantize
                 for (u8 l=0; l<64; l++) {
-                    zz_mcu[i][l] *= Q[l];
-                }
-
-                // Unzigzag
-                for (u8 l=0; l<64; l++) {
-                    mcu[i][unzigzag[l]] = zz_mcu[i][l];
+                    mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
                 }
 
                 // IDCT
@@ -1173,12 +1167,12 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                                 f32 Cu = u==0 ? 0.7071067811f : 1.0f;
 
                                 u8 l_vu = u + v*8;
-                                idct[i][l] += (f64)(Cu * Cv * mcu[i][l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                                idct[l] += (f64)(Cu * Cv * mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
                             }
                         }
 
-                        f32 a = (f32)(0.25f*idct[i][l] + 128);
-                        idct[i][l] = a; // clamp(a+0.5);
+                        f32 a = (f32)(0.25f*idct[l] + 128);
+                        idct[l] = a; // clamp(a+0.5);
                     }
                 }
 
@@ -1191,7 +1185,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                         u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
                         u16 l = x + y*8;
 
-                        jpeg->sh.components[i]->buffer[linear_index] = idct[i][l];
+                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
                     }
                 }
             }
