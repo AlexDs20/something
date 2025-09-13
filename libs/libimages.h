@@ -908,37 +908,32 @@ bool is_start_of_frame(u16 marker) {
            marker==StartOfFrame1 ||
            marker==StartOfFrame2 ||
            marker==StartOfFrame3 ||
+
            marker==StartOfFrame5 ||
            marker==StartOfFrame6 ||
-           marker==StartOfFrame7;
+           marker==StartOfFrame7 ||
+
+           marker==StartOfFrame9  ||
+           marker==StartOfFrame10 ||
+           marker==StartOfFrame11 ||
+
+           marker==StartOfFrame13 ||
+           marker==StartOfFrame14 ||
+           marker==StartOfFrame15;
 }
 
-bool is_restart_marker(u16 marker, s8* idx) {
+bool is_restart_marker(u16 marker, u8* idx) {
     bool out = true;
     switch (marker) {
-        case Restart0: {
-            *idx = 0;
-        } break;
-        case Restart1: {
-            *idx = 1;
-        } break;
-        case Restart2: {
-            *idx = 2;
-        } break;
-        case Restart3: {
-            *idx = 3;
-        } break;
-        case Restart4: {
-            *idx = 4;
-        } break;
-        case Restart5: {
-            *idx = 5;
-        } break;
-        case Restart6: {
-            *idx = 6;
-        } break;
+        case Restart0:
+        case Restart1:
+        case Restart2:
+        case Restart3:
+        case Restart4:
+        case Restart5:
+        case Restart6:
         case Restart7: {
-            *idx = 7;
+            *idx = (*idx+1) & 0x7;
         } break;
         default: {
             out = false;
@@ -1152,6 +1147,7 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
                     }
                 }
 
+                // Dequantize and Unzigzag
                 for (u8 l=0; l<64; l++) {
                     mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
                 }
@@ -1204,7 +1200,7 @@ JpegParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpeg
         return (JpegParsingResult){JPEG_FAIL, "No restart interval is currently unsupported."};
     }
 
-    s8 tmp;
+    u8 tmp;
     u16 n = 0;
 
     // Reset all 4 u8 values to 0
@@ -1248,7 +1244,7 @@ JpegParsingResult parse_Scan(Arena* persist_arena, Arena* local_arena, BitStream
     JpegParsingResult result = parse_ScanHeader(bs, jpeg);
     if (result.status != JPEG_SUCCESS) { return result; }
 
-    s8 restart_id = -1;
+    u8 restart_id = 0;
     while (true) {
         JpegParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
         if (result.status != JPEG_SUCCESS) {

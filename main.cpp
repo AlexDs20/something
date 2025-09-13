@@ -34,13 +34,19 @@ int main() {
     }
 
 #if 1
-    const u32 w = 4096;
-    const u32 h = 1024;
+    u32* img_b = model->material->map_Kd.data;
+    u32  img_w = model->material->map_Kd.width;
+    u32  img_h = model->material->map_Kd.height;
+    const u32 w = img_w;
+    const u32 h = img_h>512 ? 512 : img_h;
+    // const u32 w = 4096;
+    // const u32 h = 1024;
 
     const u32 bg_color = 0x777777;
 
     Win win = platform_init_win(w, h, msg);
-    memcpy(win.buffer, model->material->map_Kd.data, w*h*4);
+    memcpy(win.buffer, img_b, w*h*4);
+    // memcpy(win.buffer, model->material->map_Kd.data, w*h*4);
     // win.buffer = model->material->map_Kd.data;
 
     f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
