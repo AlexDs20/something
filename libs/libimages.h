@@ -43,8 +43,7 @@ struct JpegParsingResult {
     const char* error_message;
 };
 
-// TODO(alex):
-// ImageInfo read_image_info(string8 filename);
+ImageInfo read_image_info(string8 filename);
 
 // TODO(alex): Maybe request a pointer where there is enough space instead?
 Image read_image_file(Arena* arena, string8 filename);
@@ -1399,7 +1398,121 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Decoder_setup
     jpeg_t jpeg = {0};
 
-    JpegParsingResult result = decode_frame(persist_arena, &bs, &jpeg);
+    JpegParsingResult result;
+    {
+        LocalArena* local_arena = local_arena_alloc_create();
+
+        // Parse [Tables/misc.] of the frame
+        u16 marker = peek_2bytes(&bs);
+        while (is_interpret_marker(marker) && !overflow(&bs)) {
+            JpegParsingResult result = interpret_marker(local_arena->arena, &bs, &jpeg);
+
+            if (result.status != JPEG_SUCCESS) { return result; }
+            marker = peek_2bytes(&bs);
+        }
+
+        if (overflow(&bs)) {
+            return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
+        }
+
+        if (!is_start_of_frame(marker)) {
+            return (JpegParsingResult){JPEG_FAIL, "Did not find start of frame marker!"};
+        }
+
+        // Parse Frame header
+        skip_nbytes(&bs, 2);
+        if (marker == StartOfFrame0) {
+            jpeg.encoding = (Markers)marker;
+            printf("Parse start of frame!\n");
+            JpegParsingResult result = parse_FrameHeader(local_arena->arena, &bs, &jpeg);
+
+            if (result.status != JPEG_SUCCESS) { return result; }
+        } else {
+            return (JpegParsingResult){JPEG_FAIL, "Only StartOfFrame0 marker implemented!"};
+        }
+
+        // TODO(alex): Allocate precisely the right amount and use u8* regardless
+        // jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*jpeg.fh.src_components);
+        jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
+
+        marker = peek_2bytes(&bs);
+        while ((is_interpret_marker(marker) || (marker==StartOfScan)) && !overflow(&bs)) {       // Either DNL between scans or Tables/misc. or Scan header
+            JpegParsingResult result = parse_Scan(persist_arena, local_arena->arena, &bs, &jpeg);
+
+            if (result.status != JPEG_SUCCESS) { return result; }
+            marker = peek_2bytes(&bs);
+        }
+
+        if (overflow(&bs)) {
+            return (JpegParsingResult){JPEG_FAIL, "Trying to parse beyond the end of file!"};
+        }
+
+        // Assume YCbCr
+        // Convert to RGB
+        // TODO(alex): Make this work with various Hi/Vi
+        if (3 == jpeg.fh.src_components) {
+            f32* comp0 = jpeg.sh.components[0]->buffer;
+            f32* comp1 = jpeg.sh.components[1]->buffer;
+            f32* comp2 = jpeg.sh.components[2]->buffer;
+
+            u64 l0, l0_x, l0_y;
+            u64 l1, l1_x, l1_y;
+            u64 l2, l2_x, l2_y;
+
+            u8 l0_x_ratio, l0_y_ratio;
+            u8 l1_x_ratio, l1_y_ratio;
+            u8 l2_x_ratio, l2_y_ratio;
+
+            l0_x_ratio = jpeg.fh.Hmax / jpeg.fh.components[0].Hi;
+            l0_y_ratio = jpeg.fh.Vmax / jpeg.fh.components[0].Vi;
+
+            l1_x_ratio = jpeg.fh.Hmax / jpeg.fh.components[1].Hi;
+            l1_y_ratio = jpeg.fh.Vmax / jpeg.fh.components[1].Vi;
+
+            l2_x_ratio = jpeg.fh.Hmax / jpeg.fh.components[2].Hi;
+            l2_y_ratio = jpeg.fh.Vmax / jpeg.fh.components[2].Vi;
+
+            for (u32 y=0; y<jpeg.fh.src_height; y++) {
+                l0_y = y / l0_y_ratio;
+                l1_y = y / l1_y_ratio;
+                l2_y = y / l2_y_ratio;
+
+                for (u32 x=0; x<jpeg.fh.src_width; x++) {
+                    l0_x = x / l0_x_ratio;
+                    l1_x = x / l1_x_ratio;
+                    l2_x = x / l2_x_ratio;
+
+                    u64 l = y * jpeg.fh.src_width + x;
+                    l0 = (l0_y*jpeg.fh.components[0].xi) + l0_x;
+                    l1 = (l1_y*jpeg.fh.components[1].xi) + l1_x;
+                    l2 = (l2_y*jpeg.fh.components[2].xi) + l2_x;
+
+                    f32 r = comp0[l0]                                 + 1.402   * (comp2[l2] - 128);
+                    f32 g = comp0[l0] - 0.34414 * (comp1[l1] - 128)   - 0.71414 * (comp2[l2] - 128);
+                    f32 b = comp0[l0] + 1.772   * (comp1[l1] - 128);
+
+                    jpeg.buffer[l*4 + 0] = (u8)clamp(b+0.5);
+                    jpeg.buffer[l*4 + 1] = (u8)clamp(g+0.5);
+                    jpeg.buffer[l*4 + 2] = (u8)clamp(r+0.5);
+                    jpeg.buffer[l*4 + 3] = 255;
+                }
+            }
+        } else if (1 == jpeg.fh.src_components) {
+            f32* comp0 = jpeg.sh.components[0]->buffer;
+            for (u32 y=0; y<jpeg.fh.src_height; y++) {
+                for (u32 x=0; x<jpeg.fh.src_width; x++) {
+                    u64 l = y * jpeg.fh.src_width + x;
+                    jpeg.buffer[l*4 + 0] = (u8)clamp(comp0[l]);
+                    jpeg.buffer[l*4 + 1] = (u8)clamp(comp0[l]);
+                    jpeg.buffer[l*4 + 2] = (u8)clamp(comp0[l]);
+                    jpeg.buffer[l*4 + 3] = 255;
+                }
+            }
+        }
+
+        local_arena_alloc_reset(local_arena);
+        result = (JpegParsingResult){JPEG_SUCCESS, 0};
+    }
 
     if (result.status != JPEG_SUCCESS) { return result; }
 
@@ -1434,6 +1547,12 @@ void create_missing_image(Arena* arena, Image* out) {
         }
     }
     return;
+}
+
+ImageInfo read_image_info(string8 filename) {
+    ImageInfo out = {0};
+    // TODO
+    return out;
 }
 
 Image read_image_file(Arena* persist_arena, string8 filename) {
