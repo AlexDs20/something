@@ -1290,10 +1290,6 @@ JpegParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStrea
         marker = read_2bytes(bs);
     }
 
-    if (EndOfImage != marker) {
-        return (JpegParsingResult){JPEG_FAIL, "Did not reach EndOfImage marker after all the scans."};
-    }
-
     return (JpegParsingResult){JPEG_SUCCESS, 0};
 }
 
@@ -1319,9 +1315,9 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     jpeg_t jpeg = {0};
 
     //==============================
-    //  Start Decoding
-    JpegParsingResult result;
+    //  Decoding
     {
+        JpegParsingResult result;
         LocalArena* local_arena = local_arena_alloc_create();
 
         // Parse [Tables/misc.] of the frame
@@ -1357,6 +1353,7 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             }
             // TODO
             // else if (0xFF == marker) {
+            //     continue;
             // }
             else if (is_start_of_frame(marker)) {
                 break;
@@ -1391,12 +1388,11 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
 
         // Parse all Scans
-        JpegParsingResult result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
+        result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
         if (result.status != JPEG_SUCCESS) { return result; }
 
         // Assume YCbCr
         // Convert to RGB
-        // TODO(alex): Make this work with various Hi/Vi
         if (3 == jpeg.fh.src_components) {
             f32* comp0 = jpeg.sh.components[0]->buffer;
             f32* comp1 = jpeg.sh.components[1]->buffer;
@@ -1459,11 +1455,11 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
         local_arena_alloc_reset(local_arena);
         result = (JpegParsingResult){JPEG_SUCCESS, 0};
+
+        if (result.status != JPEG_SUCCESS) { return result; }
     }
     //  End Decoding
     //==============================
-
-    if (result.status != JPEG_SUCCESS) { return result; }
 
     out->width       = jpeg.fh.src_width;
     out->height      = jpeg.fh.src_height;
