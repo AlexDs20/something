@@ -420,7 +420,7 @@ struct jpeg_t {
     u32 current_mcu;
 
     u8* buffer;
-    Markers encoding;
+    Markers frame_type;
 };
 
 typedef struct BitStream BitStream;
@@ -450,8 +450,15 @@ bool overflow(BitStream* bs) {
 }
 
 inline
-void skip_nbytes(BitStream* bs, u64 n) {
+bool skip_nbytes(BitStream* bs, u64 n) {
+    bool error = false;
     bs->byte_pos += n;
+
+    if (bs->byte_pos < 0 | bs->byte_pos > bs->size-1) {
+        bs->byte_pos -= n;
+        error = true;
+    }
+    return error;
 }
 
 u8 read_byte(BitStream* bs) {
@@ -1105,17 +1112,33 @@ JpegParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
         53, 60, 61, 54, 47, 55, 62, 63
     };
 
-    u32 mcu_block_start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
     u32 mcu_block_start_y = (u32)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
+    // u32 mcu_block_start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
+    u32 mcu_block_start_x = jpeg->current_mcu - mcu_block_start_y*jpeg->fh.n_mcu_width;
 
     u8 n_components = jpeg->sh.n_components;
+
+    // If only 1 component in the scan => Vi and Hi should be 1
+    u8 Vi[4] = {0};
+    u8 Hi[4] = {0};
+    for (u8 i=0; i<n_components; i++) {
+        if (n_components == 1) {
+            Vi[i] = 1;
+            Hi[i] = 1;
+        }
+        else {
+            Vi[i] = jpeg->sh.components[i]->Vi;
+            Hi[i] = jpeg->sh.components[i]->Hi;
+        }
+    }
+
     for (u8 i=0; i<n_components; i++) {
         u8* Q = jpeg->sh.components[i]->QT;
         HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
         HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
 
-        for (u8 v=0; v<jpeg->sh.components[i]->Vi; v++) {
-            for (u8 h=0; h<jpeg->sh.components[i]->Hi; h++) {
+        for (u8 v=0; v<Vi[i]; v++) {
+            for (u8 h=0; h<Hi[i]; h++) {
                 s16 zz_mcu[64] = {0};
                 s16 mcu[64] = {0};
                 f32 idct[64] = {0};
@@ -1202,7 +1225,7 @@ JpegParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpeg
     u8 tmp;
     u16 n = 0;
 
-    // Reset all 4 u8 values to 0
+    // Reset all 4 s16 values to 0
     jpeg->dc_pred[0] = 0;
     jpeg->dc_pred[1] = 0;
     jpeg->dc_pred[2] = 0;
@@ -1227,8 +1250,11 @@ JpegParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpeg
 }
 
 JpegParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
-    u8 restart_id = 0;
+    u8 expected_restart_id = 0;
     u16 marker;
+
+    // TODO: Should count the number of restart intervals and loop through them
+    //
     while (true) {
         JpegParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
         if (result.status != JPEG_SUCCESS) {
@@ -1236,7 +1262,7 @@ JpegParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) 
             return result;
         }
         marker = peek_2bytes(bs);
-        if (is_restart_marker(marker, &restart_id)) {
+        if (is_restart_marker(marker, &expected_restart_id)) {
             skip_nbytes(bs, 2);
             continue;
         } else {
@@ -1263,17 +1289,8 @@ JpegParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStrea
         else if (DefineNumberOfLines == marker) {
             result = parse_DefineNumberOfLines(bs, jpeg);
         }
-        else if (ApplicationSegment0 == marker) {
+        else if (ApplicationSegment0 <= marker && marker <= ApplicationSegment14) {
             result = parse_ApplicationSegmentN(bs, jpeg);
-        }
-        else if (ApplicationSegment1 == marker) {
-            result = parse_ApplicationSegmentN(bs, jpeg);
-        }
-        else if (ApplicationSegment13 == marker) {
-            result = parse_ApplicationSegmentN(bs, jpeg);
-        }
-        else if (ApplicationSegment14 == marker) {
-            result = parse_ApplicationSegment14(bs, jpeg);
         }
         else if (Comment == marker) {
             result = parse_Comment(bs, jpeg);
@@ -1288,6 +1305,14 @@ JpegParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStrea
         }
         if (result.status != JPEG_SUCCESS) { return result; }
         marker = read_2bytes(bs);
+        /*
+        // Read next marker
+        last = read_byte(bs);
+        if (last != 0xFF) {
+            return (JpegParsingResult){JPEG_FAIL, "Expected a marker."};
+        }
+        marker = read_byte(bs);
+        */
     }
 
     return (JpegParsingResult){JPEG_SUCCESS, 0};
@@ -1307,7 +1332,8 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Get start marker
     if (marker != StartOfImage) {
         return (JpegParsingResult){JPEG_FAIL, "Missing Start Of Image marker"};
-    } else if (end_marker != EndOfImage) {
+    }
+    else if (end_marker != EndOfImage) {
         return (JpegParsingResult){JPEG_FAIL, "Missing End Of Image marker"};
     }
 
@@ -1330,23 +1356,17 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             else if (DefineHuffmanTable == marker) {
                 result = parse_DefineHuffmanTable(local_arena->arena, &bs, &jpeg);
             }
+            else if (DefineArithmeticCoding == marker) {
+                result = (JpegParsingResult){JPEG_FAIL, "Arithmetic Coding not supported."};
+            }
             else if (DefineRestartInterval == marker) {
                 result = parse_DefineRestartInterval(&bs, &jpeg);
             }
             else if (DefineNumberOfLines == marker) {
                 result = parse_DefineNumberOfLines(&bs, &jpeg);
             }
-            else if (ApplicationSegment0 == marker) {
+            else if (ApplicationSegment0 <= marker && marker <= ApplicationSegment14) {
                 result = parse_ApplicationSegmentN(&bs, &jpeg);
-            }
-            else if (ApplicationSegment1 == marker) {
-                result = parse_ApplicationSegmentN(&bs, &jpeg);
-            }
-            else if (ApplicationSegment13 == marker) {
-                result = parse_ApplicationSegmentN(&bs, &jpeg);
-            }
-            else if (ApplicationSegment14 == marker) {
-                result = parse_ApplicationSegment14(&bs, &jpeg);
             }
             else if (Comment == marker) {
                 result = parse_Comment(&bs, &jpeg);
@@ -1363,6 +1383,14 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             }
             if (result.status != JPEG_SUCCESS) { return result; }
             marker = read_2bytes(&bs);
+            /*
+            // Read next marker
+            last = read_byte(bs);
+            if (last != 0xFF) {
+                return (JpegParsingResult){JPEG_FAIL, "Expected a marker."};
+            }
+            marker = read_byte(bs);
+            */
         }
 
         if (EndOfImage == marker) {
@@ -1374,7 +1402,7 @@ JpegParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
         // Parse FrameHeader
         if (marker == StartOfFrame0) {
-            jpeg.encoding = (Markers)marker;
+            jpeg.frame_type = (Markers)marker;
             result = parse_FrameHeader(local_arena->arena, &bs, &jpeg);
 
             if (result.status != JPEG_SUCCESS) { return result; }
