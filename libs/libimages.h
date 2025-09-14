@@ -97,88 +97,88 @@ Image read_image_file(Arena* arena, string8 filename);
 
 // itu-t81.pdf page 32
 enum Markers {
-    Temporary                     = 0xFF01,
-    Reserved0                     = 0xFF02,      // 0xFF02 to 0xFFBF is reserved
+    Temporary                     = 0x01,
+    Reserved0                     = 0x02,      // 0xFF02 to 0xFFBF is reserved
 
-    StartOfFrame0                 = 0xFFC0,      // Baseline DCT
-    StartOfFrame1                 = 0xFFC1,      // Extended Sequential DCT
-    StartOfFrame2                 = 0xFFC2,      // Progressive DCT
-    StartOfFrame3                 = 0xFFC3,      // Lossless (sequential)
+    StartOfFrame0                 = 0xC0,      // Baseline DCT
+    StartOfFrame1                 = 0xC1,      // Extended Sequential DCT
+    StartOfFrame2                 = 0xC2,      // Progressive DCT
+    StartOfFrame3                 = 0xC3,      // Lossless (sequential)
 
-    DefineHuffmanTable            = 0xFFC4,
+    DefineHuffmanTable            = 0xC4,
 
-    StartOfFrame5                 = 0xFFC5,      // Differential sequential DCT
-    StartOfFrame6                 = 0xFFC6,      // Differential progressive DCT
-    StartOfFrame7                 = 0xFFC7,      // Differential lossless (sequential)
+    StartOfFrame5                 = 0xC5,      // Differential sequential DCT
+    StartOfFrame6                 = 0xC6,      // Differential progressive DCT
+    StartOfFrame7                 = 0xC7,      // Differential lossless (sequential)
 
-    JpegExtensions                = 0xFFC8,
+    JpegExtensions                = 0xC8,
 
-    StartOfFrame9                 = 0xFFC9,      // Extended sequential DCT, Arithmetic coding
-    StartOfFrame10                = 0xFFCA,      // Progressive DCT, Arithmetic coding
-    StartOfFrame11                = 0xFFCB,      // Lossless (sequential), Arithmetic coding
+    StartOfFrame9                 = 0xC9,      // Extended sequential DCT, Arithmetic coding
+    StartOfFrame10                = 0xCA,      // Progressive DCT, Arithmetic coding
+    StartOfFrame11                = 0xCB,      // Lossless (sequential), Arithmetic coding
 
-    DefineArithmeticCoding        = 0xFFCC,
+    DefineArithmeticCoding        = 0xCC,
 
-    StartOfFrame13                = 0xFFCD,      // Differential sequential DCT, Arithmetic coding
-    StartOfFrame14                = 0xFFCE,      // Differential progressive DCT, Arithmetic coding
-    StartOfFrame15                = 0xFFCF,      // Differential lossless (sequential), Arithmetic coding
+    StartOfFrame13                = 0xCD,      // Differential sequential DCT, Arithmetic coding
+    StartOfFrame14                = 0xCE,      // Differential progressive DCT, Arithmetic coding
+    StartOfFrame15                = 0xCF,      // Differential lossless (sequential), Arithmetic coding
 
-    Restart0                      = 0xFFD0,      // Restart interval termination
-    Restart1                      = 0xFFD1,
-    Restart2                      = 0xFFD2,
-    Restart3                      = 0xFFD3,
-    Restart4                      = 0xFFD4,
-    Restart5                      = 0xFFD5,
-    Restart6                      = 0xFFD6,
-    Restart7                      = 0xFFD7,
+    Restart0                      = 0xD0,      // Restart interval termination
+    Restart1                      = 0xD1,
+    Restart2                      = 0xD2,
+    Restart3                      = 0xD3,
+    Restart4                      = 0xD4,
+    Restart5                      = 0xD5,
+    Restart6                      = 0xD6,
+    Restart7                      = 0xD7,
 
-    StartOfImage                  = 0xFFD8,
-    EndOfImage                    = 0xFFD9,
-    StartOfScan                   = 0xFFDA,
-    DefineQuantizationTable       = 0xFFDB,
+    StartOfImage                  = 0xD8,
+    EndOfImage                    = 0xD9,
+    StartOfScan                   = 0xDA,
+    DefineQuantizationTable       = 0xDB,
 
-    DefineNumberOfLines           = 0xFFDC,
-    DefineRestartInterval         = 0xFFDD,
-    DefineHierarchicalProgression = 0xFFDE,
-    ExpandReferenceComponent      = 0xFFDF,
+    DefineNumberOfLines           = 0xDC,
+    DefineRestartInterval         = 0xDD,
+    DefineHierarchicalProgression = 0xDE,
+    ExpandReferenceComponent      = 0xDF,
 
-    ApplicationSegment0           = 0xFFE0,      // JFIF jpeg image and AVI1 motion jpeg
-    ApplicationSegment1           = 0xFFE1,      // EXIF metadata, TIFF ifd format, jpeg thumbnail, adobe xmp
-    ApplicationSegment2           = 0xFFE2,      // ICC color profile, flash pix
-    ApplicationSegment3           = 0xFFE3,      // Stereoscopic jpeg images
-    ApplicationSegment4           = 0xFFE4,
-    ApplicationSegment5           = 0xFFE5,
-    ApplicationSegment6           = 0xFFE6,      // NITF lossless profile
-    ApplicationSegment7           = 0xFFE7,
-    ApplicationSegment8           = 0xFFE8,
-    ApplicationSegment9           = 0xFFE9,
-    ApplicationSegment10          = 0xFFEA,      // ActiveObject (multimedia messages/captions)
-    ApplicationSegment11          = 0xFFEB,      // HELIOS JPEG Resources
-    ApplicationSegment12          = 0xFFEC,      // Picture Info, Photoshop Save for Web: Ducky
-    ApplicationSegment13          = 0xFFED,      // Photoshop Save As: IRB, 8BIM, IPTC
-    ApplicationSegment14          = 0xFFEE,
-    ApplicationSegment15          = 0xFFEF,
+    ApplicationSegment0           = 0xE0,      // JFIF jpeg image and AVI1 motion jpeg
+    ApplicationSegment1           = 0xE1,      // EXIF metadata, TIFF ifd format, jpeg thumbnail, adobe xmp
+    ApplicationSegment2           = 0xE2,      // ICC color profile, flash pix
+    ApplicationSegment3           = 0xE3,      // Stereoscopic jpeg images
+    ApplicationSegment4           = 0xE4,
+    ApplicationSegment5           = 0xE5,
+    ApplicationSegment6           = 0xE6,      // NITF lossless profile
+    ApplicationSegment7           = 0xE7,
+    ApplicationSegment8           = 0xE8,
+    ApplicationSegment9           = 0xE9,
+    ApplicationSegment10          = 0xEA,      // ActiveObject (multimedia messages/captions)
+    ApplicationSegment11          = 0xEB,      // HELIOS JPEG Resources
+    ApplicationSegment12          = 0xEC,      // Picture Info, Photoshop Save for Web: Ducky
+    ApplicationSegment13          = 0xED,      // Photoshop Save As: IRB, 8BIM, IPTC
+    ApplicationSegment14          = 0xEE,
+    ApplicationSegment15          = 0xEF,
 
-    JpegExtension0                = 0xFFF0,
-    JpegExtension1                = 0xFFF1,
-    JpegExtension2                = 0xFFF2,
-    JpegExtension3                = 0xFFF3,
-    JpegExtension4                = 0xFFF4,
-    JpegExtension5                = 0xFFF5,
-    JpegExtension6                = 0xFFF6,
-    JpegExtension7                = 0xFFF7,      // Lossless jpeg
-    JpegExtension8                = 0xFFF8,      // lossless jpeg extension parameters
-    JpegExtension9                = 0xFFF9,
-    JpegExtension10               = 0xFFFA,
-    JpegExtension11               = 0xFFFB,
-    JpegExtension12               = 0xFFFC,
-    JpegExtension13               = 0xFFFD,
+    JpegExtension0                = 0xF0,
+    JpegExtension1                = 0xF1,
+    JpegExtension2                = 0xF2,
+    JpegExtension3                = 0xF3,
+    JpegExtension4                = 0xF4,
+    JpegExtension5                = 0xF5,
+    JpegExtension6                = 0xF6,
+    JpegExtension7                = 0xF7,      // Lossless jpeg
+    JpegExtension8                = 0xF8,      // lossless jpeg extension parameters
+    JpegExtension9                = 0xF9,
+    JpegExtension10               = 0xFA,
+    JpegExtension11               = 0xFB,
+    JpegExtension12               = 0xFC,
+    JpegExtension13               = 0xFD,
 
-    Comment                       = 0xFFFE,
+    Comment                       = 0xFE,
 };
 
-void print_mk(u16 marker) {
-    printf("Marker: 0x%X\n", marker);
+void print_mk(u8 marker) {
+    printf("Marker: 0x%02dX\n", marker);
 }
 
 
@@ -907,7 +907,7 @@ ImageParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-bool is_start_of_frame(u16 marker) {
+bool is_start_of_frame(u8 marker) {
     return marker==StartOfFrame0 ||
            marker==StartOfFrame1 ||
            marker==StartOfFrame2 ||
@@ -926,7 +926,7 @@ bool is_start_of_frame(u16 marker) {
            marker==StartOfFrame15;
 }
 
-bool is_restart_marker(u16 marker, u8* idx) {
+bool is_restart_marker(u8 marker, u8* idx) {
     bool out = true;
     switch (marker) {
         case Restart0:
@@ -946,7 +946,7 @@ bool is_restart_marker(u16 marker, u8* idx) {
     return out;
 }
 
-bool is_interpret_marker(u16 marker) {
+bool is_interpret_marker(u8 marker) {
     bool out = false;
     switch (marker) {
         case DefineQuantizationTable:
@@ -975,45 +975,6 @@ bool is_interpret_marker(u16 marker) {
         } break;
     }
     return out;
-}
-
-ImageParsingResult interpret_marker(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    u16 marker = read_2bytes(bs);
-    ImageParsingResult result;
-
-    switch (marker) {
-        case ApplicationSegment0:
-        case ApplicationSegment1:
-        case ApplicationSegment13: {
-            result = parse_ApplicationSegmentN(bs, jpeg);
-        } break;
-        case ApplicationSegment14: {
-            printf("ApplicationSegment14\n");
-            result = parse_ApplicationSegment14(bs, jpeg);
-        } break;
-        case DefineQuantizationTable: {
-            printf("DefineQuantizationTable\n");
-            result = parse_DefineQuantizationTable(bs, jpeg);
-        } break;
-        case DefineRestartInterval: {
-            printf("DefineRestartInterval\n");
-            result = parse_DefineRestartInterval(bs, jpeg);
-        } break;
-        case DefineHuffmanTable: {
-            printf("DefineHuffmanTable\n");
-            result = parse_DefineHuffmanTable(arena, bs, jpeg);
-        } break;
-        case Comment: {
-            printf("Comment\n");
-            result = parse_Comment(bs, jpeg);
-        } break;
-        case DefineNumberOfLines: {
-            printf("DefineNumberOfLines\n");
-            result = parse_DefineNumberOfLines(bs, jpeg);
-        } break;
-    }
-
-    return result;
 }
 
 ImageParsingResult decode_one_Huffman_code(BitStream* bs, HuffmanNode* root, u8* result) {
@@ -1214,8 +1175,6 @@ ImageParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
 }
 
 ImageParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    u16 marker;
-
     if (jpeg->restart_interval == 0) {
         return (ImageParsingResult){IMAGE_FAIL, "No restart interval is currently unsupported."};
     }
@@ -1239,17 +1198,20 @@ ImageParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpe
         next_bit(bs, &bit);
     }
 
-    marker = peek_2bytes(bs);
-    if (!is_restart_marker(marker, &tmp) && !is_interpret_marker(marker) && marker != StartOfScan && marker != EndOfImage) {
+    u8 previous = read_byte(bs);
+    u8 marker = read_byte(bs);
+    if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
         return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
     }
+    skip_nbytes(bs, -2);
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
 ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
     u8 expected_restart_id = 0;
-    u16 marker;
+    u8 previous;
+    u8 marker;
 
     // TODO: Should count the number of restart intervals and loop through them
     //
@@ -1259,11 +1221,12 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             // TODO(alex): Here could check and move forward until next restart marker?
             return result;
         }
-        marker = peek_2bytes(bs);
+        previous = read_byte(bs);
+        marker = read_byte(bs);
         if (is_restart_marker(marker, &expected_restart_id)) {
-            skip_nbytes(bs, 2);
             continue;
         } else {
+            skip_nbytes(bs, -2);
             break;
         }
     }
@@ -1271,7 +1234,8 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 }
 
 ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStream* bs, jpeg_t* jpeg) {
-    u16 marker = read_2bytes(bs);
+    u8 previous = read_byte(bs);
+    u8 marker = read_byte(bs);
 
     ImageParsingResult result;
     while (EndOfImage != marker) {
@@ -1293,24 +1257,26 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         else if (Comment == marker) {
             result = parse_Comment(bs, jpeg);
         }
-        else if (StartOfScan==marker) {
+        else if (StartOfScan == marker) {
             result = parse_ScanHeader(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
             result = parse_scan(persist_arena, bs, jpeg);
+        }
+        else if (0xFF == marker) {
+            marker = read_byte(bs);
+            continue;
         }
         else {
             return (ImageParsingResult){IMAGE_FAIL, "Unidentified marker."};
         }
         if (result.status != IMAGE_SUCCESS) { return result; }
-        marker = read_2bytes(bs);
-        /*
+
         // Read next marker
-        last = read_byte(bs);
-        if (last != 0xFF) {
+        previous = read_byte(bs);
+        if (previous != 0xFF) {
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         marker = read_byte(bs);
-        */
     }
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
@@ -1324,15 +1290,18 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         .byte_pos = 0,
         .bit_pos = 0
     };
-    u16 marker = read_2bytes(&bs);
-    u16 end_marker = bs.data[bs.size-2]<<8 | bs.data[bs.size-1];
+    u8 previous = read_byte(&bs);
+    u8 marker = read_byte(&bs);
 
     // Get start marker
     if (marker != StartOfImage) {
         return (ImageParsingResult){IMAGE_FAIL, "Missing Start Of Image marker"};
     }
-    else if (end_marker != EndOfImage) {
-        return (ImageParsingResult){IMAGE_FAIL, "Missing End Of Image marker"};
+    else if (bs.data[bs.size-2] != 0xFF) {
+        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes does not seem to be a marker."};
+    }
+    else if (bs.data[bs.size-1] != EndOfImage) {
+        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes is not the EndOfImage marker."};
     }
 
     // Decoder_setup
@@ -1345,7 +1314,8 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         LocalArena* local_arena = local_arena_alloc_create();
 
         // Parse [Tables/misc.] of the frame
-        u16 marker = read_2bytes(&bs);
+        previous = read_byte(&bs);
+        marker = read_byte(&bs);
 
         while (EndOfImage != marker) {
             if (DefineQuantizationTable == marker) {
@@ -1369,10 +1339,10 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             else if (Comment == marker) {
                 result = parse_Comment(&bs, &jpeg);
             }
-            // TODO
-            // else if (0xFF == marker) {
-            //     continue;
-            // }
+            else if (0xFF == marker) {
+                marker = read_byte(&bs);
+                continue;
+            }
             else if (is_start_of_frame(marker)) {
                 break;
             }
@@ -1380,15 +1350,13 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 result = (ImageParsingResult){IMAGE_FAIL, "Reached an unknown marker."};
             }
             if (result.status != IMAGE_SUCCESS) { return result; }
-            marker = read_2bytes(&bs);
-            /*
+
             // Read next marker
-            last = read_byte(bs);
-            if (last != 0xFF) {
+            previous = read_byte(&bs);
+            if (previous != 0xFF) {
                 return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
             }
-            marker = read_byte(bs);
-            */
+            marker = read_byte(&bs);
         }
 
         if (EndOfImage == marker) {
