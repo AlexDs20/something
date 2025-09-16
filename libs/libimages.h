@@ -1080,12 +1080,12 @@ ImageParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     // If only 1 component in the scan => Vi and Hi should be 1
     u8 Vi[4] = {0};
     u8 Hi[4] = {0};
-    for (u8 i=0; i<n_components; i++) {
-        if (n_components == 1) {
-            Vi[i] = 1;
-            Hi[i] = 1;
-        }
-        else {
+
+    if (n_components == 1) {
+        Vi[0] = 1;
+        Hi[0] = 1;
+    } else {
+        for (u8 i=0; i<n_components; i++) {
             Vi[i] = jpeg->sh.components[i]->Vi;
             Hi[i] = jpeg->sh.components[i]->Hi;
         }
@@ -1174,52 +1174,45 @@ ImageParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    if (jpeg->restart_interval == 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "No restart interval is currently unsupported."};
-    }
-
-    u8 tmp;
-    u16 n = 0;
-
-    // Reset all 4 s16 values to 0
-    jpeg->dc_pred[0] = 0;
-    jpeg->dc_pred[1] = 0;
-    jpeg->dc_pred[2] = 0;
-    jpeg->dc_pred[3] = 0;
-    u64 m = 512*512;
-    // while (n++ < jpeg->restart_interval) {
-    while (n++ < m) {
-        ImageParsingResult result = parse_mcu(arena, bs, jpeg);
-        if (result.status != IMAGE_SUCCESS) { return result; }
-    }
-
-    // Go through all the last bits until byte aligned
-    u8 bit;
-    while (bs->bit_pos != 0) {
-        next_bit(bs, &bit);
-    }
-
-    u8 previous = read_byte(bs);
-    u8 marker = read_byte(bs);
-    if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
-        return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
-    }
-    skip_nbytes(bs, -2);
-
-    return (ImageParsingResult){IMAGE_SUCCESS, 0};
-}
-
 ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
     u8 expected_restart_id = 0;
     u8 previous;
     u8 marker;
 
     ImageParsingResult result;
-    // TODO HERE
-    // If we only have 1 component in this scan
-    //  => we should use Hi/Vi = 1
+
+    // To go from flat zigzag order to flat unzigzag order
+    const u8 unzigzag[64] = {
+        0,   1,  8, 16,  9,  2,  3, 10,
+        17, 24, 32, 25, 18, 11,  4,  5,
+        12, 19, 26, 33, 40, 48, 41, 34,
+        27, 20, 13,  6,  7, 14, 21, 28,
+        35, 42, 49, 56, 57, 50, 43, 36,
+        29, 22, 15, 23, 30, 37, 44, 51,
+        58, 59, 52, 45, 38, 31, 39, 46,
+        53, 60, 61, 54, 47, 55, 62, 63
+    };
+
+    // If only 1 component in the scan => Vi and Hi should be 1
     //  => This means that the number of mcu is not that from the FrameHeader
+    u8 Vi[4] = {0};
+    u8 Hi[4] = {0};
+    u8 n_components = jpeg->sh.n_components;
+    u32 n_mcu_width = jpeg->fh.n_mcu_width;
+    u32 n_mcu_height = jpeg->fh.n_mcu_height;
+
+    if (n_components == 1) {
+        Vi[0] = 1;
+        Hi[0] = 1;
+        n_mcu_width =  ceilf32((f32)jpeg->fh.components[0].xi / 8);
+        n_mcu_height = ceilf32((f32)jpeg->fh.components[0].yi / 8);
+    } else {
+        for (u8 i=0; i<n_components; i++) {
+            Vi[i] = jpeg->sh.components[i]->Vi;
+            Hi[i] = jpeg->sh.components[i]->Hi;
+        }
+    }
+
     u64 restart_interval;
     u64 n_restart_intervals;
 
@@ -1231,23 +1224,106 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
         restart_interval = jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height;
     }
 
-    printf("restart_interval: %d\n", restart_interval);
-    printf("n_restart_intervals: %d\n", n_restart_intervals);
-
+    u64 current_mcu = 0;
     for (u64 i=0; i<n_restart_intervals; i++) {
         // ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
         {
-            u8 tmp;
-            u64 n = 0;
-
             // Reset all 4 s16 values to 0
             jpeg->dc_pred[0] = 0;
             jpeg->dc_pred[1] = 0;
             jpeg->dc_pred[2] = 0;
             jpeg->dc_pred[3] = 0;
-            // while (n++ < jpeg->restart_interval) {
+
+            u64 n = 0;
             while (n++ < restart_interval) {
-                ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
+                // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
+                {
+                    u32 mcu_block_start_y = (u32)(current_mcu / jpeg->fh.n_mcu_width);
+                    // u32 mcu_block_start_x = current_mcu % jpeg->fh.n_mcu_width;
+                    u32 mcu_block_start_x = current_mcu - mcu_block_start_y*jpeg->fh.n_mcu_width;
+
+                    for (u8 i=0; i<n_components; i++) {
+                        u8* Q = jpeg->sh.components[i]->QT;
+                        HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
+                        HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
+
+                        for (u8 v=0; v<Vi[i]; v++) {
+                            for (u8 h=0; h<Hi[i]; h++) {
+                                s16 zz_mcu[64] = {0};
+                                s16 mcu[64] = {0};
+                                f32 idct[64] = {0};
+
+                                s16 value;
+                                ImageParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
+                                if (result.status != IMAGE_SUCCESS) { return result; }
+
+                                s16 dc = jpeg->dc_pred[i] + value;
+                                jpeg->dc_pred[i] = dc;
+                                zz_mcu[0] = dc;
+
+                                u8 j = 1;
+                                while (j<64) {        // and not a marker that would indicate something
+                                    u8 preceding_zeros = 0;
+                                    ImageParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
+                                    s16 ac = value;
+
+                                    if (ac == 0 && preceding_zeros == 0) {
+                                        while (j<64) {
+                                            zz_mcu[j++] = 0;
+                                        }
+                                    } else {
+                                        for (u8 k=0; k<preceding_zeros; k++) {
+                                            zz_mcu[j++] = 0;
+                                        }
+                                        zz_mcu[j++] = ac;
+                                    }
+                                }
+
+                                // Dequantize and Unzigzag
+                                for (u8 l=0; l<64; l++) {
+                                    mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
+                                }
+
+                                // IDCT
+                                for (u8 y=0; y<8; y++) {
+                                    for (u8 x=0; x<8; x++) {
+                                        u8 l = x+y*8;
+
+                                        for (u8 v=0; v<8; v++) {
+                                            f32 Cv = v==0 ? 0.7071067811f : 1.0f;
+                                            for (u8 u=0; u<8; u++) {
+                                                f32 Cu = u==0 ? 0.7071067811f : 1.0f;
+
+                                                u8 l_vu = u + v*8;
+                                                idct[l] += (f64)(Cu * Cv * mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                                            }
+                                        }
+
+                                        f32 a = (f32)(0.25f*idct[l] + 128);
+                                        idct[l] = a; // clamp(a+0.5);
+                                    }
+                                }
+
+                                // Assign the value at the correct component buffer position
+                                u32 idx_x = ((mcu_block_start_x*jpeg->sh.components[i]->Hi) + h) * 8;
+                                u32 idx_y = ((mcu_block_start_y*jpeg->sh.components[i]->Vi) + v) * 8;
+
+                                for (u8 y=0; y<8; y++) {
+                                    for (u8 x=0; x<8; x++) {
+                                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
+                                        u16 l = x + y*8;
+
+                                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    current_mcu++;
+
+                }
+
                 if (result.status != IMAGE_SUCCESS) { return result; }
             }
 
@@ -1257,14 +1333,13 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                 next_bit(bs, &bit);
             }
 
+            u8 tmp;
             u8 previous = read_byte(bs);
             u8 marker = read_byte(bs);
             if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
                 return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
             }
             skip_nbytes(bs, -2);
-
-            // return (ImageParsingResult){IMAGE_SUCCESS, 0};
         }
 
         if (result.status != IMAGE_SUCCESS) {
