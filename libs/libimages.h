@@ -178,7 +178,7 @@ enum Markers {
 };
 
 void print_mk(u8 marker) {
-    printf("Marker: 0x%02dX\n", marker);
+    printf("Marker: 0x%02X\n", marker);
 }
 
 
@@ -1187,7 +1187,9 @@ ImageParsingResult parse_EntropySegment(Arena* arena, BitStream* bs, jpeg_t* jpe
     jpeg->dc_pred[1] = 0;
     jpeg->dc_pred[2] = 0;
     jpeg->dc_pred[3] = 0;
-    while (n++ < jpeg->restart_interval) {
+    u64 m = 512*512;
+    // while (n++ < jpeg->restart_interval) {
+    while (n++ < m) {
         ImageParsingResult result = parse_mcu(arena, bs, jpeg);
         if (result.status != IMAGE_SUCCESS) { return result; }
     }
@@ -1213,10 +1215,58 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     u8 previous;
     u8 marker;
 
-    // TODO: Should count the number of restart intervals and loop through them
-    //
-    while (true) {
-        ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
+    ImageParsingResult result;
+    // TODO HERE
+    // If we only have 1 component in this scan
+    //  => we should use Hi/Vi = 1
+    //  => This means that the number of mcu is not that from the FrameHeader
+    u64 restart_interval;
+    u64 n_restart_intervals;
+
+    if (jpeg->restart_interval != 0) {
+        restart_interval = jpeg->restart_interval;
+        n_restart_intervals = ((jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height) + restart_interval-1) / restart_interval;
+    } else {
+        n_restart_intervals = 1;
+        restart_interval = jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height;
+    }
+
+    printf("restart_interval: %d\n", restart_interval);
+    printf("n_restart_intervals: %d\n", n_restart_intervals);
+
+    for (u64 i=0; i<n_restart_intervals; i++) {
+        // ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
+        {
+            u8 tmp;
+            u64 n = 0;
+
+            // Reset all 4 s16 values to 0
+            jpeg->dc_pred[0] = 0;
+            jpeg->dc_pred[1] = 0;
+            jpeg->dc_pred[2] = 0;
+            jpeg->dc_pred[3] = 0;
+            // while (n++ < jpeg->restart_interval) {
+            while (n++ < restart_interval) {
+                ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
+                if (result.status != IMAGE_SUCCESS) { return result; }
+            }
+
+            // Go through all the last bits until byte aligned
+            u8 bit;
+            while (bs->bit_pos != 0) {
+                next_bit(bs, &bit);
+            }
+
+            u8 previous = read_byte(bs);
+            u8 marker = read_byte(bs);
+            if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
+                return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
+            }
+            skip_nbytes(bs, -2);
+
+            // return (ImageParsingResult){IMAGE_SUCCESS, 0};
+        }
+
         if (result.status != IMAGE_SUCCESS) {
             // TODO(alex): Here could check and move forward until next restart marker?
             return result;
@@ -1293,15 +1343,19 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     u8 previous = read_byte(&bs);
     u8 marker = read_byte(&bs);
 
+    if (previous != 0xFF) {
+        return (ImageParsingResult){IMAGE_FAIL, "Did not start with a marker."};
+    }
+
     // Get start marker
     if (marker != StartOfImage) {
-        return (ImageParsingResult){IMAGE_FAIL, "Missing Start Of Image marker"};
+        return (ImageParsingResult){IMAGE_FAIL, "Missing Start Of Image marker."};
     }
     else if (bs.data[bs.size-2] != 0xFF) {
-        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes does not seem to be a marker."};
+        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes are not a marker."};
     }
     else if (bs.data[bs.size-1] != EndOfImage) {
-        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes is not the EndOfImage marker."};
+        return (ImageParsingResult){IMAGE_FAIL, "Last 2 bytes are not the EndOfImage marker."};
     }
 
     // Decoder_setup
