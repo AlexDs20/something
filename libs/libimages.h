@@ -1218,10 +1218,10 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 
     if (jpeg->restart_interval != 0) {
         restart_interval = jpeg->restart_interval;
-        n_restart_intervals = ((jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height) + restart_interval-1) / restart_interval;
+        n_restart_intervals = ((n_mcu_width * n_mcu_height) + restart_interval-1) / restart_interval;
     } else {
         n_restart_intervals = 1;
-        restart_interval = jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height;
+        restart_interval = n_mcu_width * n_mcu_height;
     }
 
     u64 current_mcu = 0;
@@ -1238,9 +1238,8 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             while (n++ < restart_interval) {
                 // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
                 {
-                    u32 mcu_block_start_y = (u32)(current_mcu / jpeg->fh.n_mcu_width);
-                    // u32 mcu_block_start_x = current_mcu % jpeg->fh.n_mcu_width;
-                    u32 mcu_block_start_x = current_mcu - mcu_block_start_y*jpeg->fh.n_mcu_width;
+                    u32 mcu_block_start_y = (u32)(current_mcu / n_mcu_width);
+                    u32 mcu_block_start_x = current_mcu - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
 
                     for (u8 i=0; i<n_components; i++) {
                         u8* Q = jpeg->sh.components[i]->QT;
@@ -1265,6 +1264,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 while (j<64) {        // and not a marker that would indicate something
                                     u8 preceding_zeros = 0;
                                     ImageParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
+                                    if (result.status != IMAGE_SUCCESS) { return result; }
                                     s16 ac = value;
 
                                     if (ac == 0 && preceding_zeros == 0) {
@@ -1305,8 +1305,8 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 }
 
                                 // Assign the value at the correct component buffer position
-                                u32 idx_x = ((mcu_block_start_x*jpeg->sh.components[i]->Hi) + h) * 8;
-                                u32 idx_y = ((mcu_block_start_y*jpeg->sh.components[i]->Vi) + v) * 8;
+                                u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
+                                u32 idx_y = ((mcu_block_start_y*Vi[i]) + v) * 8;
 
                                 for (u8 y=0; y<8; y++) {
                                     for (u8 x=0; x<8; x++) {
@@ -1321,10 +1321,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                     }
 
                     current_mcu++;
-
                 }
-
-                if (result.status != IMAGE_SUCCESS) { return result; }
             }
 
             // Go through all the last bits until byte aligned
@@ -1336,6 +1333,12 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             u8 tmp;
             u8 previous = read_byte(bs);
             u8 marker = read_byte(bs);
+            if (0xFF != previous) {
+                return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+            }
+            while (marker == 0xFF) {
+                marker = read_byte(bs);
+            }
             if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
                 return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
             }
