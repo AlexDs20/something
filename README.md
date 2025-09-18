@@ -53,3 +53,49 @@ X11 info:
 
 # Allocators
 - [ ] [general arena](https://muit.xyz/posts/memory-implementing-a-general-arena/)
+
+## Code style ([Eskil notes](https://www.youtube.com/watch?v=443UNeGrFoM)):
+- MY_DEFINE
+- MyType
+- my_function()
+- my_variable
+- a = b         (with spaces)
+- a == b
+
+Define words
+- array
+- type
+- node
+- entity
+- handle (opaque struct)
+- func (function pointer)
+- internal (to a module)
+
+- i, j, k, count, length, found, next, previous, array, list, f(loat temporary), vec
+
+file structure:
+- module
+- module/m_file....c
+- module/ basically no .h except for internal usage
+- module/module.h (with all for external user usage)
+
+- module_group_object_create
+- module_group_object_destroy (not object_remove)
+
+application using API should get a handle which is a void* and should not need to know what it is. The user gets the handle from the API and uses it for the function calls to the api
+
+In the internal.h file => the actual struct with everything
+
+MACRO:
+- __FILE__
+- __LINE__
+e.g.
+extern void* f_debug_mem_malloc(uint size, char* file, uint line);
+ifdef F_MEMORY_DEBUG
+#define malloc(n) f_debug_mem_malloc(n, __FILE__, __LINE__);
+
+double* a;
+
+a = malloc((sizeof *a) * 10);
+instead of using the type of a:
+a = malloc(sizeof(double)*10);

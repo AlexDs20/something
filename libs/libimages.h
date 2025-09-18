@@ -477,11 +477,11 @@ bool next_bit(BitStream* bs, u8* bit_out) {
     }
 
     u8 byte = bs->data[bs->byte_pos];
-    *bit_out = (byte >> (7-bs->bit_pos)) & 1;
+    *bit_out = (byte >> (7-bs->bit_pos)) & 0b1;
 
     // Update
     bs->bit_pos++;
-    if (bs->bit_pos==8) {
+    if (bs->bit_pos == 8) {
         bs->bit_pos = 0;
         bs->byte_pos++;
 
@@ -497,12 +497,12 @@ u8 peek_byte(BitStream* bs) {
     return bs->data[bs->byte_pos];
 }
 u16 peek_2bytes(BitStream* bs) {
-    return bs->data[bs->byte_pos]<<8 | bs->data[bs->byte_pos+1];
+    return bs->data[bs->byte_pos] << 8 | bs->data[bs->byte_pos+1];
 }
 // u8 peek_bit(BitStream* bs);
 
 u16 peek_2_bytes(u8* v) {
-    return v[0]<<8 | v[1];
+    return v[0] << 8 | v[1];
 }
 
 // TODO(alex): move to libmath.h
@@ -520,7 +520,7 @@ u32 ceilf32(f32 a) {
     return aint;
 }
 
-ImageParsingResult parse_FrameHeader(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     FrameHeader& fh = jpeg->fh;
 
     u16 length = read_2bytes(bs);
@@ -600,7 +600,7 @@ ImageParsingResult parse_FrameHeader(Arena* arena, BitStream* bs, jpeg_t* jpeg) 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
     ScanHeader& sh = jpeg->sh;
 
     u16 length = read_2bytes(bs);
@@ -687,13 +687,13 @@ ImageParsingResult parse_ScanHeader(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_ApplicationSegmentN(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_application_segment_n(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
     skip_nbytes(bs, length);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_ApplicationSegment14(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_application_segment_14(BitStream* bs, jpeg_t* jpeg) {
     // This is usually used by adobe encoders
     //
     // Adobed@
@@ -706,13 +706,13 @@ ImageParsingResult parse_ApplicationSegment14(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_Comment(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_comment(BitStream* bs, jpeg_t* jpeg) {
     u16 length = peek_2bytes(bs);
     skip_nbytes(bs, length);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_DefineRestartInterval(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_restart_interval(BitStream* bs, jpeg_t* jpeg) {
     u16 length = read_2bytes(bs);
     length -= 2;
 
@@ -727,7 +727,7 @@ ImageParsingResult parse_DefineRestartInterval(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_DefineNumberOfLines(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_number_of_lines(BitStream* bs, jpeg_t* jpeg) {
     u16 length = read_2bytes(bs);
     length -= 2;
 
@@ -746,7 +746,7 @@ ImageParsingResult parse_DefineNumberOfLines(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     HuffmanTable& ht = jpeg->ht;
 
     s32 length = (s32)read_2bytes(bs);
@@ -762,7 +762,7 @@ ImageParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t*
         u8 table_id = v & 0x0F;
 
         if (table_class > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "Huffman table class must be 0 for DC or 1 flor AC."};
+            return (ImageParsingResult){IMAGE_FAIL, "Huffman table class must be 0 for DC or 1 for AC."};
         }
         if (table_id > 1) {
             return (ImageParsingResult){IMAGE_FAIL, "Huffman table id must either be 0 or 1."};
@@ -851,7 +851,7 @@ ImageParsingResult parse_DefineHuffmanTable(Arena* arena, BitStream* bs, jpeg_t*
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_quantization_table(BitStream* bs, jpeg_t* jpeg) {
     QuantizationTables& qt = jpeg->qt;
 
     s32 length = (s32)read_2bytes(bs);
@@ -908,71 +908,34 @@ ImageParsingResult parse_DefineQuantizationTable(BitStream* bs, jpeg_t* jpeg) {
 }
 
 bool is_start_of_frame(u8 marker) {
-    return marker==StartOfFrame0 ||
-           marker==StartOfFrame1 ||
-           marker==StartOfFrame2 ||
-           marker==StartOfFrame3 ||
-
-           marker==StartOfFrame5 ||
-           marker==StartOfFrame6 ||
-           marker==StartOfFrame7 ||
-
-           marker==StartOfFrame9  ||
-           marker==StartOfFrame10 ||
-           marker==StartOfFrame11 ||
-
-           marker==StartOfFrame13 ||
-           marker==StartOfFrame14 ||
-           marker==StartOfFrame15;
+    return (StartOfFrame0 <= marker && marker <= StartOfFrame3) ||
+           (StartOfFrame5 <= marker && marker <= StartOfFrame7) ||
+           (StartOfFrame9 <= marker && marker <= StartOfFrame11) ||
+           (StartOfFrame13 <= marker && marker <= StartOfFrame15);
 }
 
 bool is_restart_marker(u8 marker, u8* idx) {
     bool out = true;
-    switch (marker) {
-        case Restart0:
-        case Restart1:
-        case Restart2:
-        case Restart3:
-        case Restart4:
-        case Restart5:
-        case Restart6:
-        case Restart7: {
-            *idx = (*idx+1) & 0x7;
-        } break;
-        default: {
-            out = false;
-        } break;
+    if (Restart0 <= marker && marker <= Restart7) {
+        *idx = (*idx+1) & 0x7;
+    }
+    else {
+        out = false;
     }
     return out;
 }
 
 bool is_interpret_marker(u8 marker) {
     bool out = false;
-    switch (marker) {
-        case DefineQuantizationTable:
-        case DefineHuffmanTable:
-        case DefineArithmeticCoding:
-        case DefineRestartInterval:
-        case Comment:
-        case DefineNumberOfLines:
-        case ApplicationSegment0:
-        case ApplicationSegment1:
-        case ApplicationSegment2:
-        case ApplicationSegment3:
-        case ApplicationSegment4:
-        case ApplicationSegment5:
-        case ApplicationSegment6:
-        case ApplicationSegment7:
-        case ApplicationSegment8:
-        case ApplicationSegment9:
-        case ApplicationSegment10:
-        case ApplicationSegment11:
-        case ApplicationSegment12:
-        case ApplicationSegment13:
-        case ApplicationSegment14:
-        case ApplicationSegment15: {
-            out = true;
-        } break;
+    if ( (DefineQuantizationTable == marker) ||
+         (DefineHuffmanTable == marker)      ||
+         (DefineArithmeticCoding == marker)  ||
+         (DefineRestartInterval == marker)   ||
+         (Comment == marker)                 ||
+         (DefineNumberOfLines == marker)     ||
+         (ApplicationSegment0 <= marker && marker <= ApplicationSegment15)) {
+    } else{
+        out = true;
     }
     return out;
 }
@@ -1056,122 +1019,6 @@ ImageParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root, u8* run_le
 s16 clamp(s16 a, s16 low=0, s16 high=255){
     s16 t = a < low ? low : a;
     return t > high ? high : t;
-}
-
-ImageParsingResult parse_mcu(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
-    // To go from flat zigzag order to flat unzigzag order
-    const u8 unzigzag[64] = {
-        0,   1,  8, 16,  9,  2,  3, 10,
-        17, 24, 32, 25, 18, 11,  4,  5,
-        12, 19, 26, 33, 40, 48, 41, 34,
-        27, 20, 13,  6,  7, 14, 21, 28,
-        35, 42, 49, 56, 57, 50, 43, 36,
-        29, 22, 15, 23, 30, 37, 44, 51,
-        58, 59, 52, 45, 38, 31, 39, 46,
-        53, 60, 61, 54, 47, 55, 62, 63
-    };
-
-    u32 mcu_block_start_y = (u32)(jpeg->current_mcu / jpeg->fh.n_mcu_width);
-    // u32 mcu_block_start_x = jpeg->current_mcu % jpeg->fh.n_mcu_width;
-    u32 mcu_block_start_x = jpeg->current_mcu - mcu_block_start_y*jpeg->fh.n_mcu_width;
-
-    u8 n_components = jpeg->sh.n_components;
-
-    // If only 1 component in the scan => Vi and Hi should be 1
-    u8 Vi[4] = {0};
-    u8 Hi[4] = {0};
-
-    if (n_components == 1) {
-        Vi[0] = 1;
-        Hi[0] = 1;
-    } else {
-        for (u8 i=0; i<n_components; i++) {
-            Vi[i] = jpeg->sh.components[i]->Vi;
-            Hi[i] = jpeg->sh.components[i]->Hi;
-        }
-    }
-
-    for (u8 i=0; i<n_components; i++) {
-        u8* Q = jpeg->sh.components[i]->QT;
-        HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
-        HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
-
-        for (u8 v=0; v<Vi[i]; v++) {
-            for (u8 h=0; h<Hi[i]; h++) {
-                s16 zz_mcu[64] = {0};
-                s16 mcu[64] = {0};
-                f32 idct[64] = {0};
-
-                s16 value;
-                ImageParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
-                if (result.status != IMAGE_SUCCESS) { return result; }
-
-                s16 dc = jpeg->dc_pred[i] + value;
-                jpeg->dc_pred[i] = dc;
-                zz_mcu[0] = dc;
-
-                u8 j = 1;
-                while (j<64) {        // and not a marker that would indicate something
-                    u8 preceding_zeros = 0;
-                    ImageParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
-                    s16 ac = value;
-
-                    if (ac == 0 && preceding_zeros == 0) {
-                        while (j<64) {
-                            zz_mcu[j++] = 0;
-                        }
-                    } else {
-                        for (u8 k=0; k<preceding_zeros; k++) {
-                            zz_mcu[j++] = 0;
-                        }
-                        zz_mcu[j++] = ac;
-                    }
-                }
-
-                // Dequantize and Unzigzag
-                for (u8 l=0; l<64; l++) {
-                    mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
-                }
-
-                // IDCT
-                for (u8 y=0; y<8; y++) {
-                    for (u8 x=0; x<8; x++) {
-                        u8 l = x+y*8;
-
-                        for (u8 v=0; v<8; v++) {
-                            f32 Cv = v==0 ? 0.7071067811f : 1.0f;
-                            for (u8 u=0; u<8; u++) {
-                                f32 Cu = u==0 ? 0.7071067811f : 1.0f;
-
-                                u8 l_vu = u + v*8;
-                                idct[l] += (f64)(Cu * Cv * mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
-                            }
-                        }
-
-                        f32 a = (f32)(0.25f*idct[l] + 128);
-                        idct[l] = a; // clamp(a+0.5);
-                    }
-                }
-
-                // Assign the value at the correct component buffer position
-                u32 idx_x = ((mcu_block_start_x*jpeg->sh.components[i]->Hi) + h) * 8;
-                u32 idx_y = ((mcu_block_start_y*jpeg->sh.components[i]->Vi) + v) * 8;
-
-                for (u8 y=0; y<8; y++) {
-                    for (u8 x=0; x<8; x++) {
-                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
-                        u16 l = x + y*8;
-
-                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
-                    }
-                }
-            }
-        }
-    }
-
-    jpeg->current_mcu++;
-
-    return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
 ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
@@ -1363,32 +1210,32 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 
 ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStream* bs, jpeg_t* jpeg) {
     u8 previous = read_byte(bs);
-    u8 marker = read_byte(bs);
-
+    u8 marker   = read_byte(bs);
     ImageParsingResult result;
+
     while (EndOfImage != marker) {
-        if (DefineQuantizationTable == marker) {
-            result = parse_DefineQuantizationTable(bs, jpeg);
-        }
-        else if (DefineHuffmanTable == marker) {
-            result = parse_DefineHuffmanTable(local_arena, bs, jpeg);
-        }
-        else if (DefineRestartInterval == marker) {
-            result = parse_DefineRestartInterval(bs, jpeg);
-        }
-        else if (DefineNumberOfLines == marker) {
-            result = parse_DefineNumberOfLines(bs, jpeg);
-        }
-        else if (ApplicationSegment0 <= marker && marker <= ApplicationSegment14) {
-            result = parse_ApplicationSegmentN(bs, jpeg);
-        }
-        else if (Comment == marker) {
-            result = parse_Comment(bs, jpeg);
-        }
-        else if (StartOfScan == marker) {
-            result = parse_ScanHeader(bs, jpeg);
+        if (StartOfScan == marker) {
+            result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
             result = parse_scan(persist_arena, bs, jpeg);
+        }
+        else if (DefineQuantizationTable == marker) {
+            result = parse_define_quantization_table(bs, jpeg);
+        }
+        else if (DefineHuffmanTable == marker) {
+            result = parse_define_huffman_table(local_arena, bs, jpeg);
+        }
+        else if (DefineRestartInterval == marker) {
+            result = parse_define_restart_interval(bs, jpeg);
+        }
+        else if (DefineNumberOfLines == marker) {
+            result = parse_define_number_of_lines(bs, jpeg);
+        }
+        else if (ApplicationSegment0 <= marker && marker <= ApplicationSegment14) {
+            result = parse_application_segment_n(bs, jpeg);
+        }
+        else if (Comment == marker) {
+            result = parse_comment(bs, jpeg);
         }
         else if (0xFF == marker) {
             marker = read_byte(bs);
@@ -1424,9 +1271,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     if (previous != 0xFF) {
         return (ImageParsingResult){IMAGE_FAIL, "Did not start with a marker."};
     }
-
-    // Get start marker
-    if (marker != StartOfImage) {
+    else if (marker != StartOfImage) {
         return (ImageParsingResult){IMAGE_FAIL, "Missing Start Of Image marker."};
     }
     else if (bs.data[bs.size-2] != 0xFF) {
@@ -1447,36 +1292,38 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
         // Parse [Tables/misc.] of the frame
         previous = read_byte(&bs);
+        if (previous != 0xFF) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+        }
         marker = read_byte(&bs);
-
         while (EndOfImage != marker) {
-            if (DefineQuantizationTable == marker) {
-                result = parse_DefineQuantizationTable(&bs, &jpeg);
+            if (is_start_of_frame(marker)) {       // Not optimal to have it this early in the if list...
+                break;
+            }
+            else if (DefineQuantizationTable == marker) {
+                result = parse_define_quantization_table(&bs, &jpeg);
             }
             else if (DefineHuffmanTable == marker) {
-                result = parse_DefineHuffmanTable(local_arena->arena, &bs, &jpeg);
+                result = parse_define_huffman_table(local_arena->arena, &bs, &jpeg);
             }
             else if (DefineArithmeticCoding == marker) {
                 result = (ImageParsingResult){IMAGE_FAIL, "Arithmetic Coding not supported."};
             }
             else if (DefineRestartInterval == marker) {
-                result = parse_DefineRestartInterval(&bs, &jpeg);
+                result = parse_define_restart_interval(&bs, &jpeg);
             }
             else if (DefineNumberOfLines == marker) {
-                result = parse_DefineNumberOfLines(&bs, &jpeg);
+                result = parse_define_number_of_lines(&bs, &jpeg);
             }
             else if (ApplicationSegment0 <= marker && marker <= ApplicationSegment14) {
-                result = parse_ApplicationSegmentN(&bs, &jpeg);
+                result = parse_application_segment_n(&bs, &jpeg);
             }
             else if (Comment == marker) {
-                result = parse_Comment(&bs, &jpeg);
+                result = parse_comment(&bs, &jpeg);
             }
             else if (0xFF == marker) {
                 marker = read_byte(&bs);
                 continue;
-            }
-            else if (is_start_of_frame(marker)) {
-                break;
             }
             else {
                 result = (ImageParsingResult){IMAGE_FAIL, "Reached an unknown marker."};
@@ -1495,27 +1342,28 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             return (ImageParsingResult){IMAGE_FAIL, "Reached EndOfImage before parsing a StartOfFrame header!"};
         }
         else if (!is_start_of_frame(marker)) {
-            return (ImageParsingResult){IMAGE_FAIL, "Did not find start of frame marker!"};
+            return (ImageParsingResult){IMAGE_FAIL, "Did not find start of frame marker! (We should never get here...)"};
         }
 
-        // Parse FrameHeader
-        if (marker == StartOfFrame0) {
-            jpeg.frame_type = (Markers)marker;
-            result = parse_FrameHeader(local_arena->arena, &bs, &jpeg);
+        //  PARSE FRAME
+        {
+            // FrameHeader
+            if (marker == StartOfFrame0) {
+                jpeg.frame_type = (Markers)marker;
+                result = parse_frame_header(local_arena->arena, &bs, &jpeg);
+                if (result.status != IMAGE_SUCCESS) { return result; }
+            }
+            else {
+                return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
+            }
 
+            // TODO(alex): Allocate precisely the right amount and use u8* regardless
+            jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
+
+            // Parse all Scans
+            result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
         }
-        else {
-            return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
-        }
-
-        // TODO(alex): Allocate precisely the right amount and use u8* regardless
-        // jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*jpeg.fh.src_components);
-        jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
-
-        // Parse all Scans
-        result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
-        if (result.status != IMAGE_SUCCESS) { return result; }
 
         // Assume YCbCr
         // Convert to RGB
