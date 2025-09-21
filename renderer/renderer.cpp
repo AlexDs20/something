@@ -454,7 +454,7 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
             By = tmp;
         }
         for (int j=Ax; j<=Bx; j++) {
-            if (ay+i<0 || ay+i>=h || j<0 || j>=w) continue;
+            if (ay+i<0 || ay+i>=(s32)h || j<0 || j>=(s32)w) continue;
             u32 linear = w*(h- (ay+i)) + j;
 
             f32* zpix = zbuffer + linear;

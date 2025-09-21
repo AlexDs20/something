@@ -2,8 +2,8 @@
 
 BIN="./build/main"
 
-# FLAGS="-g -ggdb -pg -O0 -Wall" #-finstrument-functions -fsanitize=address"
-FLAGS="-O3"
+FLAGS="-g -ggdb -pg -O0 -Wall" # -finstrument-functions -fsanitize=address"
+# FLAGS="-O3"
 DEFINES=-D_DEBUG
 LINKS="-lc"
 LINKSDIR=

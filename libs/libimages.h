@@ -433,8 +433,8 @@ void print_bs(BitStream* bs) {
     printf("BitStream: \n");
     printf("---------\n");
     printf("  data*: %p\n", bs->data);
-    printf("  size: %p\n", bs->size);
-    printf("  byte: %d\n", bs->byte_pos);
+    printf("  size: %ld\n", bs->size);
+    printf("  byte: %ld\n", bs->byte_pos);
     printf("  bit: %d\n", bs->bit_pos);
 }
 
@@ -452,7 +452,7 @@ bool skip_nbytes(BitStream* bs, u64 n) {
     bool error = false;
     bs->byte_pos += n;
 
-    if (bs->byte_pos < 0 | bs->byte_pos > bs->size-1) {
+    if ((bs->byte_pos < 0) | (bs->byte_pos > bs->size-1)) {
         bs->byte_pos -= n;
         error = true;
     }
@@ -940,7 +940,7 @@ bool is_interpret_marker(u8 marker) {
     return out;
 }
 
-ImageParsingResult decode_one_Huffman_code(BitStream* bs, HuffmanNode* root, u8* result) {
+ImageParsingResult decode_one_huffman_code(BitStream* bs, HuffmanNode* root, u8* result) {
     HuffmanNode* node = root;
 
     // Huffman decode category which is the number of bits to decode after
@@ -965,7 +965,7 @@ ImageParsingResult decode_one_Huffman_code(BitStream* bs, HuffmanNode* root, u8*
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-s16 parse_n_bits(BitStream* bs, u8 n) {
+s16 read_n_bits(BitStream* bs, u8 n) {
     s16 out;
     u8 bit;
     u16 tmp_value = 0;
@@ -983,9 +983,9 @@ s16 parse_n_bits(BitStream* bs, u8 n) {
     return out;
 }
 
-ImageParsingResult parse_DCDataUnit(BitStream* bs, HuffmanNode* root, s16* out) {
+ImageParsingResult parse_dc_data_unit(BitStream* bs, HuffmanNode* root, s16* out) {
     u8 category;
-    decode_one_Huffman_code(bs, root, &category);
+    decode_one_huffman_code(bs, root, &category);
 
     // If category 0 => value = 0 => early exit
     if (category == 0) {
@@ -994,14 +994,13 @@ ImageParsingResult parse_DCDataUnit(BitStream* bs, HuffmanNode* root, s16* out) 
     }
 
     // Read that amount of bits
-    *out = parse_n_bits(bs, category);
-
+    *out = read_n_bits(bs, category);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root, u8* run_length, s16* out) {
+ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_length, s16* out) {
     u8 symbol;
-    decode_one_Huffman_code(bs, root, &symbol);
+    decode_one_huffman_code(bs, root, &symbol);
 
     *run_length = symbol >> 4;
     u8 category = symbol & 0x0F;
@@ -1011,7 +1010,7 @@ ImageParsingResult parse_ACDataUnit(BitStream* bs, HuffmanNode* root, u8* run_le
         return (ImageParsingResult){IMAGE_SUCCESS, 0};
     }
 
-    *out = parse_n_bits(bs, category);
+    *out = read_n_bits(bs, category);
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
@@ -1026,7 +1025,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     u8 previous;
     u8 marker;
 
-    ImageParsingResult result;
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
 
     // To go from flat zigzag order to flat unzigzag order
     const u8 unzigzag[64] = {
@@ -1100,7 +1099,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 f32 idct[64] = {0};
 
                                 s16 value;
-                                ImageParsingResult result = parse_DCDataUnit(bs, dc_ht_root, &value);
+                                result = parse_dc_data_unit(bs, dc_ht_root, &value);
                                 if (result.status != IMAGE_SUCCESS) { return result; }
 
                                 s16 dc = jpeg->dc_pred[i] + value;
@@ -1110,7 +1109,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 u8 j = 1;
                                 while (j<64) {        // and not a marker that would indicate something
                                     u8 preceding_zeros = 0;
-                                    ImageParsingResult result = parse_ACDataUnit(bs, ac_ht_root, &preceding_zeros, &value);
+                                    result = parse_ac_data_unit(bs, ac_ht_root, &preceding_zeros, &value);
                                     if (result.status != IMAGE_SUCCESS) { return result; }
                                     s16 ac = value;
 
@@ -1178,15 +1177,15 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             }
 
             u8 tmp;
-            u8 previous = read_byte(bs);
-            u8 marker = read_byte(bs);
+            previous = read_byte(bs);
+            marker = read_byte(bs);
             if (0xFF != previous) {
                 return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
             }
             while (marker == 0xFF) {
                 marker = read_byte(bs);
             }
-            if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | StartOfScan == marker | EndOfImage == marker) ) {
+            if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
                 return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
             }
             skip_nbytes(bs, -2);
