@@ -1131,19 +1131,30 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 }
 
                                 // IDCT
-                                for (u8 y=0; y<8; y++) {
-                                    for (u8 x=0; x<8; x++) {
-                                        u8 l = x+y*8;
+                                //  (I split it in 2 1D Cosine transform to reduce computation)
+                                f32 Svx[64] = {0};
 
-                                        for (u8 v=0; v<8; v++) {
-                                            for (u8 u=0; u<8; u++) {
-                                                u8 l_vu = u + v*8;
-                                                idct[l] += (f64)(mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
-                                            }
+                                for (u8 v=0; v<8; v++) {
+                                    for (u8 x=0; x<8; x++) {
+
+                                        for (u8 u=0; u<8; u++) {
+                                            u8 l_vu = v*8+u;
+                                            Svx[v*8+x] += mcu[l_vu] * IDCT_Weights[x][u];
                                         }
 
-                                        f32 a = (f32)(idct[l] + 128);
-                                        idct[l] = a; // clamp(a+0.5);
+                                    }
+                                }
+
+                                for (u8 y=0; y<8; y++) {
+                                    for (u8 x=0; x<8; x++) {
+
+                                        u8 l_yx = y*8+x;
+                                        for (u8 v=0; v<8; v++) {
+                                            idct[l_yx] += Svx[v*8+x] * IDCT_Weights[y][v];
+                                        }
+
+                                        f32 a = (f32)(idct[l_yx] + 128);
+                                        idct[l_yx] = a; // clamp(a+0.5);
                                     }
                                 }
 
