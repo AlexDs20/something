@@ -1136,16 +1136,13 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                         u8 l = x+y*8;
 
                                         for (u8 v=0; v<8; v++) {
-                                            f32 Cv = v==0 ? 0.7071067811f : 1.0f;
                                             for (u8 u=0; u<8; u++) {
-                                                f32 Cu = u==0 ? 0.7071067811f : 1.0f;
-
                                                 u8 l_vu = u + v*8;
-                                                idct[l] += (f64)(Cu * Cv * mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
+                                                idct[l] += (f64)(mcu[l_vu] * IDCT_Weights[x][u]*IDCT_Weights[y][v]);
                                             }
                                         }
 
-                                        f32 a = (f32)(0.25f*idct[l] + 128);
+                                        f32 a = (f32)(idct[l] + 128);
                                         idct[l] = a; // clamp(a+0.5);
                                     }
                                 }

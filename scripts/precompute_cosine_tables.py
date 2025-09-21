@@ -14,7 +14,11 @@ X = np.arange(0, 8)
 IDCT = np.empty((X.size, F.size), dtype=np.float64)
 
 for x in X:
-    IDCT[x] = np.cos((2*x+1)*F*np.pi/16)
+    for f in F:
+        Cf = 1
+        if f == 0:
+            Cf = 0.7071067811
+        IDCT[x, f] = (Cf/2) * np.cos((2*x+1)*f*np.pi/16)
 
 
 with open(os.path.join(os.path.dirname(__file__), "..", "libs", filename), "w") as f:
