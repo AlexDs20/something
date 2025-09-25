@@ -1048,6 +1048,7 @@ void idct_2d_2_1d_naive(f32* idct, f32* mcu) {
     }
 }
 
+const f32 SQRT2 = 1.4142135623730951;
 const f32 C1 = 0.9807852804032304;  // cos(k*pi/16)
 const f32 C2 = 0.9238795325112867;
 const f32 C3 = 0.8314696123025452;
@@ -1145,6 +1146,73 @@ void idct_2d_vetterli(f32 idct[64], f32 mcu[64]) {
         idct[l] = clamp(0.25f * idct[l] + 128);
     }
 }
+
+void dct_1d_llm(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+    // STAGE 1
+    const f32 s07 = s[0*in_stride] + s[7*in_stride];
+    const f32 s16 = s[1*in_stride] + s[6*in_stride];
+    const f32 s25 = s[2*in_stride] + s[5*in_stride];
+    const f32 s34 = s[3*in_stride] + s[4*in_stride];
+
+    const f32 d07 = s[0*in_stride] - s[7*in_stride];
+    const f32 d16 = s[1*in_stride] - s[6*in_stride];
+    const f32 d25 = s[2*in_stride] - s[5*in_stride];
+    const f32 d34 = s[3*in_stride] - s[4*in_stride];
+
+    // STAGE 2
+    // 1
+    const f32 s0734 = s07 + s34;
+    // 2
+    const f32 s1625 = s16 + s25;
+    // 3
+    const f32 d1625 = s16 - s25;
+    // 4
+    const f32 d0734 = s07 - s34;
+    // 5
+    const f32 stage2_5 = d07 * C3 + d34 * S3;
+    // 8
+    const f32 stage2_8 = -d07 * S3 + d34*C3;
+    // 6
+    const f32 stage2_6 = d16 * C1 + d25*S1;
+    // 7
+    const f32 stage2_7 = -d16 * S1 + d25*C1;
+
+    // STAGE 3
+    const f32 stage3_5 = stage2_5 + stage2_7;
+
+    const f32 stage3_8 = stage2_6 + stage2_8;
+
+    // STAGE4
+    S[0*out_stride] = s0734 + s1625;
+    S[4*out_stride] = s0734 - s1625;
+    S[2*out_stride] =  d1625 * SQRT2*C6 + d0734 *SQRT2*S6;
+    S[6*out_stride] = -d1625 * SQRT2*S6 + d0734 *SQRT2*C6;
+
+    S[7*out_stride] = stage3_8 - stage3_5;
+    S[3*out_stride] = SQRT2*(stage2_8 - stage2_6);
+    S[5*out_stride] = SQRT2*(stage2_5 - stage2_7);
+    S[1*out_stride] = stage3_8 + stage3_5;
+}
+
+void idct_1d_llm(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+}
+
+void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64] = {(f32)0xCDCDCDCD};
+
+    for (u8 v=0; v<8; v++) {
+        idct_1d_llm(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+
+    for (u8 x=0; x<8; x++) {
+        idct_1d_llm(&idct[x], 8, &Svx[x], 8);
+    }
+
+    for (u8 l=0; l<64; l++) {
+        idct[l] = clamp(0.25f * idct[l] + 128);
+    }
+}
+
 
 #if defined(IDCT_FAST)
 #define idct_2d idct_2d_fast
