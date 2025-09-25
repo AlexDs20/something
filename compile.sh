@@ -4,7 +4,7 @@ BIN="./build/main"
 
 # FLAGS="-g -ggdb -pg -O0 -Wall" # -finstrument-functions -fsanitize=address"
 FLAGS="-O3"
-DEFINES=-D_DEBUG
+DEFINES="-D_DEBUG -DIDCT_FAST"
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I."

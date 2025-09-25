@@ -27,16 +27,24 @@ int main() {
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-    string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
-    Model* model = {0};
-    if (string_get_file_extension(file_path) == ".obj") {
-        model = read_obj_model_file(scene_arena, file_path);
-    }
+    // string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
+    // Model* model = {0};
+    // if (string_get_file_extension(file_path) == ".obj") {
+    //     model = read_obj_model_file(scene_arena, file_path);
+    // }
+
+    string8 file_path = string_from_cstr(scene_arena, "assets/backpack/diffuse.jpg");
+
+    Image image = read_image_file(global_arena, file_path);
 
 #if 1
-    u32* img_b = model->material->map_Kd.data;
-    u32  img_w = model->material->map_Kd.width;
-    u32  img_h = model->material->map_Kd.height;
+    // u32* img_b = model->material->map_Kd.data;
+    // u32  img_w = model->material->map_Kd.width;
+    // u32  img_h = model->material->map_Kd.height;
+
+    u32* img_b = image.buffer;
+    u32  img_w = image.width;
+    u32  img_h = image.height;
     const u32 w = img_w;
     const u32 h = img_h>512 ? 512 : img_h;
     // const u32 w = 4096;
@@ -57,7 +65,7 @@ int main() {
         running = platform_handle_events(&win);
 
         // And this is uglier...
-        f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
+        // f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
 
         // for (int i=0; i<win.h*win.w; i++) {
         //     win.buffer[i] = bg_color;

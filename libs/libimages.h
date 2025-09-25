@@ -1020,7 +1020,7 @@ s16 clamp(s16 a, s16 low=0, s16 high=255){
     return t > high ? high : t;
 }
 
-void idct_2d_2_1d_naive(f32* idct, s16* mcu) {
+void idct_2d_2_1d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
     //  (I split it in 2 1D Cosine transform to reduce computation)
     for (u8 v=0; v<8; v++) {
@@ -1048,13 +1048,13 @@ void idct_2d_2_1d_naive(f32* idct, s16* mcu) {
     }
 }
 
-const f32 C1 = 0.9808;  // cos(k*pi/16)
-const f32 C2 = 0.9239;
-const f32 C3 = 0.8315;
-const f32 C4 = 0.7071;
-const f32 C5 = 0.5556;
-const f32 C6 = 0.3827;
-const f32 C7 = 0.1951;
+const f32 C1 = 0.9807852804032304;  // cos(k*pi/16)
+const f32 C2 = 0.9238795325112867;
+const f32 C3 = 0.8314696123025452;
+const f32 C4 = 0.7071067811865476;
+const f32 C5 = 0.5555702330196023;
+const f32 C6 = 0.38268343236508984;
+const f32 C7 = 0.19509032201612833;
 
 const f32 S1 = C7;
 const f32 S2 = C6;
@@ -1064,69 +1064,85 @@ const f32 S5 = C3;
 const f32 S6 = C2;
 const f32 S7 = C1;
 
-void idct_1d_fast(f32* S, u32 out_stride, s16* s, u32 in_stride) {
-    const f32 s07 = s[0*in_stride] + s[7*in_stride];
-    const f32 s16 = s[1*in_stride] + s[6*in_stride];
-    const f32 s25 = s[2*in_stride] + s[5*in_stride];
-    const f32 s34 = s[3*in_stride] + s[4*in_stride];
+
+void dct_1d_fast(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+    const f32 s07 = *(s + 0*in_stride) + *(s + 7*in_stride);
+    const f32 s16 = *(s + 1*in_stride) + *(s + 6*in_stride);
+    const f32 s25 = *(s + 2*in_stride) + *(s + 5*in_stride);
+    const f32 s34 = *(s + 3*in_stride) + *(s + 4*in_stride);
     const f32 s0734 = s07 + s34;
     const f32 s1625 = s16 + s25;
 
-    const f32 d07 = s[0*in_stride] - s[7*in_stride];
-    const f32 d16 = s[1*in_stride] - s[6*in_stride];
-    const f32 d25 = s[2*in_stride] - s[5*in_stride];
-    const f32 d34 = s[3*in_stride] - s[4*in_stride];
+    const f32 d07 = *(s + 0*in_stride) - *(s + 7*in_stride);
+    const f32 d16 = *(s + 1*in_stride) - *(s + 6*in_stride);
+    const f32 d25 = *(s + 2*in_stride) - *(s + 5*in_stride);
+    const f32 d34 = *(s + 3*in_stride) - *(s + 4*in_stride);
     const f32 d0734 = s07 - s34;
     const f32 d1625 = s16 - s25;
 
-    S[0*out_stride] = 0.5f * C4*(s0734+s1625);
-    S[1*out_stride] = 0.5f * (C1*d07   + C3*d16   + C5*d25  + C7*d34);
-    S[2*out_stride] = 0.5f * (C2*d0734 + C6*d1625);
-    S[3*out_stride] = 0.5f * (C3*d07 - C7*d16 - C1*d25 -C5*d34);
-    S[4*out_stride] = 0.5f * C4*(s0734-s1625);
-    S[5*out_stride] = 0.5f * (C5*d07 - C1*d16 + C7*d25 + C3*d34);
-    S[6*out_stride] = 0.5f * (C6*d0734 - C2*d1625);
-    S[7*out_stride] = 0.5f * (C7*d07 - C5*d16 +C3*d25 - C1*d34);
+    *(S + 0*out_stride) = C4 * (s0734    + s1625);
+    *(S + 1*out_stride) =      (C1*d07   + C3*d16   + C5*d25 + C7*d34);
+    *(S + 2*out_stride) =      (C2*d0734 + C6*d1625);
+    *(S + 3*out_stride) =      (C3*d07   - C7*d16   - C1*d25 - C5*d34);
+    *(S + 4*out_stride) = C4 * (s0734    - s1625);
+    *(S + 5*out_stride) =      (C5*d07   - C1*d16   + C7*d25 + C3*d34);
+    *(S + 6*out_stride) =      (C6*d0734 - C2*d1625);
+    *(S + 7*out_stride) =      (C7*d07   - C5*d16   + C3*d25 - C1*d34);
 }
 
-void idct_1d_fast_f32(f32* S, u32 out_stride, f32* s, u32 in_stride) {
-    const f32 s07 = s[0*in_stride] + s[7*in_stride];
-    const f32 s16 = s[1*in_stride] + s[6*in_stride];
-    const f32 s25 = s[2*in_stride] + s[5*in_stride];
-    const f32 s34 = s[3*in_stride] + s[4*in_stride];
-    const f32 s0734 = s07 + s34;
-    const f32 s1625 = s16 + s25;
-
-    const f32 d07 = s[0*in_stride] - s[7*in_stride];
-    const f32 d16 = s[1*in_stride] - s[6*in_stride];
-    const f32 d25 = s[2*in_stride] - s[5*in_stride];
-    const f32 d34 = s[3*in_stride] - s[4*in_stride];
-    const f32 d0734 = s07 - s34;
-    const f32 d1625 = s16 - s25;
-
-    S[0*out_stride] = 0.5f * C4 * (s0734 + s1625);
-    S[1*out_stride] = 0.5f *      (C1*d07   + C3*d16   + C5*d25  + C7*d34);
-    S[2*out_stride] = 0.5f *      (C2*d0734 + C6*d1625);
-    S[3*out_stride] = 0.5f *      (C3*d07   - C7*d16 - C1*d25 -C5*d34);
-    S[4*out_stride] = 0.5f * C4 * (s0734 - s1625);
-    S[5*out_stride] = 0.5f *      (C5*d07   - C1*d16 + C7*d25 + C3*d34);
-    S[6*out_stride] = 0.5f *      (C6*d0734 - C2*d1625);
-    S[7*out_stride] = 0.5f *      (C7*d07   - C5*d16 +C3*d25 - C1*d34);
+void idct_1d_fast(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+    // TODO
 }
 
-void idct_2d_fast(f32* idct, s16* mcu) {
-    f32 Svx[64] = {0};
+void dct_2d_fast(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64] = {(f32)0xCDCDCDCD};
+
+    for (u8 v=0; v<8; v++) {
+        dct_1d_fast(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+
+    for (u8 x=0; x<8; x++) {
+        dct_1d_fast(&idct[x], 8, &Svx[x], 8);
+    }
+
+    for (u8 l=0; l<64; l++) {
+        idct[l] = clamp(0.25f * idct[l] + 128);
+    }
+}
+
+void idct_2d_fast(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64] = {(f32)0xCDCDCDCD};
 
     for (u8 v=0; v<8; v++) {
         idct_1d_fast(&Svx[v*8], 1, &mcu[v*8], 1);
     }
 
     for (u8 x=0; x<8; x++) {
-        idct_1d_fast_f32(&idct[x], 8, &Svx[x], 8);
+        idct_1d_fast(&idct[x], 8, &Svx[x], 8);
     }
 
     for (u8 l=0; l<64; l++) {
-        idct[l] = idct[l] + 128;
+        idct[l] = clamp(0.25f * idct[l] + 128);
+    }
+}
+
+void idct_1d_vetterli(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+    // TODO
+}
+
+void idct_2d_vetterli(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64] = {(f32)0xCDCDCDCD};
+
+    for (u8 v=0; v<8; v++) {
+        idct_1d_vetterli(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+
+    for (u8 x=0; x<8; x++) {
+        idct_1d_vetterli(&idct[x], 8, &Svx[x], 8);
+    }
+
+    for (u8 l=0; l<64; l++) {
+        idct[l] = clamp(0.25f * idct[l] + 128);
     }
 }
 
@@ -1218,8 +1234,8 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 
                         for (u8 v=0; v<Vi[i]; v++) {
                             for (u8 h=0; h<Hi[i]; h++) {
-                                s16 zz_mcu[64] = {0};
-                                s16 mcu[64] = {0};
+                                f32 zz_mcu[64] = {0};
+                                f32 mcu[64] = {0};
                                 f32 idct[64] = {0};
 
                                 s16 value;
