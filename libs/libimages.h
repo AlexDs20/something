@@ -1020,7 +1020,39 @@ s16 clamp(s16 a, s16 low=0, s16 high=255){
     return t > high ? high : t;
 }
 
-void idct_2d_2_1d_naive(f32* idct, f32* mcu) {
+f32 clampf32(f32 a, f32 low=0, f32 high=255){
+    f32 t = a < low ? low : a;
+    return t > high ? high : t;
+}
+
+#define SQRT2 1.4142135623730951
+#define SQRT2INV 0.7071067811865476
+#define C1    0.9807852804032304    // cos(k*pi/16)
+#define C2    0.9238795325112867
+#define C3    0.8314696123025452
+#define C4    0.7071067811865476
+#define C5    0.5555702330196023
+#define C6    0.38268343236508984
+#define C7    0.19509032201612833
+
+// const f32 C1 = 1.3870398453221475f; // sqrt(2)*cos(1*pi/16)
+// const f32 C2 = 1.3065629648763766f; // sqrt(2)*cos(2*pi/16)
+// const f32 C3 = 1.1758756024193588f; // sqrt(2)*cos(3*pi/16)
+// const f32 C4 = 1.0000000000000000f; // sqrt(2)*cos(4*pi/16) == 1.0
+// const f32 C5 = 0.7856949583871023f; // sqrt(2)*cos(5*pi/16)
+// const f32 C6 = 0.5411961001461971f; // sqrt(2)*cos(6*pi/16)
+// const f32 C7 = 0.2758993792829431f; // sqrt(2)*cos(7*pi/16)
+
+const f32 S1 = C7;
+const f32 S2 = C6;
+const f32 S3 = C5;
+const f32 S4 = C4;
+const f32 S5 = C3;
+const f32 S6 = C2;
+const f32 S7 = C1;
+
+
+void idct_2d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
     //  (I split it in 2 1D Cosine transform to reduce computation)
     for (u8 v=0; v<8; v++) {
@@ -1048,153 +1080,42 @@ void idct_2d_2_1d_naive(f32* idct, f32* mcu) {
     }
 }
 
-const f32 SQRT2 = 1.4142135623730951;
-const f32 C1 = 0.9807852804032304;  // cos(k*pi/16)
-const f32 C2 = 0.9238795325112867;
-const f32 C3 = 0.8314696123025452;
-const f32 C4 = 0.7071067811865476;
-const f32 C5 = 0.5555702330196023;
-const f32 C6 = 0.38268343236508984;
-const f32 C7 = 0.19509032201612833;
-
-const f32 S1 = C7;
-const f32 S2 = C6;
-const f32 S3 = C5;
-const f32 S4 = C4;
-const f32 S5 = C3;
-const f32 S6 = C2;
-const f32 S7 = C1;
-
-
-void dct_1d_fast(f32* S, u32 out_stride, f32* s, u32 in_stride) {
-    const f32 s07 = *(s + 0*in_stride) + *(s + 7*in_stride);
-    const f32 s16 = *(s + 1*in_stride) + *(s + 6*in_stride);
-    const f32 s25 = *(s + 2*in_stride) + *(s + 5*in_stride);
-    const f32 s34 = *(s + 3*in_stride) + *(s + 4*in_stride);
-    const f32 s0734 = s07 + s34;
-    const f32 s1625 = s16 + s25;
-
-    const f32 d07 = *(s + 0*in_stride) - *(s + 7*in_stride);
-    const f32 d16 = *(s + 1*in_stride) - *(s + 6*in_stride);
-    const f32 d25 = *(s + 2*in_stride) - *(s + 5*in_stride);
-    const f32 d34 = *(s + 3*in_stride) - *(s + 4*in_stride);
-    const f32 d0734 = s07 - s34;
-    const f32 d1625 = s16 - s25;
-
-    *(S + 0*out_stride) = C4 * (s0734    + s1625);
-    *(S + 1*out_stride) =      (C1*d07   + C3*d16   + C5*d25 + C7*d34);
-    *(S + 2*out_stride) =      (C2*d0734 + C6*d1625);
-    *(S + 3*out_stride) =      (C3*d07   - C7*d16   - C1*d25 - C5*d34);
-    *(S + 4*out_stride) = C4 * (s0734    - s1625);
-    *(S + 5*out_stride) =      (C5*d07   - C1*d16   + C7*d25 + C3*d34);
-    *(S + 6*out_stride) =      (C6*d0734 - C2*d1625);
-    *(S + 7*out_stride) =      (C7*d07   - C5*d16   + C3*d25 - C1*d34);
-}
-
-void idct_1d_fast(f32* S, u32 out_stride, f32* s, u32 in_stride) {
-    // TODO
-}
-
-void dct_2d_fast(f32 idct[64], f32 mcu[64]) {
-    f32 Svx[64] = {(f32)0xCDCDCDCD};
-
-    for (u8 v=0; v<8; v++) {
-        dct_1d_fast(&Svx[v*8], 1, &mcu[v*8], 1);
-    }
-
-    for (u8 x=0; x<8; x++) {
-        dct_1d_fast(&idct[x], 8, &Svx[x], 8);
-    }
-
-    for (u8 l=0; l<64; l++) {
-        idct[l] = clamp(0.25f * idct[l] + 128);
-    }
-}
-
-void idct_2d_fast(f32 idct[64], f32 mcu[64]) {
-    f32 Svx[64] = {(f32)0xCDCDCDCD};
-
-    for (u8 v=0; v<8; v++) {
-        idct_1d_fast(&Svx[v*8], 1, &mcu[v*8], 1);
-    }
-
-    for (u8 x=0; x<8; x++) {
-        idct_1d_fast(&idct[x], 8, &Svx[x], 8);
-    }
-
-    for (u8 l=0; l<64; l++) {
-        idct[l] = clamp(0.25f * idct[l] + 128);
-    }
-}
-
-void idct_1d_vetterli(f32* S, u32 out_stride, f32* s, u32 in_stride) {
-    // TODO
-}
-
-void idct_2d_vetterli(f32 idct[64], f32 mcu[64]) {
-    f32 Svx[64] = {(f32)0xCDCDCDCD};
-
-    for (u8 v=0; v<8; v++) {
-        idct_1d_vetterli(&Svx[v*8], 1, &mcu[v*8], 1);
-    }
-
-    for (u8 x=0; x<8; x++) {
-        idct_1d_vetterli(&idct[x], 8, &Svx[x], 8);
-    }
-
-    for (u8 l=0; l<64; l++) {
-        idct[l] = clamp(0.25f * idct[l] + 128);
-    }
-}
-
-void dct_1d_llm(f32* S, u32 out_stride, f32* s, u32 in_stride) {
-    // STAGE 1
-    const f32 s07 = s[0*in_stride] + s[7*in_stride];
-    const f32 s16 = s[1*in_stride] + s[6*in_stride];
-    const f32 s25 = s[2*in_stride] + s[5*in_stride];
-    const f32 s34 = s[3*in_stride] + s[4*in_stride];
-
-    const f32 d07 = s[0*in_stride] - s[7*in_stride];
-    const f32 d16 = s[1*in_stride] - s[6*in_stride];
-    const f32 d25 = s[2*in_stride] - s[5*in_stride];
-    const f32 d34 = s[3*in_stride] - s[4*in_stride];
-
-    // STAGE 2
-    // 1
-    const f32 s0734 = s07 + s34;
-    // 2
-    const f32 s1625 = s16 + s25;
-    // 3
-    const f32 d1625 = s16 - s25;
-    // 4
-    const f32 d0734 = s07 - s34;
-    // 5
-    const f32 stage2_5 = d07 * C3 + d34 * S3;
-    // 8
-    const f32 stage2_8 = -d07 * S3 + d34*C3;
-    // 6
-    const f32 stage2_6 = d16 * C1 + d25*S1;
-    // 7
-    const f32 stage2_7 = -d16 * S1 + d25*C1;
-
-    // STAGE 3
-    const f32 stage3_5 = stage2_5 + stage2_7;
-
-    const f32 stage3_8 = stage2_6 + stage2_8;
-
-    // STAGE4
-    S[0*out_stride] = s0734 + s1625;
-    S[4*out_stride] = s0734 - s1625;
-    S[2*out_stride] =  d1625 * SQRT2*C6 + d0734 *SQRT2*S6;
-    S[6*out_stride] = -d1625 * SQRT2*S6 + d0734 *SQRT2*C6;
-
-    S[7*out_stride] = stage3_8 - stage3_5;
-    S[3*out_stride] = SQRT2*(stage2_8 - stage2_6);
-    S[5*out_stride] = SQRT2*(stage2_5 - stage2_7);
-    S[1*out_stride] = stage3_8 + stage3_5;
-}
-
 void idct_1d_llm(f32* S, u32 out_stride, f32* s, u32 in_stride) {
+    const f32 stage4_0 = s[0];
+    const f32 stage4_1 = s[4];
+    const f32 stage4_2 = s[2];
+    const f32 stage4_3 = s[6];
+    const f32 stage4_4 = s[1] - s[7];
+    const f32 stage4_5 = SQRT2 * s[3];
+    const f32 stage4_6 = SQRT2 * s[5];
+    const f32 stage4_7 = s[1] + s[7];
+
+    const f32 stage3_0 = stage4_0 + stage4_1;
+    const f32 stage3_1 = stage4_0 - stage4_1;
+    const f32 stage3_2 =  SQRT2*stage4_2*C6 + SQRT2*stage4_3*S6;
+    const f32 stage3_3 = -SQRT2*stage4_2*S6 + SQRT2*stage4_3*C6;
+    const f32 stage3_4 = stage4_4 + stage4_6;
+    const f32 stage3_5 = stage4_7 - stage4_5;
+    const f32 stage3_6 = stage4_4 - stage4_6;
+    const f32 stage3_7 = stage4_7 + stage4_5;
+
+    const f32 stage2_0 = stage3_0 + stage3_3;
+    const f32 stage2_1 = stage3_1 + stage3_2;
+    const f32 stage2_2 = stage3_1 - stage3_2;
+    const f32 stage2_3 = stage3_0 - stage3_3;
+    const f32 stage2_4 = stage3_4 * C3 + stage3_7 * S3;
+    const f32 stage2_5 = stage3_5 * C1 + stage3_6 * S1;
+    const f32 stage2_6 = -stage3_5 * S1 + stage3_6 * C1;
+    const f32 stage2_7 = -stage3_4 * S3 + stage3_7 * C3;
+
+    s[0*out_stride] = stage2_0 + stage2_7;
+    s[1*out_stride] = stage2_1 + stage2_6;
+    s[2*out_stride] = stage2_2 + stage2_5;
+    s[3*out_stride] = stage2_3 + stage2_4;
+    s[4*out_stride] = stage2_3 - stage2_4;
+    s[5*out_stride] = stage2_2 - stage2_5;
+    s[6*out_stride] = stage2_1 - stage2_6;
+    s[7*out_stride] = stage2_0 - stage2_7;
 }
 
 void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
@@ -1213,19 +1134,96 @@ void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     }
 }
 
+void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    f32 tmp0 = in[0*in_stride];
+    f32 tmp1 = in[2*in_stride];
+    f32 tmp2 = in[4*in_stride];
+    f32 tmp3 = in[6*in_stride];
 
-#if defined(IDCT_FAST)
-#define idct_2d idct_2d_fast
-#elif defined(IDCT_VETTERLI)
-#define idct_2d idct_2d_vetterli
-#elif defined(IDCT_AAN)
+    f32 tmp4 = in[1*in_stride];
+    f32 tmp5 = in[3*in_stride];
+    f32 tmp6 = in[5*in_stride];
+    f32 tmp7 = in[7*in_stride];
+
+    //
+    f32 tmp10 = tmp0 + tmp2;	/* phase 3 */
+    f32 tmp11 = tmp0 - tmp2;
+    f32 tmp13 = tmp1 + tmp3;	/* phases 5-3 */
+    f32 tmp12 = (tmp1 - tmp3) * (1.414213562f) - tmp13; /* 2*c4 */
+    tmp0 = tmp10 + tmp13;	/* phase 2 */
+    tmp3 = tmp10 - tmp13;
+    tmp1 = tmp11 + tmp12;
+    tmp2 = tmp11 - tmp12;
+
+    //
+    f32 z13  = tmp6 + tmp5;		/* phase 6 */
+    f32 z10  = tmp6 - tmp5;
+    f32 z11  = tmp4 + tmp7;
+    f32 z12  = tmp4 - tmp7;
+    tmp7     = z11 + z13;		/* phase 5 */
+    tmp11    = (z11 - z13) * (1.414213562); /* 2*c4 */
+    f32 z5   = (z10 + z12) * (1.847759065); /* 2*c2 */
+    tmp10    = (1.082392200) * z12 - z5; /* 2*(c2-c6) */
+    tmp12    = (-2.613125930) * z10 + z5; /* -2*(c2+c6) */
+    tmp6     = tmp12 - tmp7;	/* phase 2 */
+    tmp5     = tmp11 - tmp6;
+    tmp4     = tmp10 + tmp5;
+
+
+    //
+    out[0*out_stride] = 0.25f*(tmp0 + tmp7);
+    out[1*out_stride] = 0.5f*SQRT2INV*C1*(tmp0 - tmp7);
+    out[2*out_stride] = 0.5f*SQRT2INV*C2*(tmp1 + tmp6);
+    out[3*out_stride] = 0.5f*SQRT2INV*C3*(tmp1 - tmp6);
+    out[4*out_stride] = 0.5f*SQRT2INV*C4*(tmp2 + tmp5);
+    out[5*out_stride] = 0.5f*SQRT2INV*C5*(tmp2 - tmp5);
+    out[6*out_stride] = 0.5f*SQRT2INV*C6*(tmp3 + tmp4);
+    out[7*out_stride] = 0.5f*SQRT2INV*C7*(tmp3 - tmp4);
+}
+
+void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64];
+
+    for (u8 v=0; v<8; v++) {
+        idct_1d_aan(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+
+    for (u8 x=0; x<8; x++) {
+        idct_1d_aan(&idct[x], 8, &Svx[x], 8);
+    }
+
+    for (u8 l=0; l<64; l++) {
+        idct[l] = clampf32(idct[l] + 128);
+    }
+}
+
+void idct_1d_lf(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+}
+
+void idct_2d_lf(f32 idct[64], f32 mcu[64]) {
+    f32 Svx[64];
+
+    for (u8 v=0; v<8; v++) {
+        idct_1d_lf(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+
+    for (u8 x=0; x<8; x++) {
+        idct_1d_lf(&idct[x], 8, &Svx[x], 8);
+    }
+
+    for (u8 l=0; l<64; l++) {
+        idct[l] = clampf32(0.25f*idct[l] + 128);
+    }
+}
+
+#if defined(IDCT_AAN)
 #define idct_2d idct_2d_aan
 #elif defined(IDCT_LLM)
 #define idct_2d idct_2d_llm
 #elif defined(IDCT_LF)
 #define idct_2d idct_2d_lf
 #else
-#define idct_2d idct_2d_2_1d_naive
+#define idct_2d idct_2d_naive
 #endif
 
 ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
