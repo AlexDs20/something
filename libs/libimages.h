@@ -1067,6 +1067,12 @@ void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 
 // WORKS
 void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    const f32 a1 = C4;
+    const f32 a2 = C2 - C6;
+    const f32 a3 = C4;
+    const f32 a4 = C2 + C6;
+    const f32 a5 = C6;
+
     const f32 b0 =  in[0*in_stride] + in[7*in_stride];
     const f32 b1 =  in[1*in_stride] + in[6*in_stride];
     const f32 b2 =  in[2*in_stride] + in[5*in_stride];
@@ -1094,21 +1100,16 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d6 = c6;
     const f32 d7 = c7;
 
-    const f32 a1 = C4;
-    const f32 a2 = C2 - C6;
-    const f32 a3 = C4;
-    const f32 a4 = C2 + C6;
-    const f32 a5 = C6;
+    const f32 d8 = a5*(d4+d6);
 
-    const f32 e8 = a5*(d4+d6);
 
     const f32 e0 = d0;
     const f32 e1 = d1;
     const f32 e2 = a1 * d2;
     const f32 e3 = d3;
-    const f32 e4 = -(e8 + a2 * d4);
+    const f32 e4 = -d8 - a2 * d4;
     const f32 e5 = a3 * d5;
-    const f32 e6 = a4*d6 - e8;
+    const f32 e6 = a4*d6 - d8;
     const f32 e7 = d7;
 
 
@@ -1131,16 +1132,25 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 g6 = f5 - f6;
     const f32 g7 = f7 - f4;
 
+    // Scaling
+    const f32 s0 = SQRT8INV * (1.0f/C0);
+    const f32 s1 = 0.25f * SQRT2 * (1.0f/C1);
+    const f32 s2 = 0.25f * SQRT2 * (1.0f/C2);
+    const f32 s3 = 0.25f * SQRT2 * (1.0f/C3);
+    const f32 s4 = 0.25f * SQRT2 * (1.0f/C4);
+    const f32 s5 = 0.25f * SQRT2 * (1.0f/C5);
+    const f32 s6 = 0.25f * SQRT2 * (1.0f/C6);
+    const f32 s7 = 0.25f * SQRT2 * (1.0f/C7);
 
-    out[0*out_stride] = SQRT8INV              * g0;
-    out[4*out_stride] = SQRT8INV              * g1;
-    out[2*out_stride] = ((C2/2) / (1+a1))     * g2;
-    out[6*out_stride] = ((C6/2) / (1-a1))     * g3;
+    out[0*out_stride] = s0 * g0;
+    out[4*out_stride] = s4 * g1;
+    out[2*out_stride] = s2 * g2;
+    out[6*out_stride] = s6 * g3;
 
-    out[5*out_stride] = ((C5/2) / (1-a5))     * g4;
-    out[1*out_stride] = ((C1/2) / (1+a4-a5))  * g5;
-    out[7*out_stride] = ((C7/2) / (1-a4+a5))  * g6;
-    out[3*out_stride] = ((C3/2) / (1+a5))     * g7;
+    out[5*out_stride] = s5 * g4;
+    out[1*out_stride] = s1 * g5;
+    out[7*out_stride] = s7 * g6;
+    out[3*out_stride] = s3 * g7;
 }
 
 // DOES NOT WORK
@@ -1306,7 +1316,7 @@ void idct_2d_naive(f32* idct, f32* mcu) {
         idct_1d_naive(&tmp[v*8], 1, &mcu[v*8], 1);
     }
     for (u8 v=0; v<8; v++) {
-        dct_1d_llm(&tmp2[v*8], 1, &tmp[v*8], 1);
+        dct_1d_aan(&tmp2[v*8], 1, &tmp[v*8], 1);
     }
     for (u8 v=0; v<8; v++) {
         idct_1d_naive(&Svx[v*8], 1, &tmp2[v*8], 1);
