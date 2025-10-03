@@ -1155,39 +1155,33 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 
 // DOES NOT WORK
 void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-    f32 tmp0 = 0.022097086912079608 * in[0*in_stride];
-    f32 tmp1 = 0.016912378129568657 * in[2*in_stride];
-    f32 tmp2 = 0.022097086912079608 * in[4*in_stride];
-    f32 tmp3 = 0.04083009265238676 * in[6*in_stride];
+    const f32 h0 = in[0*in_stride];
+    const f32 h1 = in[2*in_stride];
+    const f32 h2 = in[4*in_stride];
+    const f32 h3 = in[6*in_stride];
 
-    f32 tmp4 = 0.015931111847004974 * in[1*in_stride];
-    f32 tmp5 = 0.018792027716720165 * in[3*in_stride];
-    f32 tmp6 = 0.028124256973012986 * in[5*in_stride];
-    f32 tmp7 = 0.08009110774192205 * in[7*in_stride];
+    const f32 h4 = in[1*in_stride];
+    const f32 h5 = in[3*in_stride];
+    const f32 h6 = in[5*in_stride];
+    const f32 h7 = in[7*in_stride];
 
-    //
-    f32 tmp10 = tmp0 + tmp2;	/* phase 3 */
-    f32 tmp11 = tmp0 - tmp2;
-    f32 tmp13 = tmp1 + tmp3;	/* phases 5-3 */
-    f32 tmp12 = (tmp1 - tmp3) * (1.414213562f) - tmp13; /* 2*c4 */
-    tmp0 = tmp10 + tmp13;	/* phase 2 */
-    tmp3 = tmp10 - tmp13;
-    tmp1 = tmp11 + tmp12;
-    tmp2 = tmp11 - tmp12;
+    const f32 g0 = h0;
+    const f32 g1 = h1;
+    const f32 g2 = h2;
+    const f32 g3 = h3;
+    const f32 g4 = h4 - h7;
+    const f32 g5 = h5 + h6;
+    const f32 g6 = h5 - h6;
+    const f32 g7 = h7 + h4;
 
-    //
-    f32 z13  = tmp6 + tmp5;		/* phase 6 */
-    f32 z10  = tmp6 - tmp5;
-    f32 z11  = tmp4 + tmp7;
-    f32 z12  = tmp4 - tmp7;
-    tmp7     = z11 + z13;		/* phase 5 */
-    tmp11    = (z11 - z13) * (1.414213562); /* 2*c4 */
-    f32 z5   = (z10 + z12) * (1.847759065); /* 2*c2 */
-    tmp10    = (1.082392200) * z12 - z5; /* 2*(c2-c6) */
-    tmp12    = (-2.613125930) * z10 + z5; /* -2*(c2+c6) */
-    tmp6     = tmp12 - tmp7;	/* phase 2 */
-    tmp5     = tmp11 - tmp6;
-    tmp4     = tmp10 + tmp5;
+    const f32 f0 = g0;
+    const f32 f1 = g1;
+    const f32 f2 = g2 - g3;
+    const f32 f3 = g2 + g3;
+    const f32 f4 = g4;
+    const f32 f5 = g5 - g7;
+    const f32 f6 = g6;
+    const f32 f7 = g7 + g5;
 
 
     //
