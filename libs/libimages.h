@@ -1094,12 +1094,11 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d6 = c6;
     const f32 d7 = c7;
 
-
-    const f32 a1 = 0.707;
-    const f32 a2 = 0.541;
-    const f32 a3 = 0.707;
-    const f32 a4 = 1.307;
-    const f32 a5 = 0.383;
+    const f32 a1 = C4;
+    const f32 a2 = C2 - C6;
+    const f32 a3 = C4;
+    const f32 a4 = C2 + C6;
+    const f32 a5 = C6;
 
     const f32 e8 = a5*(d4+d6);
 
@@ -1133,18 +1132,67 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 g7 = f7 - f4;
 
 
-    out[0*out_stride] = SQRT8INV                * g0;
-    out[4*out_stride] = SQRT8INV                * g1;
-    out[2*out_stride] = ((C2/2) / (a1+1))       * g2;
-    out[6*out_stride] = ((C6/2) / (-a1+1))      * g3;
+    out[0*out_stride] = SQRT8INV              * g0;
+    out[4*out_stride] = SQRT8INV              * g1;
+    out[2*out_stride] = ((C2/2) / (1+a1))     * g2;
+    out[6*out_stride] = ((C6/2) / (1-a1))     * g3;
 
-    out[5*out_stride] = ((C5/2) / (1-a5))       * g4;
-    out[1*out_stride] = ((C1/2) / (-a5+a4+1))   * g5;
-    out[7*out_stride] = ((C7/2) / (a5-a4+1))    * g6;
-    out[3*out_stride] = ((C3/2) / (a5+1))       * g7;
+    out[5*out_stride] = ((C5/2) / (1-a5))     * g4;
+    out[1*out_stride] = ((C1/2) / (1+a4-a5))  * g5;
+    out[7*out_stride] = ((C7/2) / (1-a4+a5))  * g6;
+    out[3*out_stride] = ((C3/2) / (1+a5))     * g7;
+}
+
+// DOES NOT WORK
+void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    f32 tmp0 = 0.022097086912079608 * in[0*in_stride];
+    f32 tmp1 = 0.016912378129568657 * in[2*in_stride];
+    f32 tmp2 = 0.022097086912079608 * in[4*in_stride];
+    f32 tmp3 = 0.04083009265238676 * in[6*in_stride];
+
+    f32 tmp4 = 0.015931111847004974 * in[1*in_stride];
+    f32 tmp5 = 0.018792027716720165 * in[3*in_stride];
+    f32 tmp6 = 0.028124256973012986 * in[5*in_stride];
+    f32 tmp7 = 0.08009110774192205 * in[7*in_stride];
+
+    //
+    f32 tmp10 = tmp0 + tmp2;	/* phase 3 */
+    f32 tmp11 = tmp0 - tmp2;
+    f32 tmp13 = tmp1 + tmp3;	/* phases 5-3 */
+    f32 tmp12 = (tmp1 - tmp3) * (1.414213562f) - tmp13; /* 2*c4 */
+    tmp0 = tmp10 + tmp13;	/* phase 2 */
+    tmp3 = tmp10 - tmp13;
+    tmp1 = tmp11 + tmp12;
+    tmp2 = tmp11 - tmp12;
+
+    //
+    f32 z13  = tmp6 + tmp5;		/* phase 6 */
+    f32 z10  = tmp6 - tmp5;
+    f32 z11  = tmp4 + tmp7;
+    f32 z12  = tmp4 - tmp7;
+    tmp7     = z11 + z13;		/* phase 5 */
+    tmp11    = (z11 - z13) * (1.414213562); /* 2*c4 */
+    f32 z5   = (z10 + z12) * (1.847759065); /* 2*c2 */
+    tmp10    = (1.082392200) * z12 - z5; /* 2*(c2-c6) */
+    tmp12    = (-2.613125930) * z10 + z5; /* -2*(c2+c6) */
+    tmp6     = tmp12 - tmp7;	/* phase 2 */
+    tmp5     = tmp11 - tmp6;
+    tmp4     = tmp10 + tmp5;
+
+
+    //
+    out[0*out_stride] = (tmp0 + tmp7);
+    out[1*out_stride] = (tmp0 - tmp7);
+    out[2*out_stride] = (tmp1 + tmp6);
+    out[3*out_stride] = (tmp1 - tmp6);
+    out[4*out_stride] = (tmp2 + tmp5);
+    out[5*out_stride] = (tmp2 - tmp5);
+    out[6*out_stride] = (tmp3 + tmp4);
+    out[7*out_stride] = (tmp3 - tmp4);
 }
 
 // WORKS
+// TODO: Reduce rotation ops
 void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 a0 =  in[0*in_stride] + in[7*in_stride];
     const f32 a1 =  in[1*in_stride] + in[6*in_stride];
@@ -1194,7 +1242,8 @@ void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[1*out_stride] = SQRT8INV * d7;
 }
 
-// DOES NOT WORK
+// WORKS
+// TODO: Reduce rotation ops
 void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d0 = in[0*in_stride];
     const f32 d1 = in[4*in_stride];
@@ -1216,8 +1265,8 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 
     const f32 b0 = c0 + c1;
     const f32 b1 = c0 - c1;
-    const f32 b2 = SQRT2 * ( c2 * C6 + c3 * S6);
-    const f32 b3 = SQRT2 * (-c2 * S6 + c3 * C6);
+    const f32 b2 = SQRT2 * ( c2 * C6 - c3 * S6);        // NOTE we need to use inverse rotation (== transposed matrix)
+    const f32 b3 = SQRT2 * ( c2 * S6 + c3 * C6);
     const f32 b4 = c4 + c6;
     const f32 b5 = c7 - c5;
     const f32 b6 = c4 - c6;
@@ -1227,10 +1276,10 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 a1 = b2 + b1;
     const f32 a2 = b1 - b2;
     const f32 a3 = b0 - b3;
-    const f32 a4 =  b4 * C3 + b7 * S3;
-    const f32 a7 = -b4 * S3 + b7 * C3;
-    const f32 a5 =  b5 * C1 + b6 * S1;
-    const f32 a6 = -b5 * S1 + b6 * C1;
+    const f32 a4 =  b4 * C3 - b7 * S3;
+    const f32 a7 =  b4 * S3 + b7 * C3;
+    const f32 a5 =  b5 * C1 - b6 * S1;
+    const f32 a6 =  b5 * S1 + b6 * C1;
 
     out[0*out_stride] = SQRT8INV * (a0 + a7);
     out[1*out_stride] = SQRT8INV * (a1 + a6);
@@ -1245,30 +1294,23 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 // WORKS
 void idct_2d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
-    //  (I split it in 2 1D Cosine transform to reduce computation)
     f32 tmp[64] = {0};
+    f32 tmp2[64] = {0};
 
+    /*
+    for (u8 v=0; v<8; v++) {
+        idct_1d_naive(&Svx[v*8], 1, &mcu[v*8], 1);
+    }
+    */
     for (u8 v=0; v<8; v++) {
         idct_1d_naive(&tmp[v*8], 1, &mcu[v*8], 1);
     }
-
     for (u8 v=0; v<8; v++) {
-        idct_1d_llm(&Svx[v*8], 1, &mcu[v*8], 1);
+        dct_1d_llm(&tmp2[v*8], 1, &tmp[v*8], 1);
     }
-
-
-    // for (u8 v=0; v<8; v++) {
-    //     for (u8 i=0; i<8; i++) {
-    //         printf(
-    //             "%.3f  %.3f %.3f\n",
-    //             tmp[v*8+i], Svx[v*8+i],
-    //             Svx[v*8+i] / tmp[v*8+i]
-    //         );
-    //     }
-    // }
-    // printf("\n");
-
-
+    for (u8 v=0; v<8; v++) {
+        idct_1d_naive(&Svx[v*8], 1, &tmp2[v*8], 1);
+    }
 
     for (u8 x=0; x<8; x++) {
         idct_1d_naive(&idct[x], 8, &Svx[x], 8);
@@ -1279,113 +1321,9 @@ void idct_2d_naive(f32* idct, f32* mcu) {
     }
 }
 
-/*
- * TODO: REWRITE CLEARER TO COMPARE
-static void idct_1d_llm_mit(int *dctBlock) {
-    static const int c1=251 ; /* cos(pi/16)<<8 */
-    static const int s1=50  ; /* sin(pi/16)<<8 */
-    static const int c3=213 ; /* cos(3pi/16)<<8 */
-    static const int s3=142 ; /* sin(3pi/16)<<8 */
-    static const int r2c6=277; /* cos(6pi/16)*sqrt(2)<<9 */
-    static const int r2s6=669;
-    static const int r2=181; /* sqrt(2)<<7 */
-
-    /* Stage 4 */
-    int x0 = dctBlock[0]<<9;
-    int x1 = dctBlock[1]<<7;
-    int x2 = dctBlock[2];
-    int x3 = dctBlock[3]*r2;
-    int x4 = dctBlock[4]<<9;
-    int x5 = dctBlock[5]*r2;
-    int x6 = dctBlock[6];
-    int x7 = dctBlock[7]<<7;
-
-
-    int x8=x7+x1;
-    x1 -= x7;
-
-    /* Stage 3 */
-    x7  = x0+x4;
-    x0 -= x4;
-    x4  = x1+x5;
-    x1 -= x5;
-    x5  = x3+x8;
-    x8 -= x3;
-    x3  = r2c6*(x2+x6);
-    x6  = x3+(-r2c6-r2s6)*x6;
-    x2  = x3+(-r2c6+r2s6)*x2;
-
-
-    /* Stage 2 */
-    x3 = x7+x2;
-    x7 -= x2;
-    x2 = x0+x6;
-    x0 -= x6;
-
-    x6 = c3*(x4+x5);
-    x5 = (x6+(-c3-s3)*x5)>>6;
-    x4 = (x6+(-c3+s3)*x4)>>6;
-
-    x6 = c1*(x1+x8);
-    x1 = (x6+(-c1-s1)*x1)>>6;
-    x8 = (x6+(-c1+s1)*x8)>>6;
-
-
-    /* Stage 1, rounding and output */
-    x7 += 512;
-    x2 += 512;
-    x0 += 512;
-    x3 += 512;
-
-    const s32 a0 = x3;
-    const s32 a7 = x4;
-    const s32 a1 = x2;
-    const s32 a6 = x8;
-
-    dctBlock[0] = (a0 + a7) >>10;
-    dctBlock[1] = (a1 + a6) >>10;
-    dctBlock[2] = (x0+x1) >>10;
-    dctBlock[3] = (x7+x5) >>10;
-    dctBlock[4] = (x7-x5) >>10;
-    dctBlock[5] = (x0-x1) >>10;
-    dctBlock[6] = (a1 - a6) >>10;
-    dctBlock[7] = (a0 - a7) >>10;
-}
-*/
-
-
-/*
-void idct_2d_naive(f32* idct, f32* mcu) {
-    f32 Svx[64] = {0};
-    //  (I split it in 2 1D Cosine transform to reduce computation)
-    for (u8 v=0; v<8; v++) {
-        for (u8 x=0; x<8; x++) {
-
-            for (u8 u=0; u<8; u++) {
-                u8 l_vu = v*8+u;
-                Svx[v*8+x] += mcu[l_vu] * IDCT_Weights[x][u];
-            }
-        }
-    }
-
-    for (u8 y=0; y<8; y++) {
-        for (u8 x=0; x<8; x++) {
-
-            u8 l_yx = y*8+x;
-            for (u8 v=0; v<8; v++) {
-                idct[l_yx] += Svx[v*8+x] * IDCT_Weights[y][v];
-            }
-
-            f32 a = (f32)(idct[l_yx] + 128);
-            idct[l_yx] = a; // clamp(a+0.5);
-        }
-    }
-}
-*/
-
 // WORKS
 void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
-    f32 Svx[64] = {(f32)0xCDCDCDCD};
+    f32 Svx[64] = {0};
 
     for (u8 v=0; v<8; v++) {
         idct_1d_llm(&Svx[v*8], 1, &mcu[v*8], 1);
@@ -1398,54 +1336,6 @@ void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     for (u8 l=0; l<64; l++) {
         idct[l] = clamp(idct[l] + 128);
     }
-}
-
-// DOES NOT WORK
-void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-    f32 tmp0 = in[0*in_stride];
-    f32 tmp1 = in[2*in_stride];
-    f32 tmp2 = in[4*in_stride];
-    f32 tmp3 = in[6*in_stride];
-
-    f32 tmp4 = in[1*in_stride];
-    f32 tmp5 = in[3*in_stride];
-    f32 tmp6 = in[5*in_stride];
-    f32 tmp7 = in[7*in_stride];
-
-    //
-    f32 tmp10 = tmp0 + tmp2;	/* phase 3 */
-    f32 tmp11 = tmp0 - tmp2;
-    f32 tmp13 = tmp1 + tmp3;	/* phases 5-3 */
-    f32 tmp12 = (tmp1 - tmp3) * (1.414213562f) - tmp13; /* 2*c4 */
-    tmp0 = tmp10 + tmp13;	/* phase 2 */
-    tmp3 = tmp10 - tmp13;
-    tmp1 = tmp11 + tmp12;
-    tmp2 = tmp11 - tmp12;
-
-    //
-    f32 z13  = tmp6 + tmp5;		/* phase 6 */
-    f32 z10  = tmp6 - tmp5;
-    f32 z11  = tmp4 + tmp7;
-    f32 z12  = tmp4 - tmp7;
-    tmp7     = z11 + z13;		/* phase 5 */
-    tmp11    = (z11 - z13) * (1.414213562); /* 2*c4 */
-    f32 z5   = (z10 + z12) * (1.847759065); /* 2*c2 */
-    tmp10    = (1.082392200) * z12 - z5; /* 2*(c2-c6) */
-    tmp12    = (-2.613125930) * z10 + z5; /* -2*(c2+c6) */
-    tmp6     = tmp12 - tmp7;	/* phase 2 */
-    tmp5     = tmp11 - tmp6;
-    tmp4     = tmp10 + tmp5;
-
-
-    //
-    out[0*out_stride] = 0.25f*(tmp0 + tmp7);
-    out[1*out_stride] = 0.5f*SQRT2INV*C1*(tmp0 - tmp7);
-    out[2*out_stride] = 0.5f*SQRT2INV*C2*(tmp1 + tmp6);
-    out[3*out_stride] = 0.5f*SQRT2INV*C3*(tmp1 - tmp6);
-    out[4*out_stride] = 0.5f*SQRT2INV*C4*(tmp2 + tmp5);
-    out[5*out_stride] = 0.5f*SQRT2INV*C5*(tmp2 - tmp5);
-    out[6*out_stride] = 0.5f*SQRT2INV*C6*(tmp3 + tmp4);
-    out[7*out_stride] = 0.5f*SQRT2INV*C7*(tmp3 - tmp4);
 }
 
 // WORKS
