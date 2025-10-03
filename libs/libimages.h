@@ -1036,7 +1036,6 @@ f32 clampf32(f32 a, f32 low=0, f32 high=255){
 #define C6    0.38268343236508984
 #define C7    0.19509032201612833
 
-
 const f32 S1 = C7;
 const f32 S2 = C6;
 const f32 S3 = C5;
@@ -1045,6 +1044,7 @@ const f32 S5 = C3;
 const f32 S6 = C2;
 const f32 S7 = C1;
 
+// WORKS
 void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     for (u8 u=0; u<8; u++) {
         f32 sum = 0;
@@ -1055,55 +1055,17 @@ void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     }
 }
 
-void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-    const f32 a0 =  in[0*in_stride] + in[7*in_stride];
-    const f32 a1 =  in[1*in_stride] + in[6*in_stride];
-    const f32 a2 =  in[2*in_stride] + in[5*in_stride];
-    const f32 a3 =  in[3*in_stride] + in[4*in_stride];
-    const f32 a4 = -in[4*in_stride] + in[3*in_stride];
-    const f32 a5 = -in[5*in_stride] + in[2*in_stride];
-    const f32 a6 = -in[6*in_stride] + in[1*in_stride];
-    const f32 a7 = -in[7*in_stride] + in[0*in_stride];
+// WORKS
+void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    for (u8 x=0; x<8; x++) {
+        for (u8 u=0; u<8; u++) {
+            out[x*out_stride] += in[u*in_stride] * IDCT_Weights[x][u];
+        }
 
-    const f32 b0 = a0 + a3;
-    const f32 b1 = a1 + a2;
-    const f32 b2 = a1 - a2;
-    const f32 b3 = a0 - a3;
-    const f32 b4 =  a4 * C3 + a7 * S3;
-    const f32 b7 = -a4 * S3 + a7 * C3;
-    const f32 b5 =  a5 * C1 + a6 * S1;
-    const f32 b6 = -a5 * S1 + a6 * C1;
-
-    const f32 c0 = b0 + b1;
-    const f32 c1 = b0 - b1;
-    const f32 c2 = SQRT2 * ( b2 * C6 + b3 * S6);
-    const f32 c3 = SQRT2 * (-b2 * S6 + b3 * C6);
-    const f32 c4 = b4 + b6;
-    const f32 c5 = b7 - b5;
-    const f32 c6 = b4 - b6;
-    const f32 c7 = b7 + b5;
-
-    const f32 d0 = c0;
-    const f32 d1 = c1;
-    const f32 d2 = c2;
-    const f32 d3 = c3;
-    const f32 d4 = c7 - c4;
-    const f32 d5 = SQRT2 * c5;
-    const f32 d6 = SQRT2 * c6;
-    const f32 d7 = c7 + c4;
-
-    // In the article they decided to scale by \sqrt{2} instead of \sqrt{2/N}
-    // So I need to add the /sqrt(8)
-    out[0*out_stride] = SQRT8INV * d0;
-    out[4*out_stride] = SQRT8INV * d1;
-    out[2*out_stride] = SQRT8INV * d2;
-    out[6*out_stride] = SQRT8INV * d3;
-    out[7*out_stride] = SQRT8INV * d4;
-    out[3*out_stride] = SQRT8INV * d5;
-    out[5*out_stride] = SQRT8INV * d6;
-    out[1*out_stride] = SQRT8INV * d7;
+    }
 }
 
+// WORKS
 void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 b0 =  in[0*in_stride] + in[7*in_stride];
     const f32 b1 =  in[1*in_stride] + in[6*in_stride];
@@ -1182,15 +1144,57 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[3*out_stride] = ((C3/2) / (a5+1))       * g7;
 }
 
-void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-    for (u8 x=0; x<8; x++) {
-        for (u8 u=0; u<8; u++) {
-            out[x*out_stride] += in[u*in_stride] * IDCT_Weights[x][u];
-        }
+// WORKS
+void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    const f32 a0 =  in[0*in_stride] + in[7*in_stride];
+    const f32 a1 =  in[1*in_stride] + in[6*in_stride];
+    const f32 a2 =  in[2*in_stride] + in[5*in_stride];
+    const f32 a3 =  in[3*in_stride] + in[4*in_stride];
+    const f32 a4 = -in[4*in_stride] + in[3*in_stride];
+    const f32 a5 = -in[5*in_stride] + in[2*in_stride];
+    const f32 a6 = -in[6*in_stride] + in[1*in_stride];
+    const f32 a7 = -in[7*in_stride] + in[0*in_stride];
 
-    }
+    const f32 b0 = a0 + a3;
+    const f32 b1 = a1 + a2;
+    const f32 b2 = a1 - a2;
+    const f32 b3 = a0 - a3;
+    const f32 b4 =  a4 * C3 + a7 * S3;
+    const f32 b7 = -a4 * S3 + a7 * C3;
+    const f32 b5 =  a5 * C1 + a6 * S1;
+    const f32 b6 = -a5 * S1 + a6 * C1;
+
+    const f32 c0 = b0 + b1;
+    const f32 c1 = b0 - b1;
+    const f32 c2 = SQRT2 * ( b2 * C6 + b3 * S6);
+    const f32 c3 = SQRT2 * (-b2 * S6 + b3 * C6);
+    const f32 c4 = b4 + b6;
+    const f32 c5 = b7 - b5;
+    const f32 c6 = b4 - b6;
+    const f32 c7 = b7 + b5;
+
+    const f32 d0 = c0;
+    const f32 d1 = c1;
+    const f32 d2 = c2;
+    const f32 d3 = c3;
+    const f32 d4 = c7 - c4;
+    const f32 d5 = SQRT2 * c5;
+    const f32 d6 = SQRT2 * c6;
+    const f32 d7 = c7 + c4;
+
+    // In the article they decided to scale by \sqrt{2} instead of \sqrt{2/N}
+    // So I need to add the /sqrt(8)
+    out[0*out_stride] = SQRT8INV * d0;
+    out[4*out_stride] = SQRT8INV * d1;
+    out[2*out_stride] = SQRT8INV * d2;
+    out[6*out_stride] = SQRT8INV * d3;
+    out[7*out_stride] = SQRT8INV * d4;
+    out[3*out_stride] = SQRT8INV * d5;
+    out[5*out_stride] = SQRT8INV * d6;
+    out[1*out_stride] = SQRT8INV * d7;
 }
 
+// DOES NOT WORK
 void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d0 = in[0*in_stride];
     const f32 d1 = in[4*in_stride];
@@ -1200,15 +1204,6 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d5 = in[3*in_stride];
     const f32 d6 = in[5*in_stride];
     const f32 d7 = in[1*in_stride];
-
-    // const f32 d0 = in[0*in_stride];
-    // const f32 d1 = in[4*in_stride];
-    // const f32 d2 = in[2*in_stride];
-    // const f32 d3 = in[6*in_stride];
-    // const f32 d4 = in[7*in_stride];
-    // const f32 d5 = in[3*in_stride];
-    // const f32 d6 = in[5*in_stride];
-    // const f32 d7 = in[1*in_stride];
 
     const f32 c0 = d0;
     const f32 c1 = d1;
@@ -1247,23 +1242,32 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[7*out_stride] = SQRT8INV * (-a7 + a0);
 }
 
+// WORKS
 void idct_2d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
     //  (I split it in 2 1D Cosine transform to reduce computation)
     f32 tmp[64] = {0};
-    f32 tmp2[64] = {0};
 
     for (u8 v=0; v<8; v++) {
         idct_1d_naive(&tmp[v*8], 1, &mcu[v*8], 1);
     }
 
-    for (u8 y=0; y<8; y++) {
-        dct_1d_llm(&tmp2[y*8], 1, &tmp[y*8], 1);
+    for (u8 v=0; v<8; v++) {
+        idct_1d_llm(&Svx[v*8], 1, &mcu[v*8], 1);
     }
 
-    for (u8 v=0; v<8; v++) {
-        idct_1d_naive(&Svx[v*8], 1, &tmp2[v*8], 1);
-    }
+
+    // for (u8 v=0; v<8; v++) {
+    //     for (u8 i=0; i<8; i++) {
+    //         printf(
+    //             "%.3f  %.3f %.3f\n",
+    //             tmp[v*8+i], Svx[v*8+i],
+    //             Svx[v*8+i] / tmp[v*8+i]
+    //         );
+    //     }
+    // }
+    // printf("\n");
+
 
 
     for (u8 x=0; x<8; x++) {
@@ -1276,38 +1280,83 @@ void idct_2d_naive(f32* idct, f32* mcu) {
 }
 
 /*
-void idct_2d_naive(f32* idct, f32* mcu) {
-    f32 Svx[64] = {0};
-    //  (I split it in 2 1D Cosine transform to reduce computation)
-    for (u8 v=0; v<8; v++) {
-        for (u8 x=0; x<8; x++) {
+ * TODO: REWRITE CLEARER TO COMPARE
+static void idct_1d_llm_mit(int *dctBlock) {
+    static const int c1=251 ; /* cos(pi/16)<<8 */
+    static const int s1=50  ; /* sin(pi/16)<<8 */
+    static const int c3=213 ; /* cos(3pi/16)<<8 */
+    static const int s3=142 ; /* sin(3pi/16)<<8 */
+    static const int r2c6=277; /* cos(6pi/16)*sqrt(2)<<9 */
+    static const int r2s6=669;
+    static const int r2=181; /* sqrt(2)<<7 */
 
-            for (u8 u=0; u<8; u++) {
-                u8 l_vu = v*8+u;
-                Svx[v*8+x] += mcu[l_vu] * IDCT_Weights[x][u];
-            }
-        }
-    }
+    /* Stage 4 */
+    int x0 = dctBlock[0]<<9;
+    int x1 = dctBlock[1]<<7;
+    int x2 = dctBlock[2];
+    int x3 = dctBlock[3]*r2;
+    int x4 = dctBlock[4]<<9;
+    int x5 = dctBlock[5]*r2;
+    int x6 = dctBlock[6];
+    int x7 = dctBlock[7]<<7;
 
-    for (u8 y=0; y<8; y++) {
-        for (u8 x=0; x<8; x++) {
 
-            u8 l_yx = y*8+x;
-            for (u8 v=0; v<8; v++) {
-                idct[l_yx] += Svx[v*8+x] * IDCT_Weights[y][v];
-            }
+    int x8=x7+x1;
+    x1 -= x7;
 
-            f32 a = (f32)(idct[l_yx] + 128);
-            idct[l_yx] = a; // clamp(a+0.5);
-        }
-    }
+    /* Stage 3 */
+    x7  = x0+x4;
+    x0 -= x4;
+    x4  = x1+x5;
+    x1 -= x5;
+    x5  = x3+x8;
+    x8 -= x3;
+    x3  = r2c6*(x2+x6);
+    x6  = x3+(-r2c6-r2s6)*x6;
+    x2  = x3+(-r2c6+r2s6)*x2;
+
+
+    /* Stage 2 */
+    x3 = x7+x2;
+    x7 -= x2;
+    x2 = x0+x6;
+    x0 -= x6;
+
+    x6 = c3*(x4+x5);
+    x5 = (x6+(-c3-s3)*x5)>>6;
+    x4 = (x6+(-c3+s3)*x4)>>6;
+
+    x6 = c1*(x1+x8);
+    x1 = (x6+(-c1-s1)*x1)>>6;
+    x8 = (x6+(-c1+s1)*x8)>>6;
+
+
+    /* Stage 1, rounding and output */
+    x7 += 512;
+    x2 += 512;
+    x0 += 512;
+    x3 += 512;
+
+    const s32 a0 = x3;
+    const s32 a7 = x4;
+    const s32 a1 = x2;
+    const s32 a6 = x8;
+
+    dctBlock[0] = (a0 + a7) >>10;
+    dctBlock[1] = (a1 + a6) >>10;
+    dctBlock[2] = (x0+x1) >>10;
+    dctBlock[3] = (x7+x5) >>10;
+    dctBlock[4] = (x7-x5) >>10;
+    dctBlock[5] = (x0-x1) >>10;
+    dctBlock[6] = (a1 - a6) >>10;
+    dctBlock[7] = (a0 - a7) >>10;
 }
 */
+
 
 /*
 void idct_2d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
-    f32 tmp[64] = {0};
     //  (I split it in 2 1D Cosine transform to reduce computation)
     for (u8 v=0; v<8; v++) {
         for (u8 x=0; x<8; x++) {
@@ -1317,64 +1366,7 @@ void idct_2d_naive(f32* idct, f32* mcu) {
                 Svx[v*8+x] += mcu[l_vu] * IDCT_Weights[x][u];
             }
         }
-
-        idct_1d_llm(&tmp[v*8], 1, &mcu[v*8], 1);
     }
-    for (u8 v=0; v<8; v++) {
-        printf("          \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                %.5f %.5f \n\
-                ",
-                // Svx[v*8+0] / tmp[v*8+0],
-                // Svx[v*8+1] / tmp[v*8+1],
-                // Svx[v*8+2] / tmp[v*8+2],
-                // Svx[v*8+3] / tmp[v*8+3],
-                // Svx[v*8+4] / tmp[v*8+4],
-                // Svx[v*8+5] / tmp[v*8+5],
-                // Svx[v*8+6] / tmp[v*8+6],
-                // Svx[v*8+7] / tmp[v*8+7]
-                Svx[v*8+0],
-                tmp[v*8+0],
-                Svx[v*8+1],
-                tmp[v*8+1],
-                Svx[v*8+2],
-                tmp[v*8+2],
-                Svx[v*8+3],
-                tmp[v*8+3],
-                Svx[v*8+4],
-                tmp[v*8+4],
-                Svx[v*8+5],
-                tmp[v*8+5],
-                Svx[v*8+6],
-                tmp[v*8+6],
-                Svx[v*8+7],
-                tmp[v*8+7]
-                // Svx[v*8+0],
-                // Svx[v*8+1],
-                // Svx[v*8+2],
-                // Svx[v*8+3],
-                // Svx[v*8+4],
-                // Svx[v*8+5],
-                // Svx[v*8+6],
-                // Svx[v*8+7],
-                // tmp[v*8+0],
-                // tmp[v*8+1],
-                // tmp[v*8+2],
-                // tmp[v*8+3],
-                // tmp[v*8+4],
-                // tmp[v*8+5],
-                // tmp[v*8+6],
-                // tmp[v*8+7]
-                );
-        printf("\n");
-    }
-    printf("====================\n");
 
     for (u8 y=0; y<8; y++) {
         for (u8 x=0; x<8; x++) {
@@ -1391,6 +1383,7 @@ void idct_2d_naive(f32* idct, f32* mcu) {
 }
 */
 
+// WORKS
 void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     f32 Svx[64] = {(f32)0xCDCDCDCD};
 
@@ -1407,6 +1400,7 @@ void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     }
 }
 
+// DOES NOT WORK
 void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     f32 tmp0 = in[0*in_stride];
     f32 tmp1 = in[2*in_stride];
@@ -1454,6 +1448,7 @@ void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[7*out_stride] = 0.5f*SQRT2INV*C7*(tmp3 - tmp4);
 }
 
+// WORKS
 void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     f32 Svx[64];
 
@@ -1470,9 +1465,11 @@ void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     }
 }
 
+// DOES NOT WORK
 void idct_1d_lf(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 }
 
+// WORKS
 void idct_2d_lf(f32 idct[64], f32 mcu[64]) {
     f32 Svx[64];
 
