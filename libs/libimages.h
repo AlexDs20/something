@@ -1024,17 +1024,17 @@ f32 clampf32(f32 a, f32 low=0, f32 high=255){
     return t > high ? high : t;
 }
 
-#define SQRT2 1.4142135623730951
-#define SQRT8INV 0.35355339059327373
-#define SQRT2INV 0.7071067811865476
-#define C0    1.000000000000000
-#define C1    0.9807852804032304    // cos(k*pi/16)
-#define C2    0.9238795325112867
-#define C3    0.8314696123025452
-#define C4    0.7071067811865476
-#define C5    0.5555702330196023
-#define C6    0.38268343236508984
-#define C7    0.19509032201612833
+#define SQRT2       1.4142135623730951f
+#define SQRT8INV    0.35355339059327373f
+#define SQRT2INV    0.7071067811865476f
+#define C0          1.000000000000000f
+#define C1          0.9807852804032304f    // cos(k*pi/16)
+#define C2          0.9238795325112867f
+#define C3          0.8314696123025452f
+#define C4          0.7071067811865476f
+#define C5          0.5555702330196023f
+#define C6          0.38268343236508984f
+#define C7          0.19509032201612833f
 
 const f32 S1 = C7;
 const f32 S2 = C6;
@@ -1044,7 +1044,6 @@ const f32 S5 = C3;
 const f32 S6 = C2;
 const f32 S7 = C1;
 
-// WORKS
 void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     for (u8 u=0; u<8; u++) {
         f32 sum = 0;
@@ -1055,7 +1054,6 @@ void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     }
 }
 
-// WORKS
 void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     for (u8 x=0; x<8; x++) {
         for (u8 u=0; u<8; u++) {
@@ -1065,7 +1063,6 @@ void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     }
 }
 
-// WORKS
 void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 a1 = C4;
     const f32 a2 = C2 - C6;
@@ -1086,6 +1083,7 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 c1 = b1 + b2;
     const f32 c2 = b1 - b2;
     const f32 c3 = b0 - b3;
+
     const f32 c4 = -b4 - b5;
     const f32 c5 = b5 + b6;
     const f32 c6 = b6 + b7;
@@ -1095,6 +1093,7 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 d1 = c0 - c1;
     const f32 d2 = c2 + c3;
     const f32 d3 = c3;
+
     const f32 d4 = c4;
     const f32 d5 = c5;
     const f32 d6 = c6;
@@ -1107,6 +1106,7 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     const f32 e1 = d1;
     const f32 e2 = a1 * d2;
     const f32 e3 = d3;
+
     const f32 e4 = -d8 - a2 * d4;
     const f32 e5 = a3 * d5;
     const f32 e6 = a4*d6 - d8;
@@ -1134,13 +1134,13 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 
     // Scaling
     const f32 s0 = SQRT8INV * (1.0f/C0);
-    const f32 s1 = 0.25f * SQRT2 * (1.0f/C1);
-    const f32 s2 = 0.25f * SQRT2 * (1.0f/C2);
-    const f32 s3 = 0.25f * SQRT2 * (1.0f/C3);
-    const f32 s4 = 0.25f * SQRT2 * (1.0f/C4);
-    const f32 s5 = 0.25f * SQRT2 * (1.0f/C5);
-    const f32 s6 = 0.25f * SQRT2 * (1.0f/C6);
-    const f32 s7 = 0.25f * SQRT2 * (1.0f/C7);
+    const f32 s1 = 0.25f * (1.0f/C1);
+    const f32 s2 = 0.25f * (1.0f/C2);
+    const f32 s3 = 0.25f * (1.0f/C3);
+    const f32 s4 = 0.25f * (1.0f/C4);
+    const f32 s5 = 0.25f * (1.0f/C5);
+    const f32 s6 = 0.25f * (1.0f/C6);
+    const f32 s7 = 0.25f * (1.0f/C7);
 
     out[0*out_stride] = s0 * g0;
     out[4*out_stride] = s4 * g1;
@@ -1153,51 +1153,121 @@ void dct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[3*out_stride] = s3 * g7;
 }
 
-// DOES NOT WORK
 void idct_1d_aan(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-    const f32 h0 = in[0*in_stride];
-    const f32 h1 = in[2*in_stride];
-    const f32 h2 = in[4*in_stride];
-    const f32 h3 = in[6*in_stride];
+    const f32 s0 = SQRT8INV * (1.0f/C0);
+    const f32 s1 = 0.25f * (1.0f/C1);
+    const f32 s2 = 0.25f * (1.0f/C2);
+    const f32 s3 = 0.25f * (1.0f/C3);
+    const f32 s4 = 0.25f * (1.0f/C4);
+    const f32 s5 = 0.25f * (1.0f/C5);
+    const f32 s6 = 0.25f * (1.0f/C6);
+    const f32 s7 = 0.25f * (1.0f/C7);
 
-    const f32 h4 = in[1*in_stride];
-    const f32 h5 = in[3*in_stride];
-    const f32 h6 = in[5*in_stride];
-    const f32 h7 = in[7*in_stride];
+    const f32 f0 = in[0*in_stride] * s0;
+    const f32 f1 = in[4*in_stride] * s4;
+    const f32 f2 = in[2*in_stride] * s2;
+    const f32 f3 = in[6*in_stride] * s6;
+    const f32 f4 = in[5*in_stride] * s5;
+    const f32 f5 = in[1*in_stride] * s1;
+    const f32 f6 = in[7*in_stride] * s7;
+    const f32 f7 = in[3*in_stride] * s3;
 
-    const f32 g0 = h0;
-    const f32 g1 = h1;
-    const f32 g2 = h2;
-    const f32 g3 = h3;
-    const f32 g4 = h4 - h7;
-    const f32 g5 = h5 + h6;
-    const f32 g6 = h5 - h6;
-    const f32 g7 = h7 + h4;
+    const f32 e0 = f0;
+    const f32 e1 = f1;
+    const f32 e2 = f2;
+    const f32 e3 = f3;
+    const f32 e4 = f4 - f7;
+    const f32 e5 = f5 + f6;
+    const f32 e6 = f5 - f6;
+    const f32 e7 = f4 + f7;
 
-    const f32 f0 = g0;
-    const f32 f1 = g1;
-    const f32 f2 = g2 - g3;
-    const f32 f3 = g2 + g3;
-    const f32 f4 = g4;
-    const f32 f5 = g5 - g7;
-    const f32 f6 = g6;
-    const f32 f7 = g7 + g5;
+    const f32 d0 =      e0;
+    const f32 d1 =      e1;
+    const f32 d2 = e2 - e3;
+    const f32 d3 = e2 + e3;
+    const f32 d4 =      e4;
+    const f32 d5 = e5 - e7;
+    const f32 d6 =      e6;
+    const f32 d7 = e5 + e7;
 
 
-    //
-    out[0*out_stride] = (tmp0 + tmp7);
-    out[1*out_stride] = (tmp0 - tmp7);
-    out[2*out_stride] = (tmp1 + tmp6);
-    out[3*out_stride] = (tmp1 - tmp6);
-    out[4*out_stride] = (tmp2 + tmp5);
-    out[5*out_stride] = (tmp2 - tmp5);
-    out[6*out_stride] = (tmp3 + tmp4);
-    out[7*out_stride] = (tmp3 - tmp4);
+    const f32 c0 =                     d0;
+    const f32 c1 =                     d1;
+    const f32 c2 =                  C4*d2;
+    const f32 c3 =                     d3;
+    const f32 c4 = -C6*d6 + d4*(-C2);
+    const f32 c5 =                  C4*d5;
+    const f32 c6 =  -C6*d4 + d6*(C2);
+    const f32 c7 =                     d7;
+
+
+    const f32 b0 = c0 + c1;
+    const f32 b1 = c0 - c1;
+    const f32 b2 =      c2;
+    const f32 b3 = c2 + c3;
+    const f32 b4 =      c4;
+    const f32 b5 =      c5;
+    const f32 b6 =      c6;
+    const f32 b7 =      c7;
+
+
+    const f32 a0 =  b0 + b3;
+    const f32 a1 =  b1 + b2;
+    const f32 a2 =  b1 - b2;
+    const f32 a3 =  b0 - b3;
+    const f32 a4 =      -b4;
+    const f32 a5 = -b4 + b5;
+    const f32 a6 =  b5 + b6;
+    const f32 a7 =  b6 + b7;
+
+    const f32 h0 = a0 + a7;
+    const f32 h1 = a1 + a6;
+    const f32 h2 = a2 + a5;
+    const f32 h3 = a3 + a4;
+    const f32 h4 = a3 - a4;
+    const f32 h5 = a2 - a5;
+    const f32 h6 = a1 - a6;
+    const f32 h7 = a0 - a7;
+
+    out[0*out_stride] = h0;
+    out[1*out_stride] = h1;
+    out[2*out_stride] = h2;
+    out[3*out_stride] = h3;
+    out[4*out_stride] = h4;
+    out[5*out_stride] = h5;
+    out[6*out_stride] = h6;
+    out[7*out_stride] = h7;
+
+
+    /*
+    const f32 a1 = C4;
+    const f32 a2 = C2 - C6;
+    const f32 a3 = C4;
+    const f32 a4 = C2 + C6;
+    const f32 a5 = C6;
+
+    const f32 b0 = f0 + f1 + f2*(a1 + 1) + f3*(1 - a1) + f4*(1 - a5) + f5*(a4 - a5 + 1) + f6*(-a4 + a5 + 1) + f7*(a5 + 1);
+    const f32 b1 =        a1*f2 - a1*f3 + f0 - f1 + f4*(-a3 - a5) + f5*(a3 + a4 - a5) + f6*(a3 - a4 + a5) + f7*(-a3 + a5);
+    const f32 b2 =        -a1*f2 + a1*f3 + f0 - f1 + f4*(a2 - a3 + a5) + f5*(a3 + a5) + f6*(a3 - a5) + f7*(-a2 - a3 - a5);
+    const f32 b3 =                    a5*f5 - a5*f6 + f0 + f1 + f2*(-a1 - 1) + f3*(a1 - 1) + f4*(a2 + a5) + f7*(-a2 - a5);
+    const f32 b4 =                   -a5*f5 + a5*f6 + f0 + f1 + f2*(-a1 - 1) + f3*(a1 - 1) + f4*(-a2 - a5) + f7*(a2 + a5);
+    const f32 b5 =      -a1*f2 + a1*f3 + f0 - f1 + f4*(-a2 + a3 - a5) + f5*(-a3 - a5) + f6*(-a3 + a5) + f7*(a2 + a3 + a5);
+    const f32 b6 =        a1*f2 - a1*f3 + f0 - f1 + f4*(a3 + a5) + f5*(-a3 - a4 + a5) + f6*(-a3 + a4 - a5) + f7*(a3 - a5);
+    const f32 b7 =f0 + f1 + f2*(a1 + 1) + f3*(1 - a1) + f4*(a5 - 1) + f5*(-a4 + a5 - 1) + f6*(a4 - a5 - 1) + f7*(-a5 - 1);
+
+    out[0*out_stride] = b0;
+    out[1*out_stride] = b1;
+    out[2*out_stride] = b2;
+    out[3*out_stride] = b3;
+    out[4*out_stride] = b4;
+    out[5*out_stride] = b5;
+    out[6*out_stride] = b6;
+    out[7*out_stride] = b7;
+    */
 }
 
-// WORKS
-// TODO: Reduce rotation ops
 void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    // TODO: Reduce rotation ops
     const f32 a0 =  in[0*in_stride] + in[7*in_stride];
     const f32 a1 =  in[1*in_stride] + in[6*in_stride];
     const f32 a2 =  in[2*in_stride] + in[5*in_stride];
@@ -1246,9 +1316,8 @@ void dct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[1*out_stride] = SQRT8INV * d7;
 }
 
-// WORKS
-// TODO: Reduce rotation ops
 void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    // TODO: Reduce rotation ops
     const f32 d0 = in[0*in_stride];
     const f32 d1 = in[4*in_stride];
     const f32 d2 = in[2*in_stride];
@@ -1295,37 +1364,22 @@ void idct_1d_llm(f32* out, u32 out_stride, f32* in, u32 in_stride) {
     out[7*out_stride] = SQRT8INV * (-a7 + a0);
 }
 
-// WORKS
 void idct_2d_naive(f32* idct, f32* mcu) {
     f32 Svx[64] = {0};
-    f32 tmp[64] = {0};
-    f32 tmp2[64] = {0};
-
-    /*
     for (u8 v=0; v<8; v++) {
         idct_1d_naive(&Svx[v*8], 1, &mcu[v*8], 1);
-    }
-    */
-    for (u8 v=0; v<8; v++) {
-        idct_1d_naive(&tmp[v*8], 1, &mcu[v*8], 1);
-    }
-    for (u8 v=0; v<8; v++) {
-        dct_1d_aan(&tmp2[v*8], 1, &tmp[v*8], 1);
-    }
-    for (u8 v=0; v<8; v++) {
-        idct_1d_naive(&Svx[v*8], 1, &tmp2[v*8], 1);
     }
 
     for (u8 x=0; x<8; x++) {
         idct_1d_naive(&idct[x], 8, &Svx[x], 8);
     }
 
+
     for (u8 l=0; l<64; l++) {
         idct[l] = clamp(idct[l] + 128);
     }
 }
 
-// WORKS
 void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     f32 Svx[64] = {0};
 
@@ -1342,7 +1396,6 @@ void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     }
 }
 
-// WORKS
 void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     f32 Svx[64];
 
@@ -1358,37 +1411,6 @@ void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
         idct[l] = clampf32(idct[l] + 128);
     }
 }
-
-// DOES NOT WORK
-void idct_1d_lf(f32* out, u32 out_stride, f32* in, u32 in_stride) {
-}
-
-// WORKS
-void idct_2d_lf(f32 idct[64], f32 mcu[64]) {
-    f32 Svx[64];
-
-    for (u8 v=0; v<8; v++) {
-        idct_1d_lf(&Svx[v*8], 1, &mcu[v*8], 1);
-    }
-
-    for (u8 x=0; x<8; x++) {
-        idct_1d_lf(&idct[x], 8, &Svx[x], 8);
-    }
-
-    for (u8 l=0; l<64; l++) {
-        idct[l] = clampf32(0.25f*idct[l] + 128);
-    }
-}
-
-#if defined(IDCT_AAN)
-#define idct_2d idct_2d_aan
-#elif defined(IDCT_LLM)
-#define idct_2d idct_2d_llm
-#elif defined(IDCT_LF)
-#define idct_2d idct_2d_lf
-#else
-#define idct_2d idct_2d_naive
-#endif
 
 ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
     u8 expected_restart_id = 0;
@@ -1501,7 +1523,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 }
 
                                 // IDCT
-                                idct_2d(idct, mcu);
+                                idct_2d_aan(idct, mcu);
 
                                 // Assign the value at the correct component buffer position
                                 u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
