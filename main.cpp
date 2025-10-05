@@ -32,10 +32,16 @@ int main() {
         model = read_obj_model_file(scene_arena, file_path);
     }
 
-    const u32 w = 1024;
-    const u32 h = 768;
+    u32* data = model->material->map_Kd.data;
+    u32 img_w = model->material->map_Kd.width;
+    u32 img_h = model->material->map_Kd.height;
+
+    const u32 w = img_w;
+    const u32 h = img_h<512 ? img_h : 512;
     const u32 bg_color = 0x777777;
     Win win = platform_init_win(w, h, msg);
+
+    memcpy(win.buffer, data, w * h * sizeof(u32));
 
     const f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
@@ -47,13 +53,13 @@ int main() {
         // And this is uglier...
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
 
-        for (int i=0; i<win.h*win.w; i++) {
-            win.buffer[i] = bg_color;
-            zbuffer[i] = zdefault.f;
-        }
+        // for (int i=0; i<win.h*win.w; i++) {
+        //     win.buffer[i] = bg_color;
+        //     zbuffer[i] = zdefault.f;
+        // }
 
         // draw_model_wireframe(model, win.w, win.h, win.buffer);
-        draw_model(model, win.w, win.h, win.buffer, zbuffer);
+        // draw_model(model, win.w, win.h, win.buffer, zbuffer);
 
         XPutImage(win.display, win.window, win.gc, win.xim, 0, 0, 0, 0, win.w, win.h);
         // usleep(16);
