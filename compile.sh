@@ -2,15 +2,17 @@
 
 BIN="./build/main"
 
-FLAGS="-g -ggdb -pg -O0 -Wall" # -finstrument-functions -fsanitize=address"
+FLAGS="-g -ggdb -pg -O0 -Wall"
 # FLAGS="-O3"
-DEFINES="-D_DEBUG -DIDCT_FAST"
+FLAGS+=" -march=native -masm=intel -ffast-math"
+# FLAGS+=" -finstrument-functions -fsanitize=address"
+DEFINES="-D_DEBUG"
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I."
 ENTRYPOINT="main.cpp"
 SRC="./*/*.cpp"
-CXX=g++
+CXX=clang++
 
 function echo () {
     builtin echo "[$(date +'%Y-%m-%d %H:%M:%S.%3N')] $@"
@@ -37,7 +39,13 @@ if [[ $(uname) == "Linux" ]]; then
     fi
 fi
 
-CMD="$CXX -o $BIN $ENTRYPOINT $SRC $FLAGS $INCLUDES $LINKS $DEFINES"
+if [ $BIN ]; then
+    CMD="$CXX -o $BIN $ENTRYPOINT $SRC $FLAGS $INCLUDES $LINKS $DEFINES"
+else
+    FLAGS+=" -S"
+    CMD="$CXX $ENTRYPOINT $SRC $FLAGS $INCLUDES $LINKS $DEFINES"
+fi
+
 echo "Compiling: "
 echo "   $CMD"
 SECONDS=0
@@ -47,6 +55,8 @@ duration=$SECONDS
 
 if [ $SUCCESS -eq 0 ]; then
     echo "Compilation success: $((duration / 60)) min $((duration % 60)) sec elapsed."
-    echo "running $BIN"
-    time ./$BIN
+    if [ $BIN ]; then
+        echo "running $BIN"
+        time ./$BIN
+    fi
 fi

@@ -1,55 +1,5 @@
-#ifndef _LIBIMAGES_H
-#define _LIBIMAGES_H
-
-#include "libstring.h"
-#include "utils/types.h"
-#include "platform/io.h"
-// #include "libs/libmath.h"
-
-typedef struct ImageInfo ImageInfo;
-struct ImageInfo {
-    u32 width;
-    u32 height;
-    u8 channels;
-    u8 precision;
-};
-
-typedef struct Image Image;
-struct Image {
-    union {
-        u32* data;
-        u32* buffer;
-        u8* gray;
-        u32* rgb;
-        u32* rgba;
-    };
-    u32 width;
-    u32 height;
-    u8 components;
-    u8 precision;
-};
-
-// TODO(alex): Have real errors
-typedef enum {
-    IMAGE_SUCCESS = 0,
-    IMAGE_FAIL,
-} ImageError;
-
-typedef struct ImageParsingResult ImageParsingResult;
-struct ImageParsingResult {
-    ImageError status;
-    // TODO(alex): Make this string8?
-    const char* error_message;
-};
-
-ImageInfo read_image_info(string8 filename);
-
-// TODO(alex): Maybe request a pointer where there is enough space instead?
-Image read_image_file(Arena* arena, string8 filename);
-
-#endif // _LIBIMAGES_H
-
-#ifdef LIB_IMAGES_IMPLEMENTATION
+#include "libs/ads_jpeg.h"
+#include <stdio.h>
 /*  ============
  *  JPEG JFIF
  *  ============
@@ -504,21 +454,6 @@ u16 peek_2_bytes(u8* v) {
     return v[0] << 8 | v[1];
 }
 
-// TODO(alex): move to libmath.h
-u32 ceilf32(f32 a) {
-    u32 aint = (u32)a;
-
-    // If the value is its own int
-    if (a == (f32)aint) {
-        return aint;
-    }
-
-    if (a>0) {
-        return aint+1;
-    }
-    return aint;
-}
-
 ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
     FrameHeader& fh = jpeg->fh;
 
@@ -585,8 +520,8 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
     }
 
     // Compute interesting size info related to mcu and components
-    fh.n_mcu_width  = ceilf32((f32)fh.X / (8*(u16)fh.Hmax));
-    fh.n_mcu_height = ceilf32((f32)fh.Y / (8*(u16)fh.Vmax));
+    fh.n_mcu_width  = ceil((f32)fh.X / (8*(u16)fh.Hmax));
+    fh.n_mcu_height = ceil((f32)fh.Y / (8*(u16)fh.Vmax));
 
     for (u8 i=0; i<fh.src_components; i++) {
         fh.components[i].xi = fh.n_mcu_width  * (8*fh.components[i].Hi);
@@ -1014,14 +949,14 @@ ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-s16 clamp(s16 a, s16 low=0, s16 high=255){
-    s16 t = a < low ? low : a;
-    return t > high ? high : t;
+s16 clamps16_0_255(s16 a){
+    s16 t = a < 0 ? 0 : a;
+    return t > 255 ? 255 : t;
 }
 
-f32 clampf32(f32 a, f32 low=0, f32 high=255){
-    f32 t = a < low ? low : a;
-    return t > high ? high : t;
+f32 clampf32_0_255(f32 a){
+    f32 t = a < 0 ? 0: a;
+    return t > 255 ? 255 : t;
 }
 
 #define SQRT2       1.4142135623730951f
@@ -1376,7 +1311,7 @@ void idct_2d_naive(f32* idct, f32* mcu) {
 
 
     for (u8 l=0; l<64; l++) {
-        idct[l] = clamp(idct[l] + 128);
+        idct[l] = clampf32_0_255(idct[l] + 128);
     }
 }
 
@@ -1392,7 +1327,7 @@ void idct_2d_llm(f32 idct[64], f32 mcu[64]) {
     }
 
     for (u8 l=0; l<64; l++) {
-        idct[l] = clamp(idct[l] + 128);
+        idct[l] = clampf32_0_255(idct[l] + 128);
     }
 }
 
@@ -1408,7 +1343,7 @@ void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     }
 
     for (u8 l=0; l<64; l++) {
-        idct[l] = clampf32(idct[l] + 128);
+        idct[l] = clampf32_0_255(idct[l] + 128);
     }
 }
 
@@ -1442,8 +1377,8 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     if (n_components == 1) {
         Vi[0] = 1;
         Hi[0] = 1;
-        n_mcu_width =  ceilf32((f32)jpeg->fh.components[0].xi / 8);
-        n_mcu_height = ceilf32((f32)jpeg->fh.components[0].yi / 8);
+        n_mcu_width =  ceil((f32)jpeg->fh.components[0].xi / 8);
+        n_mcu_height = ceil((f32)jpeg->fh.components[0].yi / 8);
     } else {
         for (u8 i=0; i<n_components; i++) {
             Vi[i] = jpeg->sh.components[i]->Vi;
@@ -1631,6 +1566,7 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
+// TODO(alex): This should not use Arena and string8 but standard C types.
 ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     // Note: Current goal is to support baseline DCT 8 bits
     BitStream bs = {
@@ -1782,9 +1718,9 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     f32 g = comp0[l0] - 0.34414 * (comp1[l1] - 128)   - 0.71414 * (comp2[l2] - 128);
                     f32 b = comp0[l0] + 1.772   * (comp1[l1] - 128);
 
-                    jpeg.buffer[l*4 + 0] = (u8)clamp(b+0.5);
-                    jpeg.buffer[l*4 + 1] = (u8)clamp(g+0.5);
-                    jpeg.buffer[l*4 + 2] = (u8)clamp(r+0.5);
+                    jpeg.buffer[l*4 + 0] = (u8)clampf32_0_255(b+0.5);
+                    jpeg.buffer[l*4 + 1] = (u8)clampf32_0_255(g+0.5);
+                    jpeg.buffer[l*4 + 2] = (u8)clampf32_0_255(r+0.5);
                     jpeg.buffer[l*4 + 3] = 255;
                 }
             }
@@ -1793,9 +1729,9 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             for (u32 y=0; y<jpeg.fh.src_height; y++) {
                 for (u32 x=0; x<jpeg.fh.src_width; x++) {
                     u64 l = y * jpeg.fh.src_width + x;
-                    jpeg.buffer[l*4 + 0] = (u8)clamp(comp0[l]);
-                    jpeg.buffer[l*4 + 1] = (u8)clamp(comp0[l]);
-                    jpeg.buffer[l*4 + 2] = (u8)clamp(comp0[l]);
+                    jpeg.buffer[l*4 + 0] = (u8)clampf32_0_255(comp0[l]);
+                    jpeg.buffer[l*4 + 1] = (u8)clampf32_0_255(comp0[l]);
+                    jpeg.buffer[l*4 + 2] = (u8)clampf32_0_255(comp0[l]);
                     jpeg.buffer[l*4 + 3] = 255;
                 }
             }
@@ -1817,63 +1753,3 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
-
-void create_missing_image(Arena* arena, Image* out) {
-    out->width  = 128;
-    out->height = 128;
-    out->data = (u32*)arena_alloc_push(arena, out->width*out->height*sizeof(u32));
-
-    const u32 pattern_size = 64;
-    for (u32 j=0; j<out->height; j++) {
-        for (u32 i=0; i<out->width; i++) {
-            u32 linear_index = j*out->width + i;
-            u32 color = 0;
-            if (((u32)j/pattern_size + (u32)i/pattern_size) % 2 == 1) {
-                color = 0xFF00FF;
-            }
-            out->data[linear_index] = color;
-        }
-    }
-    return;
-}
-
-ImageInfo read_image_info(string8 filename) {
-    ImageInfo out = {0};
-    // TODO
-    return out;
-}
-
-Image read_image_file(Arena* persist_arena, string8 filename) {
-    Image out = {0};
-    LocalArena* local_arena = local_arena_alloc_create();
-    u64 checkpoint = arena_alloc_checkpoint(persist_arena);
-
-    printf("Reading file: ");
-    string_print(filename);
-    printf("\n");
-    string8 data = read_file(local_arena->arena, filename);
-    string8 extension = string_get_file_extension(filename);
-
-    ImageParsingResult result = {IMAGE_FAIL, ""};
-    if (extension == ".jpg" || extension == ".jpeg") {
-        result = decode_jpeg(persist_arena, data, &out);
-    } else if (extension == ".png"){
-        // decode_png(persist_arena, data, &out);
-    } else {
-        printf("File format not supported: extension = ");
-        string_print(extension);
-    }
-
-    if (result.status != IMAGE_SUCCESS) {
-        arena_alloc_restore_zero(persist_arena, checkpoint);
-        printf("Failed parsing file: ");
-        string_print(filename);
-        printf(" with error: %s\n", result.error_message);
-        create_missing_image(persist_arena, &out);
-    }
-
-    local_arena_alloc_reset(local_arena);
-    return out;
-}
-
-#endif // LIB_IMAGES_IMPLEMENTATION

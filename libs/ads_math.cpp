@@ -1,21 +1,19 @@
-#ifndef _LIBMATH_H
-#define _LIBMATH_H
+#include "ads_math.h"
 #include <math.h>
 #include "utils/types.h"
-
 //====================
 //      u8
 //====================
 u8
-max(u8 a, u8 b) {
+maxu8(u8 a, u8 b) {
     return a > b ? a : b;
 }
 u8
-min(u8 a, u8 b) {
+minu8(u8 a, u8 b) {
     return a < b ? a : b;
 }
 u8
-clamp(u8 a, u8 low, u8 high) {
+clampu8(u8 a, u8 low, u8 high) {
     u8 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -24,15 +22,15 @@ clamp(u8 a, u8 low, u8 high) {
 //      s8
 //====================
 s8
-max(s8 a, s8 b) {
+maxs8(s8 a, s8 b) {
     return a > b ? a : b;
 }
 s8
-min(s8 a, s8 b) {
+mins8(s8 a, s8 b) {
     return a < b ? a : b;
 }
 s8
-clamp(s8 a, s8 low, s8 high) {
+clamps8(s8 a, s8 low, s8 high) {
     s8 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -41,15 +39,15 @@ clamp(s8 a, s8 low, s8 high) {
 //      u16
 //====================
 u16
-max(u16 a, u16 b) {
+maxu16(u16 a, u16 b) {
     return a > b ? a : b;
 }
 u16
-min(u16 a, u16 b) {
+minu16(u16 a, u16 b) {
     return a < b ? a : b;
 }
 u16
-clamp(u16 a, u16 low, u16 high) {
+clampu16(u16 a, u16 low, u16 high) {
     u16 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -58,15 +56,15 @@ clamp(u16 a, u16 low, u16 high) {
 //      s16
 //====================
 s16
-max(s16 a, s8 b) {
+maxs16(s16 a, s8 b) {
     return a > b ? a : b;
 }
 s16
-min(s16 a, s8 b) {
+mins16(s16 a, s8 b) {
     return a < b ? a : b;
 }
 s16
-clamp(s16 a, s8 low, s8 high) {
+clamps16(s16 a, s16 low, s16 high) {
     s16 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -75,15 +73,15 @@ clamp(s16 a, s8 low, s8 high) {
 //      u32
 //====================
 u32
-max(u32 a, u32 b) {
+maxu32(u32 a, u32 b) {
     return a > b ? a : b;
 }
 u32
-min(u32 a, u32 b) {
+minu32(u32 a, u32 b) {
     return a < b ? a : b;
 }
 u32
-clamp(u32 a, u32 low, u32 high) {
+clampu32(u32 a, u32 low, u32 high) {
     u32 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -92,15 +90,15 @@ clamp(u32 a, u32 low, u32 high) {
 //      s32
 //====================
 s32
-max(s32 a, s32 b) {
+maxs32(s32 a, s32 b) {
     return a > b ? a : b;
 }
 s32
-min(s32 a, s32 b) {
+mins32(s32 a, s32 b) {
     return a < b ? a : b;
 }
 s32
-clamp(s32 a, s32 low, s32 high) {
+clamps32(s32 a, s32 low, s32 high) {
     s32 t = a < low ? low : a;
     return t > high ? high : t;
 }
@@ -109,18 +107,34 @@ clamp(s32 a, s32 low, s32 high) {
 //      f32
 //====================
 f32
-max(f32 a, f32 b) {
+maxf32(f32 a, f32 b) {
     return a > b ? a : b;
 }
 f32
-min(f32 a, f32 b) {
+minf32(f32 a, f32 b) {
     return a < b ? a : b;
 }
 f32
-clamp(f32 a, f32 low, f32 high) {
+clampf32(f32 a, f32 low, f32 high) {
     f32 t = a < low ? low : a;
     return t > high ? high : t;
 }
+/*
+u32
+ceilf32(f32 a) {
+    u32 aint = (u32)a;
+
+    // If the value is its own int
+    if (a == (f32)aint) {
+        return aint;
+    }
+
+    if (a>0) {
+        return aint+1;
+    }
+    return aint;
+}
+*/
 
 //====================
 //      u32x2
@@ -815,5 +829,3 @@ cross(f32x3 a, f32x3 b) {
     };
     return result;
 }
-
-#endif // _LIBMATH_H

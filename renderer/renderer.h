@@ -2,7 +2,7 @@
 #define _RENDERER_H
 
 #include "utils/types.h"
-#include "libs/libimages.h"
+#include "libs/ads_images.h"
 #include "memory/allocators.h"
 
 typedef struct {

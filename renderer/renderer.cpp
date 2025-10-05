@@ -4,9 +4,9 @@
 #include <stdlib.h>
 
 #include "renderer/renderer.h"
-#include "libs/libmath.h"
+#include "libs/ads_math.h"
 #include "libs/libstring.h"
-#include "libs/libimages.h"
+#include "libs/ads_images.h"
 #include "utils/defines.h"
 #include "platform/io.h"
 
@@ -490,10 +490,10 @@ typedef union {
 
 void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
     Bboxf32 bbox = {};
-    bbox.left    = min(a->x, min(b->x, c->x));
-    bbox.right   = max(a->x, max(b->x, c->x));
-    bbox.bottom  = min(a->y, min(b->y, c->y));
-    bbox.top     = max(a->y, max(b->y, c->y));
+    bbox.left    = minf32(a->x, minf32(b->x, c->x));
+    bbox.right   = maxf32(a->x, maxf32(b->x, c->x));
+    bbox.bottom  = minf32(a->y, minf32(b->y, c->y));
+    bbox.top     = maxf32(a->y, maxf32(b->y, c->y));
 
     f32 zmid = (a->z + b->z + c->z) / 3;
 

@@ -8,8 +8,7 @@
 #include "platform/window.h"
 #include "renderer/renderer.h"
 #include "libs/libstring.h"
-#define LIB_IMAGES_IMPLEMENTATION
-#include "libs/libimages.h"
+#include "libs/ads_images.h"
 #include "utils/types.h"
 #include "utils/defines.h"
 #include "utils/io.h"
