@@ -529,6 +529,7 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
 
         // Note: Only support of 8 bits components
         fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof (f32));
+        // fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * fh.src_components * sizeof (u8));
     }
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
@@ -737,7 +738,7 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_
 
         //==============================
         // Convert table to tree for easier parsing of the entropy stream
-        HuffmanNode* root = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
+        HuffmanNode* root = (HuffmanNode*)arena_alloc_push_zero(arena, sizeof(HuffmanNode));
         if (table_class == 0) {
             ht.DCroot[idx] = root;
         } else {
@@ -1408,6 +1409,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             jpeg->dc_pred[3] = 0;
 
             u64 n = 0;
+            // TODO: This does not handle properly on the last of the restart intervals if the number of mcu in the last restart_interval is not
             while (n++ < restart_interval) {
                 // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
                 {
