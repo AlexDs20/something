@@ -36,7 +36,13 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
     if (extension == ".jpg" || extension == ".jpeg") {
-        result = decode_jpeg(persist_arena, data, &out);
+        char* f = string_to_cstr(local_arena->arena, filename);
+        int w, h, c;
+        out.gray = stbi_load(f, &w, &h, &c, 4);
+        out.width = w;
+        out.height = h;
+        out.components = c;
+        // result = decode_jpeg(persist_arena, data, &out);
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
         int w, h, c;

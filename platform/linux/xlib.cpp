@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -87,24 +88,45 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     }
 
     int screen = DefaultScreen(win.display);
-    int root = DefaultRootWindow(win.display);
+    int root = RootWindow(win.display, screen);
 
+    int screen_bit_depth = 24;
+    XVisualInfo vis_info;
+    Status status = XMatchVisualInfo(win.display, screen, screen_bit_depth, TrueColor, &vis_info);
+    if(status == 0) {
+      printf("No matching visual info\n");
+      win = {};
+      return(win);
+    }
+    win.visual = vis_info.visual;
+    win.depth = vis_info.depth;
+
+    /*
     win.visual = DefaultVisual(win.display, screen);
     win.depth = DefaultDepth(win.display, screen);
+    */
 
     // https://tronche.com/gui/x/xlib/window/attributes/
-    unsigned long valuemask = CWBackPixel | CWEventMask | CWBitGravity;
+    unsigned long valuemask = CWBackPixel | CWColormap | CWEventMask | CWBitGravity;
     XSetWindowAttributes swa;
+    swa.background_pixel = 0;   /* background fill pixel color */
+    swa.colormap = XCreateColormap(win.display, root, vis_info.visual, AllocNone);
+    swa.bit_gravity = StaticGravity;
+    swa.event_mask  = StructureNotifyMask | ExposureMask | KeyPressMask | KeyReleaseMask;
+    /*
+    unsigned long valuemask = CWBackPixel | CWEventMask | CWBitGravity;
     swa.background_pixel = 0xFFFFFFFF;
     swa.bit_gravity = StaticGravity;        // Do not discard window data on resize
 
     // https://tronche.com/gui/x/xlib/events/mask.html
     // https://tronche.com/gui/x/xlib/events/processing-overview.html#ExposureMask
     swa.event_mask = ExposureMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask;
+    */
 
     int border_width=0;
     int x=0, y=0;
-    win.window = XCreateWindow(win.display, root,
+    win.window = XCreateWindow(
+            win.display, root,
             x, y,
             win.w, win.h,
             border_width,
@@ -121,6 +143,7 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
 
     XStoreName(win.display, win.window, title);
     XMapWindow(win.display, win.window);
+    XFlush(win.display);
 
     XWindowAttributes wa;
     XGetWindowAttributes(win.display, root, &wa);
@@ -134,7 +157,18 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     int offset = 0;
     win.bitmap_pad = 32;
     int bytes_per_line = w*4;
-    win.xim = XCreateImage(win.display, win.visual, win.depth, ZPixmap, offset, NULL, win.w, win.h, win.bitmap_pad, bytes_per_line);
+    win.xim = XCreateImage(
+            win.display,
+            win.visual,
+            win.depth,
+            ZPixmap,
+            offset,
+            (char*)win.buffer,
+            win.w,
+            win.h,
+            win.bitmap_pad,
+            0);
+
     win.xim->data = (char*)win.buffer;
 
     win.gc = DefaultGC(win.display, screen);
@@ -144,6 +178,58 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     XSetWMProtocols(win.display, win.window, &win.wm_delete_window, 1);
 
     return(win);
+}
+
+void platform_render_to_window(u8* buffer, u32 width, u32 height, u32 bits_per_pixels, Win* window) {
+    // Reorder RGBA to X11 format
+    u32* data = (u32*) buffer;
+
+    int byte_order = window->xim->byte_order;
+    int bitmap_bit_order = window->xim->bitmap_bit_order;
+
+    if ((byte_order == LSBFirst) && (bitmap_bit_order == LSBFirst)) {
+        for (int i=0; i<width*height; i++) {
+            u8* p = (u8*)(data+i);
+            u8 r = p[0];
+            u8 g = p[1];
+            u8 b = p[2];
+            u8 a = p[3];
+            data[i] = a<<24 | r << 16 | g << 8 | b;
+        }
+    } else if ((byte_order == MSBFirst) && (bitmap_bit_order == MSBFirst)) {
+        for (int i=0; i<width*height; i++) {
+            u8* p = (u8*)(data+i);
+            u8 r = p[0];
+            u8 g = p[1];
+            u8 b = p[2];
+            u8 a = p[3];
+            data[i] = b<<24 | g << 16 | r << 8 | a;
+        }
+    } else {
+        fprintf(stderr, "Couldn't determine endianness in X11.\n");
+    }
+
+    // Copy data from the buffer to the window
+    u8 SCALED = 0;
+    u8 NEAREST = 1;
+    u8 LINEAR = 0;
+
+    // If not scalled => simply copy the data as they are into the buffer used for the ximage
+    if (SCALED == 0) {
+        for (u32 j=0; j<window->h; j++) {
+            memcpy(window->buffer+j*window->w, buffer+j*width*4, window->w*4);
+        }
+    } else {
+        if (NEAREST == 1) {
+        } else if (INTERP == 1) {
+        } else {
+        }
+    }
+
+    // memcpy(window->buffer, buffer, width * height * sizeof(u32));
+
+    // And put the image
+    XPutImage(window->display, window->window, window->gc, window->xim, 0, 0, 0, 0, window->w, window->h);
 }
 
 void print_event_type(int event_type) {
