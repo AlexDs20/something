@@ -221,7 +221,7 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, u32 bits_per_p
         }
     } else {
         if (NEAREST == 1) {
-        } else if (INTERP == 1) {
+        } else if (LINEAR == 1) {
         } else {
         }
     }

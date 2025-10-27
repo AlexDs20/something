@@ -31,6 +31,7 @@ int main() {
     if (string_get_file_extension(file_path) == ".obj") {
         model = read_obj_model_file(scene_arena, file_path);
     }
+    return 0;
 
     u32* data = model->material->map_Kd.data;
     u32 img_w = model->material->map_Kd.width;

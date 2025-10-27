@@ -1679,6 +1679,15 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
 
         // Assume YCbCr
         // Convert to RGB
+        bool is_little_endian = false;
+        int tmp = 0x000000FF;
+        // little endian:
+        // 0x11 22 33 44
+        // [44] [33] [22] [11]
+        unsigned char* p = (unsigned char*)(&tmp);
+        if (*p == tmp) {
+            is_little_endian = true;
+        }
         if (3 == jpeg.fh.src_components) {
             f32* comp0 = jpeg.sh.components[0]->buffer;
             f32* comp1 = jpeg.sh.components[1]->buffer;
@@ -1720,10 +1729,15 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     f32 g = comp0[l0] - 0.34414 * (comp1[l1] - 128)   - 0.71414 * (comp2[l2] - 128);
                     f32 b = comp0[l0] + 1.772   * (comp1[l1] - 128);
 
-                    jpeg.buffer[l*4 + 0] = (u8)clampf32_0_255(b+0.5);
-                    jpeg.buffer[l*4 + 1] = (u8)clampf32_0_255(g+0.5);
-                    jpeg.buffer[l*4 + 2] = (u8)clampf32_0_255(r+0.5);
-                    jpeg.buffer[l*4 + 3] = 255;
+                    if (is_little_endian) {
+                        u8 red = (u8)clampf32_0_255(r+0.5);
+                        u8 green = (u8)clampf32_0_255(g+0.5);
+                        u8 blue = (u8)clampf32_0_255(b+0.5);
+
+                        u32* p = (u32*)(jpeg.buffer+l*4);
+                        *p = 0xFF << 24 | blue << 16 | green << 8 | red;
+                    } else {
+                    }
                 }
             }
         } else if (1 == jpeg.fh.src_components) {
