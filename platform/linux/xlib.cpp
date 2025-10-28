@@ -201,60 +201,64 @@ int trailing_zero_bits(u32 x) {
     return n;
 }
 
-void platform_render_to_window(u8* buffer, u32 width, u32 height, u32 bits_per_pixels, Win* window) {
-    // Buffer image format is RGBA
+void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
+    // Copy data from the buffer to the window
+    u8 SCALED = 0;
+    u8 LINEAR = 0;
+    u8 NEAREST = 1;
+
+    // Buffer image format is RGBA and u8*
+    // and window->buffer is u32*
     u8* src = buffer;
     u8* dst = (u8*)window->buffer;
-
-    // Reorder RGBA to X11 format
-    u32* data = (u32*) buffer;
-    // window->buffer is u32*
 
     int rshift = trailing_zero_bits(window->visual->red_mask);
     int gshift = trailing_zero_bits(window->visual->green_mask);
     int bshift = trailing_zero_bits(window->visual->blue_mask);
 
-    // Note: do the shift AFTER so that if interpolating => do not need to do it on alpha
-    for (int i=0; i<width*height; i++) {
-        u8* p = (u8*)(data+i);
-        u8 r = p[0];
-        u8 g = p[1];
-        u8 b = p[2];
-        u8 a = p[3];
-        data[i] = r<<rshift | g<<gshift | b<<bshift;
-    }
-
-    // Copy data from the buffer to the window
-    u8 SCALED = 1;
-    u8 NEAREST = 1;
-    u8 LINEAR = 0;
-
     // If not scalled => simply copy the data as they are into the buffer used for the ximage
     if (SCALED == 0) {
-        for (u32 j=0; j<window->h; j++) {
-            memcpy(window->buffer+j*window->w, buffer+j*width*4, window->w*4);
+        // Just copy and reorder for correct color order
+        u32 width_bound = (width < window->w) ? width : window->w;
+        u32 height_bound = (height < window->h) ? height : window->h;
+        for (u32 j=0; j<height_bound; j++) {
+            for (u32 i=0; i<width_bound; i++) {
+                u64 src_idx = (j * width + i) * 4;
+                u8* d = src+src_idx;
+                u8 r = d[0];
+                u8 g = d[1];
+                u8 b = d[2];
+                u8 a = d[3];
+
+                u64 dst_idx = (j * window->w + i);
+                window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
+            }
         }
-    } else {
-        f32 w_ratio = (f32)width  / (f32)window->w;
-        f32 h_ratio = (f32)height / (f32)window->h;
-        if (NEAREST == 1) {
+    }
+    else {
+        if (LINEAR == 1) {
+        }
+        else {
+            f32 w_ratio = (f32)width  / (f32)window->w;
+            f32 h_ratio = (f32)height / (f32)window->h;
             for (u32 j=0; j<window->h; j++) {
                 for (u32 i=0; i<window->w; i++) {
-                    u64 idx = j*window->w + i;
                     u32 img_i = (i * w_ratio);
                     u32 img_j = (j * h_ratio);
                     img_i = img_i>width-1 ? width-1 : img_i;
                     img_j = img_j>height-1 ? height-1 : img_j;
-                    u64 img_idx = img_j*width*4 + img_i*4;
-                    window->buffer[idx] = *(u32*)(&buffer[img_idx]);
+
+                    u64 src_idx = (img_j*width + img_i)*4;
+                    u8* p = src+src_idx;
+                    u8 r = p[0];
+                    u8 g = p[1];
+                    u8 b = p[2];
+                    u8 a = p[3];
+
+                    u64 dst_idx = (j * window->w + i);
+                    window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
                 }
             }
-        } else if (LINEAR == 1) {
-            for (u32 j=0; j<window->h; j++) {
-                for (u32 i=0; i<window->w; i++) {
-                }
-            }
-        } else {
         }
     }
 

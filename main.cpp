@@ -66,8 +66,8 @@ int main() {
 
         memcpy(win_buffer, data, img_w*img_h*sizeof(u32));
 
-        // platform_render_to_window((u8*)win_buffer, w, h, 4, &win);
-        platform_render_to_window((u8*)win_buffer, img_w, img_h, 4, &win);
+        // platform_render_to_window((u8*)win_buffer, w, h, &win);
+        platform_render_to_window((u8*)win_buffer, img_w, img_h, &win);
     }
 
     char done_msg[] = "Done doing something!\n";
