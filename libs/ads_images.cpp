@@ -42,10 +42,10 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
         out.width = w;
         out.height = h;
         out.components = c;
-        printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
-        // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
-        result = decode_jpeg(persist_arena, data, &out);
-        printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
+        // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
+        // // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
+        // result = decode_jpeg(persist_arena, data, &out);
+        // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
         int w, h, c;

@@ -36,12 +36,11 @@ int main() {
     u32 img_w = model->material->map_Kd.width;
     u32 img_h = model->material->map_Kd.height;
 
-    const u32 w = 640;
-    const u32 h = 480;
-    // const u32 h = img_h<512 ? img_h : 512;
+    const u32 window_w = 640;
+    const u32 window_h = 480;
     const u32 bg_color = 0x777777;
-
-    Win win = platform_init_win(w, h, msg);
+    // TODO: Add support for RGB and GREY currently only RGBA
+    Win win = platform_init_win(window_w, window_h, msg);
 
     const f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
@@ -52,11 +51,7 @@ int main() {
 
         // And this is uglier...
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, win.h*win.w*sizeof(f32));
-
-        // u32* win_buffer = (u32*)arena_alloc_push(frame_arena, win.w*win.h*sizeof(f32));
-        // u32* win_buffer = (u32*)arena_alloc_push(frame_arena, w*h*sizeof(f32));
         u32* win_buffer = (u32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
-
         // DATA format: [RR] [GG] [BB] [AA]
         // on little-endian: 0xAABBGGRR
         // on big-endian: 0xRRGGBBAA
@@ -73,7 +68,6 @@ int main() {
 
         // platform_render_to_window((u8*)win_buffer, w, h, 4, &win);
         platform_render_to_window((u8*)win_buffer, img_w, img_h, 4, &win);
-        // usleep(16);
     }
 
     char done_msg[] = "Done doing something!\n";

@@ -75,6 +75,7 @@ int toggle_fullscreen(Display* display, Window window) {
     return(0);
 }
 
+// TODO: Add support for RGB and GREY currently only RGBA
 Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     Win win = {};
     win.w = w;
@@ -180,37 +181,51 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title) {
     return(win);
 }
 
+static
+int trailing_zero_bits(u32 x) {
+    /*
+       if gcc/clang
+        return __builtin_ctz(x);
+       if msvc
+       int n;
+       int status = _BitScanForward(n, x);
+       if (status==0) fail (return 32?);
+       else return n;
+    */
+    if (x == 0) return 32;
+    int n = 0;
+    while ((x & 1) == 0) {
+        x >>= 1;
+        n++;
+    }
+    return n;
+}
+
 void platform_render_to_window(u8* buffer, u32 width, u32 height, u32 bits_per_pixels, Win* window) {
+    // Buffer image format is RGBA
+    u8* src = buffer;
+    u8* dst = (u8*)window->buffer;
+
     // Reorder RGBA to X11 format
     u32* data = (u32*) buffer;
+    // window->buffer is u32*
 
-    int byte_order = window->xim->byte_order;
-    int bitmap_bit_order = window->xim->bitmap_bit_order;
+    int rshift = trailing_zero_bits(window->visual->red_mask);
+    int gshift = trailing_zero_bits(window->visual->green_mask);
+    int bshift = trailing_zero_bits(window->visual->blue_mask);
 
-    if ((byte_order == LSBFirst) && (bitmap_bit_order == LSBFirst)) {
-        for (int i=0; i<width*height; i++) {
-            u8* p = (u8*)(data+i);
-            u8 r = p[0];
-            u8 g = p[1];
-            u8 b = p[2];
-            u8 a = p[3];
-            data[i] = a<<24 | r << 16 | g << 8 | b;
-        }
-    } else if ((byte_order == MSBFirst) && (bitmap_bit_order == MSBFirst)) {
-        for (int i=0; i<width*height; i++) {
-            u8* p = (u8*)(data+i);
-            u8 r = p[0];
-            u8 g = p[1];
-            u8 b = p[2];
-            u8 a = p[3];
-            data[i] = b<<24 | g << 16 | r << 8 | a;
-        }
-    } else {
-        fprintf(stderr, "Couldn't determine endianness in X11.\n");
+    // Note: do the shift AFTER so that if interpolating => do not need to do it on alpha
+    for (int i=0; i<width*height; i++) {
+        u8* p = (u8*)(data+i);
+        u8 r = p[0];
+        u8 g = p[1];
+        u8 b = p[2];
+        u8 a = p[3];
+        data[i] = r<<rshift | g<<gshift | b<<bshift;
     }
 
     // Copy data from the buffer to the window
-    u8 SCALED = 0;
+    u8 SCALED = 1;
     u8 NEAREST = 1;
     u8 LINEAR = 0;
 
@@ -220,13 +235,28 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, u32 bits_per_p
             memcpy(window->buffer+j*window->w, buffer+j*width*4, window->w*4);
         }
     } else {
+        f32 w_ratio = (f32)width  / (f32)window->w;
+        f32 h_ratio = (f32)height / (f32)window->h;
         if (NEAREST == 1) {
+            for (u32 j=0; j<window->h; j++) {
+                for (u32 i=0; i<window->w; i++) {
+                    u64 idx = j*window->w + i;
+                    u32 img_i = (i * w_ratio);
+                    u32 img_j = (j * h_ratio);
+                    img_i = img_i>width-1 ? width-1 : img_i;
+                    img_j = img_j>height-1 ? height-1 : img_j;
+                    u64 img_idx = img_j*width*4 + img_i*4;
+                    window->buffer[idx] = *(u32*)(&buffer[img_idx]);
+                }
+            }
         } else if (LINEAR == 1) {
+            for (u32 j=0; j<window->h; j++) {
+                for (u32 i=0; i<window->w; i++) {
+                }
+            }
         } else {
         }
     }
-
-    // memcpy(window->buffer, buffer, width * height * sizeof(u32));
 
     // And put the image
     XPutImage(window->display, window->window, window->gc, window->xim, 0, 0, 0, 0, window->w, window->h);
