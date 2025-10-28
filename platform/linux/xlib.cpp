@@ -203,7 +203,7 @@ int trailing_zero_bits(u32 x) {
 
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     // Copy data from the buffer to the window
-    u8 SCALED = 1;
+    u8 SCALED = 0;
     u8 BILINEAR = 0;
 
     // Buffer image format is RGBA and u8*
