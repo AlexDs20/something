@@ -203,9 +203,9 @@ int trailing_zero_bits(u32 x) {
 
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     // Copy data from the buffer to the window
-    u8 SCALED = 0;
-    u8 LINEAR = 0;
-    u8 NEAREST = 1;
+    u8 SCALED = 1;
+    u8 BILINEAR = 1;
+    u8 NEAREST = 0;
 
     // Buffer image format is RGBA and u8*
     // and window->buffer is u32*
@@ -236,7 +236,52 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
         }
     }
     else {
-        if (LINEAR == 1) {
+        if (BILINEAR == 1) {
+            f32 w_ratio = (f32)width  / (f32)window->w;
+            f32 h_ratio = (f32)height / (f32)window->h;
+            for (u32 j=0; j<window->h; j++) {
+                for (u32 i=0; i<window->w; i++) {
+                    f32 img_i = (i * w_ratio);
+                    f32 img_j = (j * h_ratio);
+                    img_i = img_i>width-1  ? (f32)(width-1)  : img_i;
+                    img_j = img_j>height-1 ? (f32)(height-1) : img_j;
+
+                    u32 i0 = (u32) img_i;
+                    u32 i1 = (img_i+1>width-1) ? (u32)(width-1) : (u32)(img_i)+1;
+
+                    u32 j0 = (u32) img_j;
+                    u32 j1 = (img_j+1>height-1) ? (u32)(height-1) : (u32)(img_j)+1;
+
+                    f32 weight_i = img_i - i0;
+                    f32 weight_j = img_j - j0;
+
+                    u8 colour[3];        // r,g,b
+                    for (u8 c=0; c<3; c++) {
+                        /*    (i0,j0)  (i1,j0)
+                         *      *       *
+                         *         x
+                         *
+                         *      *       *
+                         *    (i0,j1)  (i1,j1)
+                         */
+                        u8 c_i0j0 = src[(j0 * width + i0) * 4 + c];
+                        u8 c_i1j0 = src[(j0 * width + i1) * 4 + c];
+                        u8 c_i0j1 = src[(j1 * width + i0) * 4 + c];
+                        u8 c_i1j1 = src[(j1 * width + i1) * 4 + c];
+
+                        // Horizontal lerp
+                        f32 i0_lerp = c_i0j0 + (c_i1j0-c_i0j0)*weight_i;
+                        f32 i1_lerp = c_i0j1 + (c_i1j1-c_i0j1)*weight_i;
+
+                        // Vertical lerp
+                        f32 out = i0_lerp + (i1_lerp-i0_lerp) * weight_j;
+                        colour[c] = (u8)out;
+                    }
+
+                    u64 dst_idx = (j * window->w + i);
+                    window->buffer[dst_idx] = (colour[0]<<rshift) | (colour[1]<<gshift) | (colour[2]<<bshift);
+                }
+            }
         }
         else {
             f32 w_ratio = (f32)width  / (f32)window->w;
