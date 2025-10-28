@@ -36,7 +36,7 @@ int main() {
     u32 img_h = 768;
     const u32 bg_color = 0x777777;
     // TODO: Add support for RGB and GREY currently only RGBA
-    Win win = platform_init_win(1920, 1080, msg);
+    Win win = platform_init_win(1920, 1080, msg, ADSV_NOTHING);
 
     const f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
@@ -47,8 +47,8 @@ int main() {
 
         // Allocate the area we want to draw onto
         // It does not have to be the same size as the window
-        img_w = win.w;
-        img_h = win.h;
+        // img_w = win.w;
+        // img_h = win.h;
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
         u32* win_buffer = (u32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
         // DATA format: [RR] [GG] [BB] [AA]
