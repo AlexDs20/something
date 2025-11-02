@@ -375,12 +375,14 @@ void fill_triangle_line_sweep(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vert
 
     f32 zmid = (a->z + b->z + c->z) / 3;
 
-    u32 ylow = (u32)a->y;
-    u32 ymid = (u32)b->y;
-    u32 yhigh = (u32)c->y;
+    s32 ylow  = (s32)a->y;
+    s32 ymid  = (s32)b->y;
+    s32 yhigh = (s32)c->y;
 
-    for (u32 y=ylow; y<yhigh; y++) {
-        if (y < 0 || y >= h) continue;
+    u32 low_range = ylow < 0 ? 0 : ylow;
+    u32 high_range = yhigh >= h ? h : yhigh;
+    for (u32 y=low_range; y<=high_range; y++) {
+        // if (y < 0 || y >= h) continue;
 
         u32 xs;
         u32 xe;
@@ -406,7 +408,7 @@ void fill_triangle_line_sweep(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vert
             }
         }
         if (xs>xe) { u32 tmp = xs; xs = xe; xe = tmp; }
-        for (u32 x=xs; x<=xe; x++) {
+        for (u32 x=xs; x<xe; x++) {
             if (x < 0 || x >= w) continue;
             f32* zpix = zbuffer + w*(h-y) + x;
             if (*zpix < zmid) {
@@ -523,8 +525,378 @@ u32 random_color(u64 v) {
     return c;
 }
 
+void tmp_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+    /*
+     * f(t) = A + t * AB            t in [0, 1]
+     *
+     * x = A_x + t * AB_x
+     * y = A_y + t * AB_y
+     *
+     * IF AB_y != 0 => A_y != B_y
+     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
+     * x = A_x + (y-A_y) * (AB_x / AB_y)
+     *
+     * Start at y = A_y
+     * until y = B_y
+     *
+     * y = A_y
+     *      x = A_x
+     * y = A_y + 1
+     *      x = A_x + 1 * (AB_x / AB_y)
+     * y = A_y + 2
+     *      x = A_x + 2 * (AB_x / AB_y)
+     *
+     */
+
+    Vertex* a = v1;
+    Vertex* b = v2;
+    Vertex* c = v3;
+
+    // Sort in order of ascending y: a.y<b.y<c.y
+    Vertex* t;
+    if (b->y < a->y) { t = a; a = b; b = t; }
+    if (c->y < a->y) { t = a; a = c; c = t; }
+    if (c->y < b->y) { t = b; b = c; c = t; }
+
+    // For zbuffer
+    f32 zmid = (a->z + b->z + c->z) / 3;
+
+    // Return if outside of screen
+    if (a->y>=h) return;
+    if (c->y<0) return;
+
+    if (a->y == b->y) {
+        f32 ys = (s32)(a->y+0.5f) + 0.5f;
+        f32 ye = (s32)(c->y-0.5f) + 0.5f;
+
+        f32 xs = (s32)(a->x+0.5f) + 0.5f;
+        f32 xe = (s32)(c->x-0.5f) + 0.5f;
+
+        f32 inc_left;
+        f32 inc_right;
+
+        if (b->x < a->x) {
+            f32 t = xs;
+            xs = xe + 1.0f;
+            xe = t - 1.0f;
+            inc_left =  (c->x-b->x) / (c->y-b->y);
+            inc_right = (c->x-a->x) / (c->y-a->y);
+        } else {
+            inc_left = (c->x-a->x) / (c->y-a->y);
+            inc_right =  (c->x-b->x) / (c->y-b->y);
+        }
+
+        for (f32 y=ys; y<=ye; y++) {
+            if (ys<0 || ye>h) continue;
+            for (f32 x=xs; x<=xe; x++) {
+                if (xs<0 || xe>w) continue;
+
+                u32 offset = w*(u32)(h-y) + (u32)x;
+                f32* zpix = zbuffer + offset;
+                if (*zpix < zmid) {
+                    *zpix = zmid;
+                    // printf("x=[%.2f,%.2f] y=[%.2f,%.2f]    %.2f  %.2f \n", xs, xe, ys, ye, x, y);
+                    u32* pixel = framebuffer + offset;
+                    *pixel = color;
+                }
+            }
+            xs += inc_left;
+            xe += inc_right;
+        }
+    } else if (b->y == c->y) {
+        f32 ys = (s32)(a->y+0.5f) + 0.5f;
+        f32 ye = (s32)(b->y-0.5f) + 0.5f;
+
+        f32 xs = (s32)(a->x+0.5f) + 0.5f;
+        f32 xe = xs;
+
+        f32 inc_left;
+        f32 inc_right;
+
+        if (c->x < b->x) {
+            inc_left =  (c->x-a->x) / (c->y-a->y);
+            inc_right = (b->x-a->x) / (b->y-a->y);
+        } else {
+            inc_left = (b->x-a->x) / (b->y-a->y);
+            inc_right =  (c->x-a->x) / (c->y-a->y);
+        }
+
+        for (f32 y=ys; y<=ye; y++) {
+            if (ys<0 || ye>h) continue;
+            for (f32 x=xs; x<=xe; x++) {
+                if (xs<0 || xe>w) continue;
+                u32 offset = w*(u32)(h-y) + (u32)x;
+                f32* zpix = zbuffer + offset;
+                if (*zpix < zmid) {
+                    *zpix = zmid;
+                    u32* pixel = framebuffer + offset;
+                    *pixel = color;
+                }
+            }
+            xs += inc_left;
+            xe += inc_right;
+        }
+    } else {
+        // Do increasing y
+        // a => b     same as else if
+        // b => c     same as if
+
+        f32 ys = (s32)(a->y+0.5f) + 0.5f;
+        f32 ye = (s32)(b->y-0.5f) + 0.5f;
+
+        f32 xs = (s32)(a->x+0.5f) + 0.5f;
+        f32 xe = xs;
+
+        f32 inc_left;
+        f32 inc_right;
+
+        if (c->x < b->x) {
+            inc_left =  (c->x-a->x) / (c->y-a->y);
+            inc_right = (b->x-a->x) / (b->y-a->y);
+        } else {
+            inc_left = (b->x-a->x) / (b->y-a->y);
+            inc_right =  (c->x-a->x) / (c->y-a->y);
+        }
+
+        for (f32 y=ys; y<=ye; y++) {
+            if (ys<0 || ye>h) continue;
+            for (f32 x=xs; x<=xe; x++) {
+                if (xs<0 || xe>w) continue;
+                u32 offset = w*(u32)(h-y) + (u32)x;
+                f32* zpix = zbuffer + offset;
+                if (*zpix < zmid) {
+                    *zpix = zmid;
+                    u32* pixel = framebuffer + offset;
+                    *pixel = color;
+                }
+            }
+            xs += inc_left;
+            xe += inc_right;
+        }
+
+
+        // Part 2
+
+        ys = (s32)(b->y+0.5f) + 0.5f;
+        ye = (s32)(c->y-0.5f) + 0.5f;
+
+        // x = A_x + (y-A_y) * (AC_x / AC_y)
+        f32 txs = a->x + (b->y - a->y) * (c->x-a->x) / (c->y-a->y);
+        if (txs < b->x) {
+            xs = (s32)(txs+0.5f) + 0.5f;
+            xe = (s32)(b->x-0.5f) + 0.5f;
+            inc_right = (b->x-c->x) / (b->y-c->y);
+        } else {
+            xs = (s32)(b->x+0.5f) + 0.5f;
+            xe = (s32)(txs-0.5f) + 0.5f;
+
+            inc_left = (b->x-c->x) / (b->y-c->y);;
+        }
+
+        for (f32 y=ys; y<=ye; y++) {
+            if (ys<0 || ye>h) continue;
+            for (f32 x=xs; x<=xe; x++) {
+                if (xs<0 || xe>w) continue;
+                u32 offset = w*(u32)(h-y) + (u32)x;
+                f32* zpix = zbuffer + offset;
+                if (*zpix < zmid) {
+                    *zpix = zmid;
+                    u32* pixel = framebuffer + offset;
+                    *pixel = color;
+                }
+            }
+            xs += inc_left;
+            xe += inc_right;
+        }
+    }
+}
+
+void new_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+    /*
+     * f(t) = A + t * AB            t in [0, 1]
+     *
+     * x = A_x + t * AB_x
+     * y = A_y + t * AB_y
+     *
+     * IF AB_y != 0 => A_y != B_y
+     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
+     * x = A_x + (y-A_y) * (AB_x / AB_y)
+     *
+     * Start at y = A_y
+     * until y = B_y
+     *
+     * y = A_y
+     *      x = A_x
+     * y = A_y + 1
+     *      x = A_x + 1 * (AB_x / AB_y)
+     * y = A_y + 2
+     *      x = A_x + 2 * (AB_x / AB_y)
+     *
+     *              C                                 C
+     *              x                                 x
+     *
+     *
+     *
+     *                  x        ===>           d.        xe        d always on left of e
+     *                  B                                 B
+     *
+     *    x                                 x
+     *    A                                 A
+     */
+
+    Vertex* a = v1;
+    Vertex* b = v2;
+    Vertex* c = v3;
+
+    // Sort in order of ascending y: a.y<b.y<c.y
+    Vertex* t;
+    if (b->y < a->y) { t = a; a = b; b = t; }
+    if (c->y < a->y) { t = a; a = c; c = t; }
+    if (c->y < b->y) { t = b; b = c; c = t; }
+
+    // For zbuffer
+    f32 zmid = (a->z + b->z + c->z) / 3;
+
+    f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
+    f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+    f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
+
+    // Add extra point at level of b->y along the AC line
+    f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
+
+    f32 ad_inv_slope;
+    f32 ae_inv_slope;
+    f32 dc_inv_slope;
+    f32 ec_inv_slope;
+    f32 dx;
+    f32 ex;
+
+    if (extra_x < b->x) {
+        dx = extra_x;
+        ex = b->x;
+        ad_inv_slope = ac_inv_slope;
+        ae_inv_slope = ab_inv_slope;
+        dc_inv_slope = ac_inv_slope;
+        ec_inv_slope = bc_inv_slope;
+    } else {
+        dx = b->x;
+        ex = extra_x;
+        ad_inv_slope = ab_inv_slope;
+        ae_inv_slope = ac_inv_slope;
+        dc_inv_slope = bc_inv_slope;
+        ec_inv_slope = ac_inv_slope;
+    }
+
+    f32 ys = a->y;
+    if (ys>=h) return;
+    f32 ye = c->y;
+    if (ye<0) return;
+
+    ys = ys<0 ? 0 : ys;
+    ye = ye>h ? h : ye;
+
+    ys = (s32)(ys + 0.5f) + 0.5f;
+    ye = (s32)(ye - 0.5f) + 0.5f;
+
+    f32 xs, xe;
+    for (f32 y=ys; y<=ye; y++) {
+        if (y <= b->y) {
+            xs = a->x + (y-a->y) * ad_inv_slope;
+            xe = a->x + (y-a->y) * ae_inv_slope;
+        } else {
+            xs = dx + (y-b->y) * dc_inv_slope;
+            xe = ex + (y-b->y) * ec_inv_slope;
+        }
+
+        xs = xs<0 ? 0 : xs;
+        xe = xe>w ? w : xe;
+        xs = (u32)(xs + 0.5f);
+        xe = (u32)(xe - 0.5f);
+
+        for (u32 x=xs; x<=xe; x++) {
+            u32 offset = w*(u32)(h-y) + x;
+            f32* zpix = zbuffer + offset;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+                u32* pixel = framebuffer + offset;
+                *pixel = color;
+            }
+        }
+    }
+}
+
+void new2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+    /*
+     * f(t) = A + t * AB            t in [0, 1]
+     *
+     * x = A_x + t * AB_x
+     * y = A_y + t * AB_y
+     *
+     * IF AB_y != 0 => A_y != B_y
+     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
+     * x = A_x + (y-A_y) * (AB_x / AB_y)
+     */
+
+    Vertex* a = v1;
+    Vertex* b = v2;
+    Vertex* c = v3;
+
+    // Sort in order of ascending y: a.y<b.y<c.y
+    Vertex* t;
+    if (b->y < a->y) { t = a; a = b; b = t; }
+    if (c->y < a->y) { t = a; a = c; c = t; }
+    if (c->y < b->y) { t = b; b = c; c = t; }
+
+    s32 ystart = (s32)a->y;
+    s32 ymid = (s32)b->y;
+    s32 yend = (s32)c->y;
+
+    for (s32 y=ystart; y<yend; y++) {
+
+    }
+
+}
+
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
-    // local_variable bool swapper = false;
+    static bool swapper = false;
+
+    f32 minx =  10000;
+    f32 maxx = -10000;
+    f32 miny =  10000;
+    f32 maxy = -10000;
+    f32 minz =  10000;
+    f32 maxz = -10000;
+    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
+        Face* f = (Face*)vector_alloc_get(model->faces, i);
+
+        // Only use the x y components atm
+        // Can work with perspective and camera later
+        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
+        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
+        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+
+        minx = minx < a.x ? minx : a.x;
+        minx = minx < b.x ? minx : b.x;
+        minx = minx < c.x ? minx : c.x;
+        maxx = maxx > a.x ? maxx : a.x;
+        maxx = maxx > b.x ? maxx : b.x;
+        maxx = maxx > c.x ? maxx : c.x;
+
+        miny = miny < a.y ? minx : a.y;
+        miny = miny < b.y ? minx : b.y;
+        miny = miny < c.y ? minx : c.y;
+        maxy = maxy > a.y ? maxx : a.y;
+        maxy = maxy > b.y ? maxx : b.y;
+        maxy = maxy > c.y ? maxx : c.y;
+
+        minz = minz < a.z ? minz : a.z;
+        minz = minz < b.z ? minz : b.z;
+        minz = minz < c.z ? minz : c.z;
+        maxz = maxz > a.z ? maxz : a.z;
+        maxz = maxz > b.z ? maxz : b.z;
+        maxz = maxz > c.z ? maxz : c.z;
+    }
+
     for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
 
@@ -535,26 +907,28 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
 
         // Scale to center of the screen
-        a.x = (a.x * 0.2f + 0.5f) * w;
-        a.y = (a.y * 0.2f + 0.5f) * h;
-        b.x = (b.x * 0.2f + 0.5f) * w;
-        b.y = (b.y * 0.2f + 0.5f) * h;
-        c.x = (c.x * 0.2f + 0.5f) * w;
-        c.y = (c.y * 0.2f + 0.5f) * h;
+        a.x = (a.x - minx) * h / (maxy-miny);
+        b.x = (b.x - minx) * h / (maxy-miny);
+        c.x = (c.x - minx) * h / (maxy-miny);
 
-        // u32 col = 0xFFA500;
-        u32 col = random_color(
-                  (u64)vector_alloc_get(model->vertices, f->v[0]-1)
-                + (u64)vector_alloc_get(model->vertices, f->v[1]-1)
-                - (u64)vector_alloc_get(model->vertices, f->v[2]-1));
+        a.y = (a.y - miny) * h / (maxy-miny);
+        b.y = (b.y - miny) * h / (maxy-miny);
+        c.y = (c.y - miny) * h / (maxy-miny);
+
+        a.z = (a.z - minz) / (maxz-minz);
+        b.z = (b.z - minz) / (maxz-minz);
+        c.z = (c.z - minz) / (maxz-minz);
+
+        // 0xAABBGGRR
+        u32 col = (0xFF & (u32)(220*(a.z + b.z + c.z)/3));
 
         // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // if (swapper)
-        // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // else
-        fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        new_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
     }
-    // swapper = !swapper;
+    swapper = !swapper;
 }

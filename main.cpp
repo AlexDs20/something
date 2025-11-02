@@ -32,11 +32,11 @@ int main() {
         model = read_obj_model_file(scene_arena, file_path);
     }
 
-    u32 img_w = 1024;
-    u32 img_h = 768;
+    u32 img_w = 480;
+    u32 img_h = 360;
     const u32 bg_color = 0x777777;
     // TODO: Add support for RGB and GREY currently only RGBA
-    Win win = platform_init_win(1920, 1080, msg, ADSV_NOTHING);
+    Win win = platform_init_win(1920, 1080, msg, ADSV_NEAREST);
 
     const f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
@@ -62,6 +62,7 @@ int main() {
 
         // draw_model_wireframe(model, img_w, img_h, win_buffer);
         draw_model(model, img_w, img_h, win_buffer, zbuffer);
+        // draw_model_wireframe(model, img_w, img_h, win_buffer);
         platform_render_to_window((u8*)win_buffer, img_w, img_h, &win);
     }
 

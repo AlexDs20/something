@@ -49,7 +49,7 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
         int w, h, c;
-        out.gray = stbi_load(f, &w, &h, &c, 0);
+        // out.gray = stbi_load(f, &w, &h, &c, 0);
         out.width = w;
         out.height = h;
         out.components = c;
