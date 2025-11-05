@@ -33,8 +33,8 @@ int main() {
         model = read_obj_model_file(scene_arena, file_path);
     }
 
-    u32 img_w = 360;
-    u32 img_h = 240;
+    u32 img_w = 1920;
+    u32 img_h = 1080;
     const u32 bg_color = 0x777777;
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, msg, ADSV_NEAREST);
