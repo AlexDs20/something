@@ -384,6 +384,9 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
     s32 cx = (s32)c->x;
     s32 cy = (s32)c->y;
 
+    // static int miny = 100000;
+    // static int maxy = -100000;
+
     int total_height = cy-ay;
     for (int i=0; i<total_height; i++) {
         bool second_half = i>by-ay || by==ay;
@@ -404,7 +407,9 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
         }
         for (int j=Ax; j<=Bx; j++) {
             if (ay+i<0 || ay+i>=(s32)h || j<0 || j>=(s32)w) continue;
-            u32 linear = w*(h- (ay+i)) + j;
+            // miny = miny < h-(ay+i) ? miny : h-(ay+i);
+            // maxy = maxy > h-(ay+i) ? maxy : h-(ay+i);
+            u32 linear = w*(h-(ay+i)) + j;
 
             f32* zpix = zbuffer + linear;
             if (*zpix < zmid) {
@@ -415,6 +420,8 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
             }
         }
     }
+
+    // printf("[%d,%d]\n", miny, maxy);
 }
 
 f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
@@ -472,8 +479,52 @@ u32 random_color(u64 v) {
     return c;
 }
 
+void fill_flat_top_triangle() {
+    f32 xs = a->x<0 ? 0 : a->x;
+    f32 xe = a->x>=w ? w : a->x;
+    for (u32 y=ys; y<ye; y++) {
+        // if (y<0 || y >= h) continue;
+        xs = a->x + (y-a->y) * ad_inv_slope;
+        xe = a->x + (y-a->y) * ae_inv_slope;
 
-void v0_fill_triangle_float_center_pixel(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+        u32 x_start = xs<0 ? 0 : (u32)xs;
+        u32 x_end = xe>w ? w : (u32)xe+1;
+        for (u32 x=x_start; x<x_end; x++) {
+            if (x<0 || x >= w) continue;
+            u32 offset = w*(h-1-y) + x;
+            f32* zpix = zbuffer + offset;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+                u32* pixel = framebuffer + offset;
+                *pixel = color;
+            }
+        }
+    }
+}
+
+void fill_flat_bottom_triangle() {
+    for (u32 y=ys; y<ye; y++) {
+        if (y<0 || y >= h) continue;
+        xs = dx + (y-b->y) * dc_inv_slope;
+        xe = ex + (y-b->y) * ec_inv_slope;
+
+        u32 x_start = xs<0 ? 0 : (u32)xs;
+        u32 x_end = xe>w ? w : (u32)xe+1;
+        for (u32 x=x_start; x<x_end; x++) {
+            if (x<0 || x >= w) continue;
+            u32 offset = w*(h-1-y) + x;
+            f32* zpix = zbuffer + offset;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+                u32* pixel = framebuffer + offset;
+                *pixel = color;
+            }
+        }
+    }
+}
+
+
+void v0_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -586,7 +637,7 @@ void v0_fill_triangle_float_center_pixel(u32* framebuffer, f32* zbuffer, u32 w, 
     }
 }
 
-void v1_fill_triangle_float_center_pixel(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+void v1_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -698,6 +749,87 @@ void v1_fill_triangle_float_center_pixel(u32* framebuffer, f32* zbuffer, u32 w, 
     }
 }
 
+void v2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+    /*
+     * f(t) = A + t * AB            t in [0, 1]
+     *
+     * x = A_x + t * AB_x
+     * y = A_y + t * AB_y
+     *
+     * IF AB_y != 0 => A_y != B_y
+     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
+     * x = A_x + (y-A_y) * (AB_x / AB_y)
+     *
+     * Start at y = A_y
+     * until y = B_y
+     *
+     * y = A_y
+     *      x = A_x
+     * y = A_y + 1
+     *      x = A_x + 1 * (AB_x / AB_y)
+     * y = A_y + 2
+     *      x = A_x + 2 * (AB_x / AB_y)
+     *
+     *              C                                 C
+     *              x                                 x
+     *
+     *
+     *
+     *                  x        ===>           d.        xe        d always on left of e
+     *                  B                                 B
+     *
+     *    x                                 x
+     *    A                                 A
+     */
+
+    Vertex* a = v1;
+    Vertex* b = v2;
+    Vertex* c = v3;
+
+    // Sort in order of ascending y: a.y<b.y<c.y
+    Vertex* t;
+    if (b->y < a->y) { t = a; a = b; b = t; }
+    if (c->y < a->y) { t = a; a = c; c = t; }
+    if (c->y < b->y) { t = b; b = c; c = t; }
+
+    // Fast terminate
+    if (c->y<0) return;
+    if (a->y>=h) return;
+
+    // Fast terminate along x
+    f32 x_min = a->x;
+    xmin = xmin < b->x ? xmin : b->x;
+    xmin = xmin < c->x ? xmin : c->x;
+    f32 x_max = a->x;
+    xmax = xmax > b->x ? xmax : b->x;
+    xmax = xmax > c->x ? xmax : c->x;
+    if (x_max < 0) return;
+    if (x_min >= w) return;
+
+
+    if (b->y == c->y) {
+        f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
+        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+
+        fill_flat_top_triangle(x0, y0, ye, dx, ex);
+
+    } else if (a->y == b->y) {
+        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+        f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
+
+        fill_flat_bottom_triangle();
+    } else {
+        f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
+        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+        f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
+        f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
+
+        fill_flat_top_triangle();
+        fill_flat_bottom_triangle();
+    }
+
+}
+
 
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
     static bool swapper = false;
@@ -769,10 +901,10 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // if (i > 10 && i < 20) {
             // if (swapper)
-            v1_fill_triangle_float_center_pixel(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+            v1_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
             // else
             // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-            // v0_fill_triangle_float_center_pixel(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+            // v0_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // }
 
 
