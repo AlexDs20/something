@@ -479,50 +479,6 @@ u32 random_color(u64 v) {
     return c;
 }
 
-void fill_flat_top_triangle() {
-    f32 xs = a->x<0 ? 0 : a->x;
-    f32 xe = a->x>=w ? w : a->x;
-    for (u32 y=ys; y<ye; y++) {
-        // if (y<0 || y >= h) continue;
-        xs = a->x + (y-a->y) * ad_inv_slope;
-        xe = a->x + (y-a->y) * ae_inv_slope;
-
-        u32 x_start = xs<0 ? 0 : (u32)xs;
-        u32 x_end = xe>w ? w : (u32)xe+1;
-        for (u32 x=x_start; x<x_end; x++) {
-            if (x<0 || x >= w) continue;
-            u32 offset = w*(h-1-y) + x;
-            f32* zpix = zbuffer + offset;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-                u32* pixel = framebuffer + offset;
-                *pixel = color;
-            }
-        }
-    }
-}
-
-void fill_flat_bottom_triangle() {
-    for (u32 y=ys; y<ye; y++) {
-        if (y<0 || y >= h) continue;
-        xs = dx + (y-b->y) * dc_inv_slope;
-        xe = ex + (y-b->y) * ec_inv_slope;
-
-        u32 x_start = xs<0 ? 0 : (u32)xs;
-        u32 x_end = xe>w ? w : (u32)xe+1;
-        for (u32 x=x_start; x<x_end; x++) {
-            if (x<0 || x >= w) continue;
-            u32 offset = w*(h-1-y) + x;
-            f32* zpix = zbuffer + offset;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-                u32* pixel = framebuffer + offset;
-                *pixel = color;
-            }
-        }
-    }
-}
-
 
 void v0_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
     /*
@@ -749,6 +705,111 @@ void v1_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, 
     }
 }
 
+f32 ceilf32(f32 d) {
+    f32 trunc = (f32)((s32)d);
+    if (trunc < d) {
+        return trunc+1.0f;
+    } else {
+        return trunc;
+    }
+}
+
+void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+    f32 ay = a->y;
+    f32 by = b->y;
+    f32 ax = a->x;
+    f32 bx = b->x;
+    f32 cx = c->x;
+
+    f32 y_delta_inv = 1.0f / (by - ay);
+    f32 ad_inv_slope;
+    f32 ae_inv_slope;
+
+    if (bx <= cx) {
+        ad_inv_slope = (bx - ax) * y_delta_inv;
+        ae_inv_slope = (cx - ax) * y_delta_inv;
+    } else {
+        ad_inv_slope = (cx - ax) * y_delta_inv;
+        ae_inv_slope = (bx - ax) * y_delta_inv;
+    }
+
+    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
+    u32 ye = by>h ? h : (u32)ceilf32(by);
+
+    f32 xs = ax + (ys - ay) * ad_inv_slope;
+    f32 xe = ax + (ys - ay) * ae_inv_slope;
+
+    for (u32 y=ys; y<ye; y++) {
+        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
+        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+
+        u32 offset = w*(h-1-y);
+        for (u32 x=x_start; x<x_end; x++) {
+            u32 off = offset + x;
+            f32* zpix = zbuffer + off;
+
+            if (*zpix < zmid) {
+                *zpix = zmid;
+                u32* pixel = framebuffer + off;
+                *pixel = color;
+            }
+        }
+        xs += ad_inv_slope;
+        xe += ae_inv_slope;
+    }
+}
+
+void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+    f32 ay = a->y;
+    f32 by = b->y;
+    f32 cy = c->y;
+    f32 ax = a->x;
+    f32 bx = b->x;
+    f32 cx = c->x;
+
+    f32 dc_inv_slope;
+    f32 ec_inv_slope;
+    f32 dx;
+    f32 ex;
+
+    if (ax <= bx) {
+        dc_inv_slope = (cx - ax) / (cy - ay);
+        ec_inv_slope = (cx - bx) / (cy - by);
+        dx = ax;
+        ex = bx;
+    } else {
+        dc_inv_slope = (cx - bx) / (cy - by);
+        ec_inv_slope = (cx - ax) / (cy - ay);
+        dx = bx;
+        ex = ax;
+    }
+
+    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
+    u32 ye = cy>h ? h : (u32)ceilf32(cy);
+
+    f32 xs = dx + (ys - ay) * dc_inv_slope;
+    f32 xe = ex + (ys - ay) * ec_inv_slope;
+
+    for (u32 y=ys; y<ye; y++) {
+        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
+        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+
+        u32 offset = w*(h-1-y);
+        for (u32 x=x_start; x<x_end; x++) {
+            u32 off = offset + x;
+            f32* zpix = zbuffer + off;
+            if (*zpix < zmid) {
+                *zpix = zmid;
+                u32* pixel = framebuffer + off;
+                *pixel = color;
+            }
+        }
+        xs += dc_inv_slope;
+        xe += ec_inv_slope;
+    }
+}
+
+
 void v2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
@@ -793,41 +854,35 @@ void v2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, 
     if (c->y < b->y) { t = b; b = c; c = t; }
 
     // Fast terminate
-    if (c->y<0) return;
-    if (a->y>=h) return;
+    if (c->y < 0) return;
+    if (a->y >= h) return;
+    if (a->y == c->y) return;
 
     // Fast terminate along x
-    f32 x_min = a->x;
+    f32 xmin = a->x;
     xmin = xmin < b->x ? xmin : b->x;
     xmin = xmin < c->x ? xmin : c->x;
-    f32 x_max = a->x;
+    f32 xmax = a->x;
     xmax = xmax > b->x ? xmax : b->x;
     xmax = xmax > c->x ? xmax : c->x;
-    if (x_max < 0) return;
-    if (x_min >= w) return;
+    if (xmax < 0) return;
+    if (xmin >= w) return;
 
+    f32 zmid = (a->z+b->z+c->z) / 3;
 
     if (b->y == c->y) {
-        f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
-        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-
-        fill_flat_top_triangle(x0, y0, ye, dx, ex);
-
+        fill_flat_top_triangle(a, b, c, zmid, w, h, framebuffer, zbuffer, color);
     } else if (a->y == b->y) {
-        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-        f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
-
-        fill_flat_bottom_triangle();
+        fill_flat_bottom_triangle(a, b, c, zmid, w, h, framebuffer, zbuffer, color);
     } else {
         f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
         f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
         f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
 
-        fill_flat_top_triangle();
-        fill_flat_bottom_triangle();
+        // fill_flat_top_triangle();
+        // fill_flat_bottom_triangle();
     }
-
 }
 
 
@@ -899,13 +954,11 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // if (i > 10 && i < 20) {
-            // if (swapper)
-            v1_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-            // else
-            // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-            // v0_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // }
+        // v0_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // if (swapper)
+        // v1_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // else
+        v2_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
 
 
     }
