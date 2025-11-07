@@ -205,6 +205,9 @@ int trailing_zero_bits(u32 x) {
 
 
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
+    /*
+     * Data in the buffer should be in the order: left to right, bottom up
+     */
     if ((buffer == nullptr) | (window == nullptr)) {
         return;
     }
@@ -225,25 +228,29 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     f32 w_ratio = (f32)width  / (f32)window->w;
     f32 h_ratio = (f32)height / (f32)window->h;
 
+    u32 height_minus_1 = (u32)height-1;
+    u32 width_minus_1  = (u32)width-1;
+
     if (ADSV_BILINEAR == window->draw_method) {
         for (u32 j=0; j<window->h; j++) {
             f32 img_j = (j * h_ratio);
-            img_j = img_j>height-1 ? (f32)(height-1) : img_j;
+            img_j = img_j>height_minus_1 ? (f32)(height_minus_1) : img_j;
 
             u32 j0 = (u32) img_j;
-            u32 j1 = (img_j+1>height-1) ? (u32)(height-1) : (u32)(img_j)+1;
+            u32 j1 = (img_j+1>height_minus_1) ? (u32)(height_minus_1) : (u32)(img_j)+1;
 
             f32 weight_j = img_j - j0;
 
             u64 row0 = j0 * width;
             u64 row1 = j1 * width;
 
+            u64 window_offset = (window->h - j - 1) * window->w;
             for (u32 i=0; i<window->w; i++) {
                 f32 img_i = (i * w_ratio);
-                img_i = img_i>width-1  ? (f32)(width-1)  : img_i;
+                img_i = img_i>width_minus_1  ? (f32)(width_minus_1)  : img_i;
 
                 u32 i0 = (u32) img_i;
-                u32 i1 = (img_i+1>width-1) ? (u32)(width-1) : (u32)(img_i)+1;
+                u32 i1 = (img_i+1>width_minus_1) ? (u32)(width_minus_1) : (u32)(img_i)+1;
 
                 f32 weight_i = img_i - i0;
 
@@ -270,13 +277,14 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
                     colour[c] = (u8)out;
                 }
 
-                u64 dst_idx = (j * window->w + i);
+                u64 dst_idx = (window_offset + i);
                 window->buffer[dst_idx] = (colour[0]<<rshift) | (colour[1]<<gshift) | (colour[2]<<bshift);
             }
         }
     }
     else if (ADSV_NEAREST == window->draw_method){
         for (u32 j=0; j<window->h; j++) {
+            u64 window_offset = (window->h - j - 1) * window->w;
             for (u32 i=0; i<window->w; i++) {
                 u32 img_i = (i * w_ratio);
                 u32 img_j = (j * h_ratio);
@@ -290,7 +298,7 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
                 u8 b = p[2];
                 u8 a = p[3];
 
-                u64 dst_idx = (j * window->w + i);
+                u64 dst_idx = window_offset + i;
                 window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
             }
         }
@@ -301,15 +309,16 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
         u32 width_bound = (width < window->w) ? width : window->w;
         u32 height_bound = (height < window->h) ? height : window->h;
         for (u32 j=0; j<height_bound; j++) {
+            u64 window_offset = (window->h - j - 1) * window->w;
             for (u32 i=0; i<width_bound; i++) {
-                u64 src_idx = (j * width + i) * 4;
-                u8* d = src+src_idx;
+                u64 src_idx = (j * width + i);
+                u8* d = src+src_idx * 4;
                 u8 r = d[0];
                 u8 g = d[1];
                 u8 b = d[2];
                 u8 a = d[3];
 
-                u64 dst_idx = (j * window->w + i);
+                u64 dst_idx = (window_offset + i);
                 window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
             }
         }

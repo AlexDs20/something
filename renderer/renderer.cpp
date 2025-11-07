@@ -479,7 +479,7 @@ u32 random_color(u64 v) {
     return c;
 }
 
-f32 ceilf32(f32 d) {
+static f32 ceilf32(f32 d) {
     f32 trunc = (f32)((s32)d);
     if (trunc < d) {
         return trunc+1.0f;
@@ -513,14 +513,11 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w, u3
     f32 xs = ax + (ys - ay) * ad_inv_slope;
     f32 xe = ax + (ys - ay) * ae_inv_slope;
 
-    // printf("y: [%.3f,%.3f] -> [%d,%d]\n", ay, by, ys, ye);
-    // printf("x: [%.3f,%.3f]           \n", xs, xe);
-
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
         u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
 
-        u32 offset = w*(h-1-y);
+        u32 offset = w*y;
         for (u32 x=x_start; x<x_end; x++) {
             u32 off = offset + x;
             f32* zpix = zbuffer + off;
@@ -571,7 +568,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w,
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
         u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
 
-        u32 offset = w*(h-1-y);
+        u32 offset = w*y;
         for (u32 x=x_start; x<x_end; x++) {
             u32 off = offset + x;
             f32* zpix = zbuffer + off;
@@ -742,8 +739,6 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // else
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-
-
     }
     swapper = !swapper;
 }
