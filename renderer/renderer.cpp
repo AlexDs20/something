@@ -479,232 +479,6 @@ u32 random_color(u64 v) {
     return c;
 }
 
-
-void v0_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
-    /*
-     * f(t) = A + t * AB            t in [0, 1]
-     *
-     * x = A_x + t * AB_x
-     * y = A_y + t * AB_y
-     *
-     * IF AB_y != 0 => A_y != B_y
-     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
-     * x = A_x + (y-A_y) * (AB_x / AB_y)
-     *
-     * Start at y = A_y
-     * until y = B_y
-     *
-     * y = A_y
-     *      x = A_x
-     * y = A_y + 1
-     *      x = A_x + 1 * (AB_x / AB_y)
-     * y = A_y + 2
-     *      x = A_x + 2 * (AB_x / AB_y)
-     *
-     *              C                                 C
-     *              x                                 x
-     *
-     *
-     *
-     *                  x        ===>           d.        xe        d always on left of e
-     *                  B                                 B
-     *
-     *    x                                 x
-     *    A                                 A
-     */
-
-    Vertex* a = v1;
-    Vertex* b = v2;
-    Vertex* c = v3;
-
-    // Sort in order of ascending y: a.y<b.y<c.y
-    Vertex* t;
-    if (b->y < a->y) { t = a; a = b; b = t; }
-    if (c->y < a->y) { t = a; a = c; c = t; }
-    if (c->y < b->y) { t = b; b = c; c = t; }
-
-    // Fast terminate
-    f32 ys = a->y;
-    if (ys>=h) return;
-    f32 ye = c->y;
-    if (ye<0) return;
-
-    // TODO: Fix Z-buffer so that each pixel has a Z value instead of mean over triangle
-    // For zbuffer
-    f32 zmid = (a->z + b->z + c->z) / 3;
-
-    f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
-    f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-    f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
-
-    // Add extra point at level of b->y along the AC line
-    f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
-
-    f32 ad_inv_slope;
-    f32 ae_inv_slope;
-    f32 dc_inv_slope;
-    f32 ec_inv_slope;
-    f32 dx;
-    f32 ex;
-
-    if (extra_x < b->x) {
-        dx = extra_x;
-        ex = b->x;
-        ad_inv_slope = ac_inv_slope;
-        ae_inv_slope = ab_inv_slope;
-        dc_inv_slope = ac_inv_slope;
-        ec_inv_slope = bc_inv_slope;
-    } else {
-        dx = b->x;
-        ex = extra_x;
-        ad_inv_slope = ab_inv_slope;
-        ae_inv_slope = ac_inv_slope;
-        dc_inv_slope = bc_inv_slope;
-        ec_inv_slope = ac_inv_slope;
-    }
-
-    if (ex<0) return;
-    if (dx>w) return;
-
-    ys = ys<0 ? 0 : ys;
-    ye = ye>h ? h : ye;
-    f32 xs, xe;
-    for (f32 y=(s32)(ys+0.5f)+0.5f; y<=(s32)(ye-0.5f)+0.5f; y++) {
-        // printf("v1 y: %.3f\n", y);
-        if (y < b->y) {
-            xs = a->x + (y-a->y) * ad_inv_slope;
-            xe = a->x + (y-a->y) * ae_inv_slope;
-        } else {
-            xs = dx + (y-b->y) * dc_inv_slope;
-            xe = ex + (y-b->y) * ec_inv_slope;
-        }
-
-        xs = xs<0 ? 0 : xs;
-        xe = xe>w ? w : xe;
-        for (s32 x=(s32)(xs+0.5f); x<=(s32)(xe-0.5f); x++) {
-            u32 offset = w*(s32)(h-y) + x;
-            f32* zpix = zbuffer + offset;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-                u32* pixel = framebuffer + offset;
-                *pixel = color;
-            }
-        }
-    }
-}
-
-void v1_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
-    /*
-     * f(t) = A + t * AB            t in [0, 1]
-     *
-     * x = A_x + t * AB_x
-     * y = A_y + t * AB_y
-     *
-     * IF AB_y != 0 => A_y != B_y
-     * x = A_x + ( (y - A_y) / AB_y ) * AB_x
-     * x = A_x + (y-A_y) * (AB_x / AB_y)
-     *
-     * Start at y = A_y
-     * until y = B_y
-     *
-     * y = A_y
-     *      x = A_x
-     * y = A_y + 1
-     *      x = A_x + 1 * (AB_x / AB_y)
-     * y = A_y + 2
-     *      x = A_x + 2 * (AB_x / AB_y)
-     *
-     *              C                                 C
-     *              x                                 x
-     *
-     *
-     *
-     *                  x        ===>           d.        xe        d always on left of e
-     *                  B                                 B
-     *
-     *    x                                 x
-     *    A                                 A
-     */
-
-    Vertex* a = v1;
-    Vertex* b = v2;
-    Vertex* c = v3;
-
-    // Sort in order of ascending y: a.y<b.y<c.y
-    Vertex* t;
-    if (b->y < a->y) { t = a; a = b; b = t; }
-    if (c->y < a->y) { t = a; a = c; c = t; }
-    if (c->y < b->y) { t = b; b = c; c = t; }
-
-    // Fast terminate
-    if (a->y>=h) return;
-    if (c->y<0) return;
-
-    // TODO: Fix Z-buffer so that each pixel has a Z value instead of mean over triangle
-    // For zbuffer
-    f32 zmid = (a->z + b->z + c->z) / 3;
-
-    f32 ab_inv_slope = (b->x - a->x) / (b->y - a->y);
-    f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-    f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
-
-    // Add extra point at level of b->y along the AC line
-    f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
-
-    f32 ad_inv_slope;
-    f32 ae_inv_slope;
-    f32 dc_inv_slope;
-    f32 ec_inv_slope;
-    f32 dx;
-    f32 ex;
-
-    if (extra_x < b->x) {
-        dx = extra_x;
-        ex = b->x;
-        ad_inv_slope = ac_inv_slope;
-        ae_inv_slope = ab_inv_slope;
-        dc_inv_slope = ac_inv_slope;
-        ec_inv_slope = bc_inv_slope;
-    } else {
-        dx = b->x;
-        ex = extra_x;
-        ad_inv_slope = ab_inv_slope;
-        ae_inv_slope = ac_inv_slope;
-        dc_inv_slope = bc_inv_slope;
-        ec_inv_slope = ac_inv_slope;
-    }
-
-    if (ex<0) return;
-    if (dx>w) return;
-
-    u32 ys = a->y<0 ? 0 : (u32)a->y+1;
-    u32 ye = c->y>h ? h : (u32)c->y+1;
-    f32 xs, xe;
-    for (u32 y=ys; y<ye; y++) {
-        if (y<0 || y >= h) continue;
-        if (y < b->y) {
-            xs = a->x + (y-a->y) * ad_inv_slope;
-            xe = a->x + (y-a->y) * ae_inv_slope;
-        } else {
-            xs = dx + (y-b->y) * dc_inv_slope;
-            xe = ex + (y-b->y) * ec_inv_slope;
-        }
-
-        u32 x_start = xs<0 ? 0 : (u32)xs;
-        u32 x_end = xe>w ? w : (u32)xe+1;
-        for (u32 x=x_start; x<x_end; x++) {
-            if (x<0 || x >= w) continue;
-            u32 offset = w*(h-1-y) + x;
-            f32* zpix = zbuffer + offset;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-                u32* pixel = framebuffer + offset;
-                *pixel = color;
-            }
-        }
-    }
-}
-
 f32 ceilf32(f32 d) {
     f32 trunc = (f32)((s32)d);
     if (trunc < d) {
@@ -812,8 +586,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w,
     }
 }
 
-
-void v2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -965,13 +738,10 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         u32 col = (0xFF & (u32)(220*(a.z + b.z + c.z)/3));
 
         // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // fill_triangle_line_sweep(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // v0_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // if (swapper)
-        // v1_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // else
-        v2_fill_triangle(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, col);
 
 
     }
