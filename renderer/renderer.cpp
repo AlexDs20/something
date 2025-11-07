@@ -739,6 +739,9 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, f32 zmid, u32 w, u3
     f32 xs = ax + (ys - ay) * ad_inv_slope;
     f32 xe = ax + (ys - ay) * ae_inv_slope;
 
+    // printf("y: [%.3f,%.3f] -> [%d,%d]\n", ay, by, ys, ye);
+    // printf("x: [%.3f,%.3f]           \n", xs, xe);
+
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
         u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
@@ -880,8 +883,18 @@ void v2_fill_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, 
         f32 bc_inv_slope = (c->x - b->x) / (c->y - b->y);
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
 
-        // fill_flat_top_triangle();
-        // fill_flat_bottom_triangle();
+        Vertex extra = {
+            .x = extra_x,
+            .y = b->y,
+            .z = zmid,
+        };
+
+        if (b->y > 0) {
+            fill_flat_top_triangle(a, b, &extra, zmid, w, h, framebuffer, zbuffer, color);
+        }
+        if (b->y < h) {
+            fill_flat_bottom_triangle(&extra, b, c, zmid, w, h, framebuffer, zbuffer, color);
+        }
     }
 }
 
