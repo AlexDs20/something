@@ -532,8 +532,11 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
         u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
 
-        f32 z_scanline_slope = (ze-zs)/(xe-xs);
-
+        f32 z_scanline_slope = 0.0f;
+        f32 x_width = (xe-xs);
+        if (x_width != 0.0f) {
+            z_scanline_slope = (ze-zs)/(xe-xs);
+        }
         // z = A_z + (x-A_x) * (B_z-A_z)/(B_x-A_x)
         f32 z = zs + (x_start-xs) * z_scanline_slope;
 
@@ -615,7 +618,11 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
         u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
 
-        f32 z_scanline_slope = (ze-zs)/(xe-xs);
+        f32 z_scanline_slope = 0.0f;
+        f32 x_width = (xe-xs);
+        if (x_width != 0.0f) {
+            z_scanline_slope = (ze-zs)/(xe-xs);
+        }
         f32 z = zs + (x_start-xs) * z_scanline_slope;
 
         u32 offset = w*y;
