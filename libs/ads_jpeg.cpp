@@ -1399,6 +1399,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     }
 
     u64 current_mcu = 0;
+    u64 total_number_mcu = jpeg->fh.n_mcu_width *  jpeg->fh.n_mcu_height;
     for (u64 i=0; i<n_restart_intervals; i++) {
         // ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
         {
@@ -1409,8 +1410,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             jpeg->dc_pred[3] = 0;
 
             u64 n = 0;
-            // TODO: This does not handle properly on the last of the restart intervals if the number of mcu in the last restart_interval is not
-            while (n++ < restart_interval) {
+            while (n++ < restart_interval && current_mcu < total_number_mcu) {
                 // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
                 {
                     u32 mcu_block_start_y = (u32)(current_mcu / n_mcu_width);

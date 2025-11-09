@@ -23,6 +23,8 @@ void create_missing_image(Arena* arena, Image* out) {
     return;
 }
 
+// status = read_image_info(filename, &width, &height, &components);
+
 Image read_image_file(Arena* persist_arena, string8 filename) {
     Image out = {};
     LocalArena* local_arena = local_arena_alloc_create();
@@ -36,16 +38,16 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
     if (extension == ".jpg" || extension == ".jpeg") {
-        char* f = string_to_cstr(local_arena->arena, filename);
-        int w, h, c;
-        out.gray = stbi_load(f, &w, &h, &c, 4);
-        out.width = w;
-        out.height = h;
-        out.components = c;
+        // char* f = string_to_cstr(local_arena->arena, filename);
+        // int w, h, c;
+        // out.gray = stbi_load(f, &w, &h, &c, 4);
+        // out.width = w;
+        // out.height = h;
+        // out.components = c;
         // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
         // // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
-        // result = decode_jpeg(persist_arena, data, &out);
-        // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
+        result = decode_jpeg(persist_arena, data, &out);
+        printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
         int w, h, c;

@@ -20,4 +20,5 @@ struct Image {
 };
 
 Image read_image_file(Arena* arena, string8 filename);
+// status = read_image_info(filename, &width, &height, &components);
 #endif
