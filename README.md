@@ -1,22 +1,41 @@
+# TODO
+- JPEG:
+    - [ ] Check / make restart marker work even if not a multiple of the total number of pixels
+    - [ ] Allow returning 1, 3 or 4 components as requested by a user
+    - [ ] Get the info about the jpeg image without decoding
+    - [ ] Allow flipping along y.
+    - [ ] Progressive decoding
+    - [ ] Test code on thousands of images
+- Renderer:
+    - [ ] Add another implementation for rasterizing using bounding box
+    - [ ] Add rendering texture on mesh
 
-# Platform
+# Implemented
+- Window using Xlib with scaling nearest / bilinear or no scaling
+- Basic jpeg decoder
+- .obj parser
+- Basic software renderer drawing triangles as wireframe or filling
+
+# Notes:
+- Rendering to X11 requires data stored in bottom up fashion
+- Coordinate system is x: left -> right and y: down -> up
+
+# Ideas / References
 ## Window
 
 ### Linux
 - [ ] Xlib
-    - [x] Windowing
+    - [ ] double buffering [link](https://www.x.org/releases/X11R7.7/doc/libXext/dbelib.html)
+    - [ ] Implementation using Xshm
+    - [ ] Implementation using OpenGL [eg](https://alexvia.com/post/002_initializing_opengl_on_x11/)
     - [ ] keyboard events
     - [ ] mouse events
-    - [ ] double buffering [link](https://www.x.org/releases/X11R7.7/doc/libXext/dbelib.html)
-    - [ ] Use shared memory?
     - [ ] copy/paste [link](https://handmade.network/forums/articles/t/8544-implementing_copy_paste_in_x11)
-
-- [ ] Xlib + opengl? [eg](https://alexvia.com/post/002_initializing_opengl_on_x11/)
+- [ ] Kitty terminal protocol [link](https://sw.kovidgoyal.net/kitty/graphics-protocol/)
 - [ ] Wayland
 - [ ] X11 without xlib [here](https://hereket.com/posts/from-scratch-x11-windowing/#writing-text)
 
 - [ ] Support for any buffer type: RGB, RGBA, GREY
-- [ ] Support for multiple windows
 
 X11 info:
 - [pdf reference xlib](https://www.x.org/docs/X11/xlib.pdf)
@@ -30,10 +49,6 @@ X11 info:
 - [ ] Make a more complete math library with all basic functions like ceil, cos, sin, acos, ...
 
 ## Image
-- [ ] Finish a good, simple and fast implementation to decode jpeg:
-    - [ ] Baseline DCT
-    - [ ] chroma subsampling
-    - [ ] Progressive DCT
 - [ ] Add decoding of png
 
 ## Audio
