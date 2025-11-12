@@ -342,9 +342,8 @@ void print_sh(ScanHeader& sh) {
 
     for (u8 i=0; i<sh.n_components; i++) {
         printf("Component %d: \n", i);
-        // printf("    id selector: %d\n", sh.id_selector[i]);
-        // printf("    dc selector: %d\n", sh.dc_selector[i]);
-        // printf("    ac selector: %d\n", sh.ac_selector[i]);
+        printf("    address: %p\n", sh.components[i]);
+        print_ci(sh.components[i]);
     }
     printf("Start spectral: %d\n", sh.start_spectral);
     printf("End spectral: %d\n", sh.end_spectral);
@@ -397,7 +396,7 @@ bool overflow(BitStream* bs) {
 }
 
 inline
-bool skip_nbytes(BitStream* bs, u64 n) {
+bool skip_nbytes(BitStream* bs, s64 n) {
     bool error = false;
     bs->byte_pos += n;
 
@@ -563,10 +562,19 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
         length--;
         u8 dc_selector = v >> 4;
         u8 ac_selector = v & 0x0F;
-        if (dc_selector > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
-        } else if (ac_selector > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
+        if (jpeg->frame_type == StartOfFrame0) {        // Baseline DCT
+            if (dc_selector > 1) {
+                return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
+            } else if (ac_selector > 1) {
+                return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
+            }
+        }
+        else if (jpeg->frame_type == StartOfFrame2) {   // Progressive DCT
+            if (dc_selector > 3) {
+                return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be between 0 and 3 for Progressive DCT."};
+            } else if (ac_selector > 3) {
+                return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be between 0 and 3 for Progressive DCT."};
+            }
         }
 
         // Setup the component informations so that it's complete with QT and AC/DC tables
@@ -600,25 +608,49 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
 
     sh.start_spectral = read_byte(bs);
     length--;
-    if (sh.start_spectral != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have start spectral = 0"};
-    }
 
     sh.end_spectral = read_byte(bs);
     length--;
-    if (sh.end_spectral != 63) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 0"};
+
+    if (jpeg->frame_type == StartOfFrame0) {
+        if (sh.start_spectral != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have start spectral = 0"};
+        }
+        if (sh.end_spectral != 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 0"};
+        }
+    }
+    else if (jpeg->frame_type == StartOfFrame2) {
+        if (sh.start_spectral > 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have start spectral <= 63"};
+        }
+        if (sh.end_spectral > 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral <= 63"};
+        }
+        if (sh.end_spectral < sh.start_spectral) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral smaller than start."};
+        }
     }
 
     v = read_byte(bs);
     length--;
     sh.approx_high = v >> 4;
-    if (sh.approx_high != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation high = 0"};
-    }
     sh.approx_low  = v & 0x0F;
-    if (sh.approx_low != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation low = 0"};
+    if (jpeg->frame_type == StartOfFrame0) {
+        if (sh.approx_high != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation high = 0"};
+        }
+        if (sh.approx_low != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation low = 0"};
+        }
+    }
+    else if (jpeg->frame_type == StartOfFrame2) {
+        if (sh.approx_high > 13) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have approximation high smaller than 13."};
+        }
+        if (sh.approx_low > 13) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have approximation low smaller than 13."};
+        }
     }
 
     if (length != 0) {
@@ -1534,7 +1566,19 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
-            result = parse_scan(persist_arena, bs, jpeg);
+            print_sh(jpeg->sh);
+            // result = parse_scan(persist_arena, bs, jpeg);
+
+            previous = read_byte(bs);
+            marker = read_byte(bs);
+            while ((previous != 0xFF) ||
+                   (previous == 0xFF && marker == 0x00) ||
+                   (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
+                previous = marker;
+                marker = read_byte(bs);
+            }
+            skip_nbytes(bs, -2);
+            printf("Next marker: 0x%04X\n", peek_2bytes(bs));
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
