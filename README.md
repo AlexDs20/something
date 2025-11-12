@@ -2,7 +2,9 @@
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
     - [ ] Progressive decoding
-    - [ ] Value of by 1 maybe? Check
+    - [ ] Check the output data format => u8*
+    - [ ] Check memory alloc strategy
+    - [ ] Value off by 1 maybe? Check
     - [ ] Allow returning 1, 3 or 4 components as requested by a user
     - [ ] Get the info about the jpeg image without decoding
     - [ ] Allow flipping along y.

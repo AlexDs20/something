@@ -464,7 +464,7 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
     length--;
 
     if (fh.src_precision != 8) {
-        return (ImageParsingResult){IMAGE_FAIL, "Bytes per color != 8 not supported for DCT baseline."};
+        return (ImageParsingResult){IMAGE_FAIL, "Bytes per color != 8 not supported for DCT baseline or DCT Progressive."};
     }
 
     fh.src_height = read_2bytes(bs);
@@ -485,6 +485,12 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
 
     if (fh.src_components == 0) {
         return (ImageParsingResult){IMAGE_FAIL, "Number of components = 0 not supported."};
+    }
+
+    if (jpeg->frame_type == StartOfFrame2) {     // Progressive DCT, only support for up to 4 components
+        if (fh.src_components > 4) {
+            return (ImageParsingResult){IMAGE_FAIL, "Number of components >4 not allowed by spec."};
+        }
     }
 
     u8 v;
@@ -1660,7 +1666,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         //  PARSE FRAME
         {
             // FrameHeader
-            if (marker == StartOfFrame0) {
+            if (marker == StartOfFrame0 || marker == StartOfFrame2) {      // Baseline DCT or Progressive
                 jpeg.frame_type = (Markers)marker;
                 result = parse_frame_header(local_arena->arena, &bs, &jpeg);
                 if (result.status != IMAGE_SUCCESS) { return result; }
