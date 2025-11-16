@@ -938,7 +938,7 @@ ImageParsingResult decode_one_huffman_code(BitStream* bs, HuffmanNode* root, u8*
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-s16 read_n_bits(BitStream* bs, u8 n) {
+s16 decode_n_bits(BitStream* bs, u8 n) {
     s16 out;
     u8 bit;
     u16 tmp_value = 0;
@@ -967,7 +967,7 @@ ImageParsingResult parse_dc_data_unit(BitStream* bs, HuffmanNode* root, s16* out
     }
 
     // Read that amount of bits
-    *out = read_n_bits(bs, category);
+    *out = decode_n_bits(bs, category);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
@@ -975,7 +975,7 @@ ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_
     u8 symbol;
     decode_one_huffman_code(bs, root, &symbol);
 
-    *run_length = symbol >> 4;
+    *run_length = symbol >> 4;      // preceeding zeros
     u8 category = symbol & 0x0F;
 
     if (category == 0) {
@@ -983,7 +983,7 @@ ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_
         return (ImageParsingResult){IMAGE_SUCCESS, 0};
     }
 
-    *out = read_n_bits(bs, category);
+    *out = decode_n_bits(bs, category);
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
