@@ -343,7 +343,7 @@ void print_sh(ScanHeader& sh) {
     for (u8 i=0; i<sh.n_components; i++) {
         printf("Component %d: \n", i);
         printf("    address: %p\n", sh.components[i]);
-        print_ci(sh.components[i]);
+        // print_ci(sh.components[i]);
     }
     printf("Start spectral: %d\n", sh.start_spectral);
     printf("End spectral: %d\n", sh.end_spectral);
@@ -976,7 +976,7 @@ ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_
     decode_one_huffman_code(bs, root, &symbol);
 
     *run_length = symbol >> 4;      // preceeding zeros
-    u8 category = symbol & 0x0F;
+    u8 category = symbol & 0x0F;    // Number of bits to read to get the value
 
     if (category == 0) {
         *out = 0;
@@ -1566,8 +1566,8 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
-            print_sh(jpeg->sh);
-            // result = parse_scan(persist_arena, bs, jpeg);
+            // print_sh(jpeg->sh);
+            result = parse_scan(persist_arena, bs, jpeg);
 
             previous = read_byte(bs);
             marker = read_byte(bs);

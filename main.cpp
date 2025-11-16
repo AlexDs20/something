@@ -33,9 +33,14 @@ int main() {
         model = read_obj_model_file(scene_arena, file_path);
     }
 
-    u32 img_w = 1920;
-    u32 img_h = 1080;
-    const u32 bg_color = 0x777777;
+    u32* win_buffer = model->material->map_Kd.buffer;
+    u32 img_w = model->material->map_Kd.width;
+    u32 img_h = model->material->map_Kd.height;
+
+    // u32 img_w = 1920;
+    // u32 img_h = 1080;
+    // const u32 bg_color = 0x777777;
+    const u32 bg_color = 0x18181B;
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, msg, ADSV_NEAREST);
 
@@ -50,8 +55,11 @@ int main() {
         // It does not have to be the same size as the window
         // img_w = win.w;
         // img_h = win.h;
+
+        /*
         f32* zbuffer = (f32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
         u32* win_buffer = (u32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
+
         // DATA format: [RR] [GG] [BB] [AA]
         // on little-endian: 0xAABBGGRR
         // on big-endian: 0xRRGGBBAA
@@ -63,6 +71,7 @@ int main() {
 
         // draw_model_wireframe(model, img_w, img_h, win_buffer);
         draw_model(model, img_w, img_h, win_buffer, zbuffer);
+        */
         // draw_model_wireframe(model, img_w, img_h, win_buffer);
         platform_render_to_window((u8*)win_buffer, img_w, img_h, &win);
     }
