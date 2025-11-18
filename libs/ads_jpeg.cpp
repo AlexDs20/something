@@ -252,7 +252,8 @@ typedef struct ComponentInfo ComponentInfo;
 struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
-    f32* buffer;     // decoded data
+    s16* coeff;         // the "raw" decoded coefficient 1 block after each other still in zigzag order
+    f32* buffer;        // decoded data
     u8* QT;
     u32 xi;
     u32 yi;
@@ -534,6 +535,7 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
 
         // Note: Only support of 8 bits components
         fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof (f32));
+        fh.components[i].coeff = (s16*)arena_alloc_push_zero(arena, fh.components[i].xi * fh.components[i].yi * sizeof (s16));
         // fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * fh.src_components * sizeof (u8));
     }
 
@@ -1461,9 +1463,13 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 
                         for (u8 v=0; v<Vi[i]; v++) {
                             for (u8 h=0; h<Hi[i]; h++) {
-                                f32 zz_mcu[64] = {0};
-                                f32 mcu[64] = {0};
-                                f32 idct[64] = {0};
+                                // HERE TODO: replace zz_mcu with components[i]->coeff
+                                //  And identify correctly where to put the data in the component array
+                                //  Data format is: block0[64]block1[64],...,blockxi[64,]
+                                u32 idx_x = (mcu_block_start_x*Hi[i] + h) * 64;
+                                u32 idx_y = (mcu_block_start_y*Vi[i] + v);
+                                u64 offset = idx_x + idx_y * (jpeg->sh.components[i]->xi*8);
+                                s16* zz_mcu = &jpeg->sh.components[i]->coeff[offset];
 
                                 s16 value;
                                 result = parse_dc_data_unit(bs, dc_ht_root, &value);
@@ -1492,6 +1498,10 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                     }
                                 }
 
+                                /*
+                                // TODO: Only store raw coeffs here and convert after all is done
+                                //  to have better support for progressive DCT
+
                                 // Dequantize and Unzigzag
                                 for (u8 l=0; l<64; l++) {
                                     mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
@@ -1512,6 +1522,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                         jpeg->sh.components[i]->buffer[linear_index] = idct[l];
                                     }
                                 }
+                                */
                             }
                         }
                     }
@@ -1727,6 +1738,77 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             if (result.status != IMAGE_SUCCESS) { return result; }
         }
 
+        // To go from flat zigzag order to flat unzigzag order
+        const u8 unzigzag[64] = {
+            0,   1,  8, 16,  9,  2,  3, 10,
+            17, 24, 32, 25, 18, 11,  4,  5,
+            12, 19, 26, 33, 40, 48, 41, 34,
+            27, 20, 13,  6,  7, 14, 21, 28,
+            35, 42, 49, 56, 57, 50, 43, 36,
+            29, 22, 15, 23, 30, 37, 44, 51,
+            58, 59, 52, 45, 38, 31, 39, 46,
+            53, 60, 61, 54, 47, 55, 62, 63
+        };
+
+        // TODO(alex): WIP
+        for (u8 i=0; i<jpeg.fh.src_components; i++) {
+            s16* comp = jpeg.fh.components[i].coeff;
+            u8* Q = jpeg.fh.components[i].QT;
+
+            u32 n_du_width =  ceil((f32)jpeg.fh.components[0].xi / 8);
+            u32 n_du_height = ceil((f32)jpeg.fh.components[0].yi / 8);
+
+            // If I put them contiguous in memory
+            for (u64 block_id=0; block_id<n_du_width*n_du_height; block_id++) {
+                s16* coeff = &comp[block_id * 64];
+                f32 mcu[64];
+                f32 idct[64];
+
+                // Dequantize and Unzigzag
+                for (u8 l=0; l<64; l++) {
+                    mcu[unzigzag[l]] = coeff[l] * Q[l];
+                }
+
+                // IDCT
+                idct_2d_aan(idct, mcu);
+
+                // Write data at correct place
+                /*
+                for (u8 y=0; y<8; y++) {
+                    for (u8 x=0; x<8; x++) {
+                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
+                        u16 l = x + y*8;
+
+                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
+                    }
+                }
+                */
+            }
+
+        }
+
+        /*
+        // Dequantize and Unzigzag
+        for (u8 l=0; l<64; l++) {
+            mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
+        }
+
+        // IDCT
+        idct_2d_aan(idct, mcu);
+
+        // Assign the value at the correct component buffer position
+        u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
+        u32 idx_y = ((mcu_block_start_y*Vi[i]) + v) * 8;
+
+        for (u8 y=0; y<8; y++) {
+            for (u8 x=0; x<8; x++) {
+                u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
+                u16 l = x + y*8;
+
+                jpeg->sh.components[i]->buffer[linear_index] = idct[l];
+            }
+        }
+
         // Assume YCbCr
         // Convert to RGB
         int tmp = 0x000000FF;
@@ -1795,6 +1877,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 }
             }
         }
+        */
 
         local_arena_alloc_reset(local_arena);
         result = (ImageParsingResult){IMAGE_SUCCESS, 0};
