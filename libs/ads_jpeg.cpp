@@ -1759,30 +1759,34 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             u32 n_du_height = ceil((f32)jpeg.fh.components[0].yi / 8);
 
             // If I put them contiguous in memory
-            for (u64 block_id=0; block_id<n_du_width*n_du_height; block_id++) {
-                s16* coeff = &comp[block_id * 64];
-                f32 mcu[64];
-                f32 idct[64];
+            for (u32 block_id_y=0; block_id_y<n_du_height; block_id_y++) {
+                for (u32 block_id_x=0; block_id_x<n_du_width; block_id_x++) {
+                    u64 block_id = block_id_y * n_du_width + block_id_x;
 
-                // Dequantize and Unzigzag
-                for (u8 l=0; l<64; l++) {
-                    mcu[unzigzag[l]] = coeff[l] * Q[l];
-                }
+                    s16* coeff = &comp[block_id * 64];
+                    f32 mcu[64];
+                    f32 idct[64];
 
-                // IDCT
-                idct_2d_aan(idct, mcu);
+                    // Dequantize and Unzigzag
+                    for (u8 l=0; l<64; l++) {
+                        mcu[unzigzag[l]] = coeff[l] * Q[l];
+                    }
 
-                // Write data at correct place
-                /*
-                for (u8 y=0; y<8; y++) {
-                    for (u8 x=0; x<8; x++) {
-                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
-                        u16 l = x + y*8;
+                    // IDCT
+                    idct_2d_aan(idct, mcu);
 
-                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
+                    // Write data at correct place
+                    u32 idx_x = block_id_x * 8;
+                    u32 idx_y = block_id_y * 8;
+                    u32 base_offset = idx_y * jpeg.sh.components[i]->xi + idx_x;
+                    for (u8 y=0; y<8; y++) {
+                        for (u8 x=0; x<8; x++) {
+                            u64 linear_index = base_offset + y * jpeg.sh.components[i]->xi + x;
+                            u16 l = x + y*8;
+                            jpeg.sh.components[i]->buffer[linear_index] = idct[l];
+                        }
                     }
                 }
-                */
             }
 
         }
@@ -1808,6 +1812,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 jpeg->sh.components[i]->buffer[linear_index] = idct[l];
             }
         }
+        */
 
         // Assume YCbCr
         // Convert to RGB
@@ -1877,7 +1882,6 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 }
             }
         }
-        */
 
         local_arena_alloc_reset(local_arena);
         result = (ImageParsingResult){IMAGE_SUCCESS, 0};
