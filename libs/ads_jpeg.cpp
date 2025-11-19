@@ -1580,16 +1580,16 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
             // print_sh(jpeg->sh);
             result = parse_scan(persist_arena, bs, jpeg);
 
-            previous = read_byte(bs);
-            marker = read_byte(bs);
-            while ((previous != 0xFF) ||
-                   (previous == 0xFF && marker == 0x00) ||
-                   (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
-                previous = marker;
-                marker = read_byte(bs);
-            }
-            skip_nbytes(bs, -2);
-            printf("Next marker: 0x%04X\n", peek_2bytes(bs));
+            // previous = read_byte(bs);
+            // marker = read_byte(bs);
+            // while ((previous != 0xFF) ||
+            //        (previous == 0xFF && marker == 0x00) ||
+            //        (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
+            //     previous = marker;
+            //     marker = read_byte(bs);
+            // }
+            // skip_nbytes(bs, -2);
+            // printf("Next marker: 0x%04X\n", peek_2bytes(bs));
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
@@ -1750,7 +1750,6 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             53, 60, 61, 54, 47, 55, 62, 63
         };
 
-        // TODO(alex): WIP
         for (u8 i=0; i<jpeg.fh.src_components; i++) {
             s16* comp = jpeg.fh.components[i].coeff;
             u8* Q = jpeg.fh.components[i].QT;
@@ -1764,8 +1763,8 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     u64 block_id = block_id_y * n_du_width + block_id_x;
 
                     s16* coeff = &comp[block_id * 64];
-                    f32 mcu[64];
-                    f32 idct[64];
+                    f32 mcu[64] = {0};
+                    f32 idct[64] = {0};
 
                     // Dequantize and Unzigzag
                     for (u8 l=0; l<64; l++) {
@@ -1788,31 +1787,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     }
                 }
             }
-
         }
-
-        /*
-        // Dequantize and Unzigzag
-        for (u8 l=0; l<64; l++) {
-            mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
-        }
-
-        // IDCT
-        idct_2d_aan(idct, mcu);
-
-        // Assign the value at the correct component buffer position
-        u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
-        u32 idx_y = ((mcu_block_start_y*Vi[i]) + v) * 8;
-
-        for (u8 y=0; y<8; y++) {
-            for (u8 x=0; x<8; x++) {
-                u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
-                u16 l = x + y*8;
-
-                jpeg->sh.components[i]->buffer[linear_index] = idct[l];
-            }
-        }
-        */
 
         // Assume YCbCr
         // Convert to RGB
