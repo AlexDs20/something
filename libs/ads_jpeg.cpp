@@ -42,8 +42,6 @@
  *
  */
 
-#include "libs/IDCT_Weights.txt"
-
 // itu-t81.pdf page 32
 enum Markers {
     Temporary                     = 0x01,
@@ -1021,6 +1019,7 @@ const f32 S6 = C2;
 const f32 S7 = C1;
 
 void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    #include "libs/IDCT_Weights.txt"
     for (u8 u=0; u<8; u++) {
         f32 sum = 0;
         for (u8 x=0; x<8; x++) {
@@ -1031,6 +1030,7 @@ void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 }
 
 void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    #include "libs/IDCT_Weights.txt"
     for (u8 x=0; x<8; x++) {
         for (u8 u=0; u<8; u++) {
             out[x*out_stride] += in[u*in_stride] * IDCT_Weights[x][u];
@@ -1438,6 +1438,11 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
         restart_interval = n_mcu_width * n_mcu_height;
     }
 
+    // if (jpeg->sh.approx_high != 0 || (jpeg->sh.start_spectral != 0 && jpeg->sh.end_spectral != 0))
+    //     return result;
+
+    printf("Approx low: %d\n", jpeg->sh.approx_low);
+
     u64 current_mcu = 0;
     u64 total_number_mcu = jpeg->fh.n_mcu_width *  jpeg->fh.n_mcu_height;
     for (u64 i=0; i<n_restart_intervals; i++) {
@@ -1479,6 +1484,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 jpeg->dc_pred[i] = dc;
                                 zz_mcu[0] = dc;
 
+                                /*
                                 u8 j = 1;
                                 while (j<64) {        // and not a marker that would indicate something
                                     u8 preceding_zeros = 0;
@@ -1495,31 +1501,6 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                             zz_mcu[j++] = 0;
                                         }
                                         zz_mcu[j++] = ac;
-                                    }
-                                }
-
-                                /*
-                                // TODO: Only store raw coeffs here and convert after all is done
-                                //  to have better support for progressive DCT
-
-                                // Dequantize and Unzigzag
-                                for (u8 l=0; l<64; l++) {
-                                    mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
-                                }
-
-                                // IDCT
-                                idct_2d_aan(idct, mcu);
-
-                                // Assign the value at the correct component buffer position
-                                u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
-                                u32 idx_y = ((mcu_block_start_y*Vi[i]) + v) * 8;
-
-                                for (u8 y=0; y<8; y++) {
-                                    for (u8 x=0; x<8; x++) {
-                                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
-                                        u16 l = x + y*8;
-
-                                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
                                     }
                                 }
                                 */
@@ -1547,6 +1528,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                 marker = read_byte(bs);
             }
             if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
+                // return result;
                 return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
             }
             skip_nbytes(bs, -2);
@@ -1579,17 +1561,16 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
             if (result.status != IMAGE_SUCCESS) { return result; }
             // print_sh(jpeg->sh);
             result = parse_scan(persist_arena, bs, jpeg);
-
-            // previous = read_byte(bs);
-            // marker = read_byte(bs);
-            // while ((previous != 0xFF) ||
-            //        (previous == 0xFF && marker == 0x00) ||
-            //        (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
-            //     previous = marker;
-            //     marker = read_byte(bs);
-            // }
-            // skip_nbytes(bs, -2);
-            // printf("Next marker: 0x%04X\n", peek_2bytes(bs));
+            previous = read_byte(bs);
+            marker = read_byte(bs);
+            while ((previous != 0xFF) ||
+                   (previous == 0xFF && marker == 0x00) ||
+                   (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
+                previous = marker;
+                marker = read_byte(bs);
+            }
+            skip_nbytes(bs, -2);
+            printf("Next marker: 0x%04X\n", peek_2bytes(bs));
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
@@ -1754,8 +1735,8 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             s16* comp = jpeg.fh.components[i].coeff;
             u8* Q = jpeg.fh.components[i].QT;
 
-            u32 n_du_width =  ceil((f32)jpeg.fh.components[0].xi / 8);
-            u32 n_du_height = ceil((f32)jpeg.fh.components[0].yi / 8);
+            u32 n_du_width =  ceil((f32)jpeg.fh.components[i].xi / 8);
+            u32 n_du_height = ceil((f32)jpeg.fh.components[i].yi / 8);
 
             // If I put them contiguous in memory
             for (u32 block_id_y=0; block_id_y<n_du_height; block_id_y++) {
