@@ -325,8 +325,8 @@ typedef struct ScanHeader ScanHeader;
 struct ScanHeader {
     u8 n_components;
 
-    u8 start_spectral;              // Not used for baseline
-    u8 end_spectral;                // Not used
+    u8 spectral_start;              // Not used for baseline
+    u8 spectral_end;                // Not used
     u8 approx_high;                 // Not used
     u8 approx_low;                  // Not used
 
@@ -344,8 +344,8 @@ void print_sh(ScanHeader& sh) {
         printf("    address: %p\n", sh.components[i]);
         // print_ci(sh.components[i]);
     }
-    printf("Start spectral: %d\n", sh.start_spectral);
-    printf("End spectral: %d\n", sh.end_spectral);
+    printf("Start spectral: %d\n", sh.spectral_start);
+    printf("End spectral: %d\n", sh.spectral_end);
     printf("Approx high: %d\n", sh.approx_high);
     printf("Approx low: %d\n", sh.approx_low);
 }
@@ -606,28 +606,25 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
         }
     }
 
-    sh.start_spectral = read_byte(bs);
+    sh.spectral_start = read_byte(bs);
     length--;
 
-    sh.end_spectral = read_byte(bs);
+    sh.spectral_end = read_byte(bs);
     length--;
 
     if (jpeg->frame_type == StartOfFrame0) {
-        if (sh.start_spectral != 0) {
+        if (sh.spectral_start != 0) {
             return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have start spectral = 0"};
         }
-        if (sh.end_spectral != 63) {
-            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 0"};
+        if (sh.spectral_end != 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 63"};
         }
     }
     else if (jpeg->frame_type == StartOfFrame2) {
-        if (sh.start_spectral > 63) {
-            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have start spectral <= 63"};
-        }
-        if (sh.end_spectral > 63) {
+        if (sh.spectral_end > 63) {
             return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral <= 63"};
         }
-        if (sh.end_spectral < sh.start_spectral) {
+        if (sh.spectral_end < sh.spectral_start) {
             return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral smaller than start."};
         }
     }
@@ -1388,24 +1385,12 @@ void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     }
 }
 
-ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
     u8 expected_restart_id = 0;
     u8 previous;
     u8 marker;
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
-
-    // To go from flat zigzag order to flat unzigzag order
-    const u8 unzigzag[64] = {
-        0,   1,  8, 16,  9,  2,  3, 10,
-        17, 24, 32, 25, 18, 11,  4,  5,
-        12, 19, 26, 33, 40, 48, 41, 34,
-        27, 20, 13,  6,  7, 14, 21, 28,
-        35, 42, 49, 56, 57, 50, 43, 36,
-        29, 22, 15, 23, 30, 37, 44, 51,
-        58, 59, 52, 45, 38, 31, 39, 46,
-        53, 60, 61, 54, 47, 55, 62, 63
-    };
 
     // If only 1 component in the scan => Vi and Hi should be 1
     //  => This means that the number of mcu is not that from the FrameHeader
@@ -1438,11 +1423,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
         restart_interval = n_mcu_width * n_mcu_height;
     }
 
-    // if (jpeg->sh.approx_high != 0 || (jpeg->sh.start_spectral != 0 && jpeg->sh.end_spectral != 0))
-    //     return result;
-
-    printf("Approx low: %d\n", jpeg->sh.approx_low);
-
+    u64 skips;
     u64 current_mcu = 0;
     u64 total_number_mcu = jpeg->fh.n_mcu_width *  jpeg->fh.n_mcu_height;
     for (u64 i=0; i<n_restart_intervals; i++) {
@@ -1453,6 +1434,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             jpeg->dc_pred[1] = 0;
             jpeg->dc_pred[2] = 0;
             jpeg->dc_pred[3] = 0;
+            skips = 0;      // Used to skip frequency bands for progressive
 
             u64 n = 0;
             while (n++ < restart_interval && current_mcu < total_number_mcu) {
@@ -1468,8 +1450,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
 
                         for (u8 v=0; v<Vi[i]; v++) {
                             for (u8 h=0; h<Hi[i]; h++) {
-                                // HERE TODO: replace zz_mcu with components[i]->coeff
-                                //  And identify correctly where to put the data in the component array
+                                //  Identify correctly where to put the data in the component array
                                 //  Data format is: block0[64]block1[64],...,blockxi[64,]
                                 u32 idx_x = (mcu_block_start_x*Hi[i] + h) * 64;
                                 u32 idx_y = (mcu_block_start_y*Vi[i] + v);
@@ -1484,7 +1465,6 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                 jpeg->dc_pred[i] = dc;
                                 zz_mcu[0] = dc;
 
-                                /*
                                 u8 j = 1;
                                 while (j<64) {        // and not a marker that would indicate something
                                     u8 preceding_zeros = 0;
@@ -1503,7 +1483,6 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                                         zz_mcu[j++] = ac;
                                     }
                                 }
-                                */
                             }
                         }
                     }
@@ -1528,7 +1507,149 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
                 marker = read_byte(bs);
             }
             if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
-                // return result;
+                return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
+            }
+            skip_nbytes(bs, -2);
+        }
+
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
+        }
+        previous = read_byte(bs);
+        marker = read_byte(bs);
+        if (is_restart_marker(marker, &expected_restart_id)) {
+            continue;
+        } else {
+            skip_nbytes(bs, -2);
+            break;
+        }
+    }
+    return (ImageParsingResult){IMAGE_SUCCESS, 0};
+}
+
+ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
+    u8 expected_restart_id = 0;
+    u8 previous;
+    u8 marker;
+
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+
+    // If only 1 component in the scan => Vi and Hi should be 1
+    //  => This means that the number of mcu is not that from the FrameHeader
+    u8 Vi[4] = {0};
+    u8 Hi[4] = {0};
+    u8 n_components = jpeg->sh.n_components;
+    u32 n_mcu_width = jpeg->fh.n_mcu_width;
+    u32 n_mcu_height = jpeg->fh.n_mcu_height;
+
+    if (n_components == 1) {
+        Vi[0] = 1;
+        Hi[0] = 1;
+        n_mcu_width =  ceil((f32)jpeg->fh.components[0].xi / 8);
+        n_mcu_height = ceil((f32)jpeg->fh.components[0].yi / 8);
+    } else {
+        for (u8 i=0; i<n_components; i++) {
+            Vi[i] = jpeg->sh.components[i]->Vi;
+            Hi[i] = jpeg->sh.components[i]->Hi;
+        }
+    }
+
+    u64 restart_interval;
+    u64 n_restart_intervals;
+
+    if (jpeg->restart_interval != 0) {
+        restart_interval = jpeg->restart_interval;
+        n_restart_intervals = ((n_mcu_width * n_mcu_height) + restart_interval-1) / restart_interval;
+    } else {
+        n_restart_intervals = 1;
+        restart_interval = n_mcu_width * n_mcu_height;
+    }
+
+    u64 skips;
+    u64 current_mcu = 0;
+    u64 total_number_mcu = jpeg->fh.n_mcu_width *  jpeg->fh.n_mcu_height;
+    for (u64 i=0; i<n_restart_intervals; i++) {
+        // ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
+        {
+            // Reset all 4 s16 values to 0
+            jpeg->dc_pred[0] = 0;
+            jpeg->dc_pred[1] = 0;
+            jpeg->dc_pred[2] = 0;
+            jpeg->dc_pred[3] = 0;
+            skips = 0;      // Used to skip frequency bands for progressive
+
+            u64 n = 0;
+            while (n++ < restart_interval && current_mcu < total_number_mcu) {
+                // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
+                {
+                    u32 mcu_block_start_y = (u32)(current_mcu / n_mcu_width);
+                    u32 mcu_block_start_x = current_mcu - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
+
+                    for (u8 i=0; i<n_components; i++) {
+                        u8* Q = jpeg->sh.components[i]->QT;
+                        HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
+                        HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
+
+                        for (u8 v=0; v<Vi[i]; v++) {
+                            for (u8 h=0; h<Hi[i]; h++) {
+                                //  Identify correctly where to put the data in the component array
+                                //  Data format is: block0[64]block1[64],...,blockxi[64,]
+                                u32 idx_x = (mcu_block_start_x*Hi[i] + h) * 64;
+                                u32 idx_y = (mcu_block_start_y*Vi[i] + v);
+                                u64 offset = idx_x + idx_y * (jpeg->sh.components[i]->xi*8);
+                                s16* zz_mcu = &jpeg->sh.components[i]->coeff[offset];
+
+                                s16 value;
+                                result = parse_dc_data_unit(bs, dc_ht_root, &value);
+                                if (result.status != IMAGE_SUCCESS) { return result; }
+
+                                s16 dc = jpeg->dc_pred[i] + value;
+                                jpeg->dc_pred[i] = dc;
+                                zz_mcu[0] = dc;
+
+                                u8 j = 1;
+                                while (j<64) {        // and not a marker that would indicate something
+                                    u8 preceding_zeros = 0;
+                                    result = parse_ac_data_unit(bs, ac_ht_root, &preceding_zeros, &value);
+                                    if (result.status != IMAGE_SUCCESS) { return result; }
+                                    s16 ac = value;
+
+                                    if (ac == 0 && preceding_zeros == 0) {
+                                        while (j<64) {
+                                            zz_mcu[j++] = 0;
+                                        }
+                                    } else {
+                                        for (u8 k=0; k<preceding_zeros; k++) {
+                                            zz_mcu[j++] = 0;
+                                        }
+                                        zz_mcu[j++] = ac;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    current_mcu++;
+                }
+            }
+
+            // Go through all the last bits until byte aligned
+            u8 bit;
+            while (bs->bit_pos != 0) {
+                next_bit(bs, &bit);
+            }
+
+            u8 tmp;
+            previous = read_byte(bs);
+            marker = read_byte(bs);
+            if (0xFF != previous) {
+                return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+            }
+            while (marker == 0xFF) {
+                marker = read_byte(bs);
+            }
+            if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
                 return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
             }
             skip_nbytes(bs, -2);
@@ -1559,18 +1680,12 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
-            // print_sh(jpeg->sh);
-            result = parse_scan(persist_arena, bs, jpeg);
-            previous = read_byte(bs);
-            marker = read_byte(bs);
-            while ((previous != 0xFF) ||
-                   (previous == 0xFF && marker == 0x00) ||
-                   (previous == 0xFF && marker >= 0xD0 && marker <= 0xD7)) {
-                previous = marker;
-                marker = read_byte(bs);
+
+            if (StartOfFrame0 == jpeg->frame_type) {
+                result = parse_baseline_scan(persist_arena, bs, jpeg);
+            } else if (StartOfFrame2 == jpeg->frame_type) {
+                result = parse_progressive_scan(persist_arena, bs, jpeg);
             }
-            skip_nbytes(bs, -2);
-            printf("Next marker: 0x%04X\n", peek_2bytes(bs));
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
