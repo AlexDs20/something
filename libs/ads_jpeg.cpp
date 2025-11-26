@@ -1492,6 +1492,7 @@ ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, Jpeg
         u8 bit;
         while (bs->bit_pos != 0) {
             next_bit(bs, &bit);
+            // assert bit == 1 ?
         }
 
         u8 tmp;
@@ -1589,10 +1590,22 @@ ImageParsingResult decode_progressive_dc_first_scan(BitStream* bs, Jpeg* jpeg) {
                     }
                 }
             }
+        }
 
-            // printf("ri_idx/interval_num: %d/%d    mcu_idx/restart_interval_size %d/%d\n", ri_idx+1, restart_interval_num,
-            //         mcu_idx+1, restart_interval_size
-            //         );
+        // Go through all the last bits until byte aligned
+        if (bs->bit_pos != 0) {
+            bs->bit_pos = 0;
+            bs->byte_pos += 1;
+        }
+
+        u8 previous = read_byte(bs);
+        if (previous != 0xFF) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker after being done with a set of mcu."};
+        }
+        u8 marker = read_byte(bs);
+        if (marker < Restart0 || marker > Restart7) {
+            skip_nbytes(bs, -2);
+            break;
         }
     }
 
