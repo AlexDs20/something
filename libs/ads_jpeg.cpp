@@ -1525,7 +1525,7 @@ ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, Jpeg
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult decode_progressive_dc_first_scan(BitStream* bs, Jpeg* jpeg) {
+ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
     // - For each restart interval
     // - For each set of MCU in a restart interval e.g. 512 MCU
     // - For each MCU
@@ -1572,21 +1572,116 @@ ImageParsingResult decode_progressive_dc_first_scan(BitStream* bs, Jpeg* jpeg) {
 
                 for (u8 vi=0; vi<Vi[comp_idx]; vi++) {
                     for (u8 hi=0; hi<Hi[comp_idx]; hi++) {
-                        // Decode DC
-                        s16 value;
-                        result = parse_dc_data_unit(bs, dc_ht_root, &value);
-                        if (result.status != IMAGE_SUCCESS) { return result; }
-
-                        dc_pred[comp_idx] += value;
-
                         // Lots of stuff just to write to the write spot...
                         u32 idx_x = (mcu_block_start_x*Hi[comp_idx] + hi) * 64;
                         u32 idx_y = (mcu_block_start_y*Vi[comp_idx] + vi);
                         u64 offset = idx_x + idx_y * (jpeg->sh.components[comp_idx]->xi*8);
                         s16* zz_mcu = &jpeg->sh.components[comp_idx]->coeff[offset];
 
-                        zz_mcu[0] = dc_pred[comp_idx] << jpeg->sh.approx_low;
+                        // Decode DC
+                        if (jpeg->sh.approx_high == 0) {    // First time decoding DC
+                            s16 value;
+                            result = parse_dc_data_unit(bs, dc_ht_root, &value);
+                            if (result.status != IMAGE_SUCCESS) { return result; }
+                            dc_pred[comp_idx] += value;
 
+                            zz_mcu[0] = dc_pred[comp_idx] << jpeg->sh.approx_low;
+                        } else {
+                            u8 bit;
+                            bool FIXME_error = next_bit(bs, &bit);
+                            zz_mcu[0] |= (bit << jpeg->sh.approx_low);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Go through all the last bits until byte aligned
+        if (bs->bit_pos != 0) {
+            bs->bit_pos = 0;
+            bs->byte_pos += 1;
+        }
+
+        u8 previous = read_byte(bs);
+        if (previous != 0xFF) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker after being done with a set of mcu."};
+        }
+        u8 marker = read_byte(bs);
+        if (marker < Restart0 || marker > Restart7) {
+            skip_nbytes(bs, -2);
+            break;
+        }
+    }
+
+    return result;
+}
+
+ImageParsingResult decode_progressive_ac_first_scan(BitStream* bs, Jpeg* jpeg) {
+    // - For each restart interval
+    // - For each set of MCU in a restart interval e.g. 512 MCU
+    // - For each MCU
+    // - For each component
+    // - For each elem in Hi
+    // - For each elem in Vi
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+
+    u8 Hi[4] = {0};
+    u8 Vi[4] = {0};
+    u8 n_components = jpeg->sh.n_components;
+    u32 n_mcu_width = jpeg->fh.n_mcu_width;
+    u32 n_mcu_height = jpeg->fh.n_mcu_height;
+
+    if (n_components == 1) {    // 1 component => no Hi / Vi
+        Hi[0] = 1;
+        Vi[0] = 1;
+        n_mcu_width  = ceil((f32)jpeg->sh.components[0]->xi / 8);
+        n_mcu_height = ceil((f32)jpeg->sh.components[0]->yi / 8);
+    } else {
+        for (u8 i=0; i<n_components; i++) {
+            Hi[i] = jpeg->sh.components[i]->Hi;
+            Vi[i] = jpeg->sh.components[i]->Vi;
+        }
+    }
+    u64 total_n_mcu = n_mcu_width * n_mcu_height;
+
+    u32 restart_interval_size = jpeg->restart_interval != 0 ? jpeg->restart_interval : total_n_mcu;
+    u32 restart_interval_num  = ceil((f32)total_n_mcu / restart_interval_size);
+
+    u64 processed_mcu = 0;
+    for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
+        s16 dc_pred[4] = {0};
+
+        for (u32 mcu_idx=0; mcu_idx<restart_interval_size; mcu_idx++) {
+            if (processed_mcu + mcu_idx >= total_n_mcu) {
+                break;
+            }
+            u32 mcu_block_start_y = (u32)((processed_mcu + mcu_idx) / n_mcu_width);
+            u32 mcu_block_start_x =       (processed_mcu + mcu_idx) - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
+
+            for (u8 comp_idx=0; comp_idx<n_components; comp_idx++) {
+                HuffmanNode* dc_ht_root = jpeg->sh.components[comp_idx]->DCHuffmanTable;
+
+                for (u8 vi=0; vi<Vi[comp_idx]; vi++) {
+                    for (u8 hi=0; hi<Hi[comp_idx]; hi++) {
+                        // Lots of stuff just to write to the write spot...
+                        u32 idx_x = (mcu_block_start_x*Hi[comp_idx] + hi) * 64;
+                        u32 idx_y = (mcu_block_start_y*Vi[comp_idx] + vi);
+                        u64 offset = idx_x + idx_y * (jpeg->sh.components[comp_idx]->xi*8);
+                        s16* zz_mcu = &jpeg->sh.components[comp_idx]->coeff[offset];
+
+                        // Decode AC
+                        if (jpeg->sh.approx_high == 0) {    // First time decoding AC
+                            s16 value;
+                            result = parse_dc_data_unit(bs, dc_ht_root, &value);
+                            if (result.status != IMAGE_SUCCESS) { return result; }
+                            dc_pred[comp_idx] += value;
+
+                            zz_mcu[0] = dc_pred[comp_idx] << jpeg->sh.approx_low;
+                        } else {                            // Subsequent
+                            u8 bit;
+                            bool FIXME_error = next_bit(bs, &bit);
+                            zz_mcu[0] |= (bit << jpeg->sh.approx_low);
+                        }
                     }
                 }
             }
@@ -1616,17 +1711,14 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
     printf("ri: %d\n", jpeg->restart_interval);
 
-    if (jpeg->sh.spectral_end == 0 && jpeg->sh.approx_high == 0) {       // DC first pass
-        result = decode_progressive_dc_first_scan(bs, jpeg);
-    }
-    else if (jpeg->sh.spectral_end == 0 && jpeg->sh.approx_high != 0) {  // DC more bits
-        // decode_progressive_dc_subsequent_scan();
+    if (jpeg->sh.spectral_end == 0) {       // DC
+        result = decode_progressive_dc(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0 && jpeg->sh.approx_high == 0) { // AC band first pass
-        // decode_progressive_ac_first_scan();
+        // result = decode_progressive_ac_first_scan(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0 && jpeg->sh.approx_high != 0) { // AC band more details
-        // decode_progressive_ac_subsequent_scan();
+        // result = decode_progressive_ac_subsequent_scan(bs, jpeg);
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
@@ -1656,6 +1748,8 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
+
+            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components);
 
             if (StartOfFrame0 == jpeg->frame_type) {
                 result = parse_baseline_scan(persist_arena, bs, jpeg);
