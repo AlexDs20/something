@@ -139,8 +139,6 @@ struct HuffmanNode {
 
 typedef struct HuffmanTable HuffmanTable;
 struct HuffmanTable {
-    u8 n;
-    u8 id[4];   // map index to id
     //                index
     HuffmanNode* DCroot[4];
     HuffmanNode* ACroot[4];
@@ -174,10 +172,9 @@ void print_ht(HuffmanTable& ht, bool include_tree=false) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
-    printf("Number tables: %d\n", ht.n);
-    for (u8 i=0; i<ht.n; i++) {
-        printf("Table %d:\n", i);
-        printf("    id: %d\n", ht.id[i]);
+    for (u8 i=0; i<4; i++) {
+        printf("DC ptr %p:\n", ht.DCroot[i]);
+        printf("AC ptr %p:\n", ht.ACroot[i]);
 
         if (include_tree) {
             printf("    DCTree: \n    ");
@@ -554,25 +551,27 @@ ImageParsingResult parse_scan_header(BitStream* bs, Jpeg* jpeg) {
     }
 
     u8 v;
+    u8 dc_selector[4];
+    u8 ac_selector[4];
     for (u8 i=0; i<sh.n_components; i++) {
         u8 id_selector = read_byte(bs);
         length--;
 
         v = read_byte(bs);
         length--;
-        u8 dc_selector = v >> 4;
-        u8 ac_selector = v & 0x0F;
+        dc_selector[i] = v >> 4;
+        ac_selector[i] = v & 0x0F;
         if (jpeg->frame_type == StartOfFrame0) {        // Baseline DCT
-            if (dc_selector > 1) {
+            if (dc_selector[i] > 1) {
                 return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
-            } else if (ac_selector > 1) {
+            } else if (ac_selector[i] > 1) {
                 return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
             }
         }
         else if (jpeg->frame_type == StartOfFrame2) {   // Progressive DCT
-            if (dc_selector > 3) {
+            if (dc_selector[i] > 3) {
                 return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be between 0 and 3 for Progressive DCT."};
-            } else if (ac_selector > 3) {
+            } else if (ac_selector[i] > 3) {
                 return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be between 0 and 3 for Progressive DCT."};
             }
         }
@@ -582,15 +581,8 @@ ImageParsingResult parse_scan_header(BitStream* bs, Jpeg* jpeg) {
             if (id_selector == jpeg->fh.components[j].id) {
                 sh.components[i] = &jpeg->fh.components[j];
 
-                // Set the components DC/AC tables
-                for (u8 k=0; k<jpeg->ht.n; k++) {
-                    if (dc_selector == jpeg->ht.id[k]) {
-                        sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[k];
-                    }
-                    if (ac_selector == jpeg->ht.id[k]) {
-                        sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[k];
-                    }
-                }
+                sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[dc_selector[i]];
+                sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[ac_selector[i]];
 
                 // Set the correct Quantization table
                 u8 qt_id_selector = jpeg->fh.QT_selector[j];
@@ -628,6 +620,23 @@ ImageParsingResult parse_scan_header(BitStream* bs, Jpeg* jpeg) {
             return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral smaller than start."};
         }
     }
+
+    // Now that we know the spectral ranges
+    // We can check that we have the needed AC/DC tables
+    for (u8 i=0; i<sh.n_components; i++) {
+        if ((sh.spectral_start == 0) && (jpeg->ht.DCroot[dc_selector[i]] == NULL)) {
+            return (ImageParsingResult){IMAGE_FAIL, "Undefined DC table."};
+        }
+        if (sh.spectral_start == 0)
+            printf("SH: DC ptr %p\n", jpeg->ht.DCroot[dc_selector[i]]);
+
+        if ((sh.spectral_end > 0) && (jpeg->ht.ACroot[ac_selector[i]] == NULL)) {
+            return (ImageParsingResult){IMAGE_FAIL, "Undefined AC table."};
+        }
+        if (sh.spectral_end > 0)
+            printf("SH: AC ptr %p\n", jpeg->ht.ACroot[ac_selector[i]]);
+    }
+
 
     v = read_byte(bs);
     length--;
@@ -730,31 +739,13 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg*
         // Get the table type and id
         u8 table_class = v >> 4;                 // 0 DC or lossless  --- 1 AC
         u8 table_id = v & 0x0F;
-        printf("TABLE (%d,%d)\n", table_class, table_id);
 
         if (table_class > 1) {
             return (ImageParsingResult){IMAGE_FAIL, "Huffman table class must be 0 for DC or 1 for AC."};
         }
-        if (table_id > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "Huffman table id must either be 0 or 1."};
+        if (table_id > 3) {
+            return (ImageParsingResult){IMAGE_FAIL, "Huffman table id must be <= 3."};
         }
-
-        // Check if we already have the id (because same id for DC and AC)
-        u8 idx = ht.n;
-        {
-            for (u8 i=0; i<ht.n; i++) {
-                if (table_id == ht.id[i]) {
-                    idx = i;
-                    break;
-                }
-            }
-            // If we don't have the id, increase number of tables
-            if (idx == ht.n) {
-                ht.n++;
-            }
-        }
-        ht.id[2*table_class+idx] = table_id;
-        printf("table_id: %d idx: %d, [%d,%d,%d,%d]\n", table_id, idx, ht.id[0], ht.id[1], ht.id[2], ht.id[3]);
 
         // Read actual huffman table code lengths and associated symbols
         // For each length of symbols save that length and count the total number of symbols
@@ -777,9 +768,9 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg*
         // Convert table to tree for easier parsing of the entropy stream
         HuffmanNode* root = (HuffmanNode*)arena_alloc_push_zero(arena, sizeof(HuffmanNode));
         if (table_class == 0) {
-            ht.DCroot[idx] = root;
+            ht.DCroot[table_id] = root;
         } else {
-            ht.ACroot[idx] = root;
+            ht.ACroot[table_id] = root;
         }
 
         HuffmanNode* node = 0;
@@ -798,11 +789,13 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg*
                     u8 bit = (code >> c) & 1;
                     if (bit) { // right
                         if (!node->right) {
+                            // TODO(alex): Perf: preallocate before the loop so that we don't need to push the pointer everytime?
                             node->right = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
                         }
                         node = node->right;
                     } else {    // left
                         if (!node->left) {
+                            // TODO(alex): Perf: preallocate before the loop so that we don't need to push the pointer everytime?
                             node->left = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
                         }
                         node = node->left;
@@ -819,6 +812,8 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg*
     if (length != 0) {
         return (ImageParsingResult){IMAGE_FAIL, "Expected length of DHT and read data does not match."};
     }
+
+    print_ht(ht);
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
@@ -1601,7 +1596,7 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
     return result;
 }
 
-ImageParsingResult decode_progressive_ac_first_scan(BitStream* bs, Jpeg* jpeg) {
+ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     // - For each restart interval
     // - For each set of MCU in a restart interval e.g. 512 MCU
     // - For each MCU
@@ -1723,12 +1718,8 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
     if (jpeg->sh.spectral_end == 0) {       // DC
         result = decode_progressive_dc(bs, jpeg);
     }
-    else if (jpeg->sh.spectral_start > 0 && jpeg->sh.approx_high == 0) { // AC band first pass
-        result = decode_progressive_ac_first_scan(bs, jpeg);
-        result = {IMAGE_SUCCESS, 0};
-    }
-    else if (jpeg->sh.spectral_start > 0 && jpeg->sh.approx_high != 0) { // AC band more details
-        // result = decode_progressive_ac_subsequent_scan(bs, jpeg);
+    else if (jpeg->sh.spectral_start > 0) { // AC
+        result = decode_progressive_ac(bs, jpeg);
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
@@ -1760,15 +1751,17 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
 
-            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components);
-            print_sh(jpeg->sh);
-            print_ci(jpeg->sh.components[0]);
+            // print_sh(jpeg->sh);
+            // print_ci(jpeg->sh.components[0]);
 
+            printf("Parsing scan\n");
+            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components);
             if (StartOfFrame0 == jpeg->frame_type) {
                 result = parse_baseline_scan(persist_arena, bs, jpeg);
             } else if (StartOfFrame2 == jpeg->frame_type) {
                 result = parse_progressive_scan(persist_arena, bs, jpeg);
             }
+            printf("Done parsing scan\n");
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
