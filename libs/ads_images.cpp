@@ -1,6 +1,5 @@
 #include "libs/libstring.h"
 #include "libs/ads_jpeg.h"
-#include "time.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "extern/stb_image.h"
@@ -47,10 +46,7 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
         // out.components = c;
         // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
         // // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
-        clock_t start = clock();
         result = decode_jpeg(persist_arena, data, &out);
-        clock_t stop = clock();
-        printf("Elapsed: %.4f\n", (double)(stop - start) / CLOCKS_PER_SEC);
         // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
