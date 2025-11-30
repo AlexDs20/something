@@ -10,6 +10,7 @@ struct test_entry {
 };
 
 test_entry tests[] = {
+    {"JPEG_progressive_rgb", test_read_progressive_rgb},
     {"JPEG_baseline_gray", test_read_baseline_gray},
     {"JPEG_baseline_rgb", test_read_baseline_rgb},
 };

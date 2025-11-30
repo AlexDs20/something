@@ -3,11 +3,9 @@
 if [ "$#" -eq 1 ] && [ "$1" == "test" ]; then
     BIN="./build/test"
     ENTRYPOINT="tests/test.cpp"
-    SRC="./{memory,utils,platform,renderer,libs}/*.cpp"
 else
     BIN="./build/main"
     ENTRYPOINT="main.cpp"
-    SRC="./{memory,utils,platform,renderer,libs}/*.cpp"
 fi
 
 
@@ -20,7 +18,8 @@ FLAGS+=" -march=native -masm=intel -ffast-math"
 DEFINES="-D_DEBUG"
 LINKS="-lc"
 LINKSDIR=
-INCLUDES="-I."
+INCLUDES="-I. -I./src/"
+SRC="./src/*/*.cpp"
 CXX=clang++
 
 function echo () {

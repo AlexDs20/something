@@ -8,11 +8,20 @@ Arena* arena = arena_alloc_create_zero(1*GiB);
 int test_read_baseline_rgb() {
     string8 filename = string_from_cstr(arena, "assets/backpack/diffuse.jpg");
     read_image_file(arena, filename);
+    // ASSERT_NOT_NULL(image.buffer);
     return 0;
 }
 
 int test_read_baseline_gray() {
     string8 filename = string_from_cstr(arena, "assets/backpack/specular.jpg");
-    read_image_file(arena, filename);
+    Image image = read_image_file(arena, filename);
+    // ASSERT_NOT_NULL(image.buffer);
+    return 0;
+}
+
+int test_read_progressive_rgb() {
+    string8 filename = string_from_cstr(arena, "assets/backpack/diffuse_restart_marker_progressive.jpg");
+    Image image = read_image_file(arena, filename);
+    // ASSERT_NOT_NULL(image.buffer);
     return 0;
 }
