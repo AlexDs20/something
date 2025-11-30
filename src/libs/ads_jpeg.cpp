@@ -1487,8 +1487,12 @@ ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, Jpeg
 
             current_mcu++;
         }
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
+        }
 
-        // Go through all the last bits until byte aligned
+        // Go through all the last bits until byte aligned (bit filling)
         u8 bit;
         while (bs->bit_pos != 0) {
             next_bit(bs, &bit);
@@ -1500,20 +1504,18 @@ ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, Jpeg
         if (0xFF != previous) {
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
+        // TODO(alex): check this
         while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
             marker = read_byte(bs);
         }
-        if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
-            return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
-        }
-        skip_nbytes(bs, -2);
+        // if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
+        //     return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
+        // }
+        // skip_nbytes(bs, -2);
 
-        if (result.status != IMAGE_SUCCESS) {
-            // TODO(alex): Here could check and move forward until next restart marker?
-            return result;
-        }
-        previous = read_byte(bs);
-        marker = read_byte(bs);
+        // previous = read_byte(bs);
+        // marker = read_byte(bs);
         if (is_restart_marker(marker, &expected_restart_id)) {
             continue;
         } else {
@@ -1595,25 +1597,12 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
                 }
             }
         }
-
-#if 0
-        // Go through all the last bits until byte aligned
-        if (bs->bit_pos != 0) {
-            bs->bit_pos = 0;
-            bs->byte_pos += 1;
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
         }
 
-        u8 previous = read_byte(bs);
-        if (previous != 0xFF) {
-            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker after being done with a set of mcu."};
-        }
-        u8 marker = read_byte(bs);
-        if (marker < Restart0 || marker > Restart7) {
-            skip_nbytes(bs, -2);
-            break;
-        }
-#else
-        // Go through all the last bits until byte aligned
+        // Go through all the last bits until byte aligned (bit filling)
         u8 bit;
         while (bs->bit_pos != 0) {
             next_bit(bs, &bit);
@@ -1625,29 +1614,17 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
         if (0xFF != previous) {
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
+        // TODO(alex): check this
         while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
             marker = read_byte(bs);
         }
-        if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
-            return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
-        }
-        skip_nbytes(bs, -2);
-
-        if (result.status != IMAGE_SUCCESS) {
-            // TODO(alex): Here could check and move forward until next restart marker?
-            return result;
-        }
-        previous = read_byte(bs);
-        marker = read_byte(bs);
-        u8 expected_restart_id;
-        if (is_restart_marker(marker, &expected_restart_id)) {
+        if (is_restart_marker(marker, &tmp)) {
             continue;
         } else {
             skip_nbytes(bs, -2);
             break;
         }
-
-#endif
     }
 
     return result;
@@ -1760,21 +1737,6 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
     else if (jpeg->sh.spectral_start > 0) { // AC
         if (jpeg->sh.approx_high == 0) {
             // result = decode_progressive_ac(bs, jpeg);
-        } else {
-#if 0
-            u8 previous = read_byte(bs);
-            u8 marker = read_byte(bs);
-            while (true) {
-                previous = marker;
-                marker = read_byte(bs);
-                if (previous == 0xFF && (marker != 0x00 && (marker < Restart0 || marker>Restart7)) ) {
-                    printf("MARKER: 0x%02X%02X\n", previous, marker);
-                    skip_nbytes(bs, -2);
-                    bs->bit_pos = 0;
-                    break;
-                }
-            }
-#endif
         }
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
@@ -1783,14 +1745,14 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
             u8 previous = read_byte(bs);
             u8 marker = read_byte(bs);
             while (true) {
-                previous = marker;
-                marker = read_byte(bs);
                 if (previous == 0xFF && (marker != 0x00 && (marker < Restart0 || marker>Restart7)) ) {
                     printf("MARKER: 0x%02X%02X\n", previous, marker);
                     skip_nbytes(bs, -2);
                     bs->bit_pos = 0;
                     break;
                 }
+                previous = marker;
+                marker = read_byte(bs);
             }
 #endif
     return result;
