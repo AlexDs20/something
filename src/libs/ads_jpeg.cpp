@@ -1703,23 +1703,36 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                 }
 
             } else {                            // Subsequent
+                break;
                 // TODO
                 // zz_mcu[0] |= (bit << jpeg->sh.approx_low);
             }
         }
-
-        // Go through all the last bits until byte aligned
-        if (bs->bit_pos != 0) {
-            bs->bit_pos = 0;
-            bs->byte_pos += 1;
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
         }
 
+        // Go through all the last bits until byte aligned (bit filling)
+        u8 bit;
+        while (bs->bit_pos != 0) {
+            next_bit(bs, &bit);
+        }
+
+        u8 tmp;
         u8 previous = read_byte(bs);
-        if (previous != 0xFF) {
-            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker after being done with a set of mcu."};
-        }
         u8 marker = read_byte(bs);
-        if (marker < Restart0 || marker > Restart7) {
+        if (0xFF != previous) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+        }
+        // TODO(alex): check this
+        while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
+            marker = read_byte(bs);
+        }
+        if (is_restart_marker(marker, &tmp)) {
+            continue;
+        } else {
             skip_nbytes(bs, -2);
             break;
         }
@@ -1770,7 +1783,7 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
             if (result.status != IMAGE_SUCCESS) { return result; }
 
             printf("Parsing scan\n");
-            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components);
+            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d Cid: %p\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components, jpeg->sh.components[0]);
             if (StartOfFrame0 == jpeg->frame_type) {
                 result = parse_baseline_scan(persist_arena, bs, jpeg);
             } else if (StartOfFrame2 == jpeg->frame_type) {
