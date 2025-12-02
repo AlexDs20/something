@@ -1655,8 +1655,8 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             u32 mcu_block_start_x =       (processed_mcu + mcu_idx) - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
 
             // Lots of stuff just to write to the write spot...
-            u32 idx_x = (mcu_block_start_x*1 + 1) * 64;
-            u32 idx_y = (mcu_block_start_y*1 + 1);
+            u32 idx_x = (mcu_block_start_x*1 + 0) * 64;
+            u32 idx_y = (mcu_block_start_y*1 + 0);
             u64 offset = idx_x + idx_y * (jpeg->sh.components[0]->xi*8);
             s16* zz_mcu = &jpeg->sh.components[0]->coeff[offset];
 
@@ -1749,7 +1749,7 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
     }
     else if (jpeg->sh.spectral_start > 0) { // AC
         if (jpeg->sh.approx_high == 0) {
-            // result = decode_progressive_ac(bs, jpeg);
+            result = decode_progressive_ac(bs, jpeg);
         }
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
