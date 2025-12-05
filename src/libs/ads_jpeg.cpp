@@ -3,12 +3,49 @@
 /*  ==================
  *  JPEG Documentation
  *  ==================
- *  This implementation only convers Baseline Sequential jpg compression (JFIF implementation)
- *  If JPG progressive or gierarchical compression, see itu-1150 standard
+ *  This implementation currently only covers Baseline Sequential (and soon progressive) DCT jpg compression
  *
- *  - This JPG implementation standard: https://www.w3.org/Graphics/JPEG/itu-t81.pdf
- *  - JFIF standard: https://www.w3.org/Graphics/JPEG/jfif3.pdf
- *  - Interesting note to not read 186 pages: https://www.opennet.ru/docs/formats/jpeg.txt
+ *  Some references:
+ *  The official jpeg compression algorithm specification can be found here:
+ *      - https://www.w3.org/Graphics/JPEG/itu-t81.pdf
+ *  The original Jpeg File Interchange Format specification:
+ *      - https://www.w3.org/Graphics/JPEG/jfif3.pdf
+ *  The newer Exchangeable Image File format:
+ *      - FILL IN
+ *  Some other article that I found interesting:
+ *      - Interesting note to not read 186 pages: https://www.opennet.ru/docs/formats/jpeg.txt
+ *
+ *  Introduction:
+ *  -------------
+ *  While jpeg is generally considered a file format, it is really an algorithm for compressing image-like data.
+ *  The jpeg specificiation itu-t81 actually does not say much about the components (i.e. color channels) in the image as it is just a compression algorithm, instead the components are specified by metadata.
+ *  One could think of using RGB but it is more common to use YCbCr as specified by JFIF.
+ *  Because the goal of this format is to compress the data, specific tricks have to be applied to the data and sometimes specific parameters must be specified and stored within the jpeg file to be to able to uncompress the image.
+ *  A jpeg file is there not only the compressed image data but it also specifies a number of parameters that specifies how to process the compressed data.
+ *  Thus markers with specific meaning (e.g 0xFFC4) are used throughout a jpeg file to speficy what type of content follows the marker.
+ *
+ *  There are several "flavours" of the jpeg compression algorithm, the simplest one is the baseline algorithm.
+ *  I will also cover the progressive version of the algorithm.
+ *  There is also the lossless version and different encoding method (specifically arithmetic coding) which I will not cover (as I haven't read the specs for these.)
+ *
+ *  In the following I will first start by explaining the baseline compression algorithm and then mention what progressive compression does differently from the baseline.
+ *
+ *  How the compression works:
+ *  --------------------------
+ *  These are the few main steps:
+ *  - Convert from RGB to YCbCr
+ *  - Convert from position space (8x8 pixels) to frequency space using discrete cosine transform (DCT). This is similar to fourier transform but only using cosines.
+ *  - "Quantize" the amplitude coefficients obtained from DCT. By quantize, it is simply meant "dividing the coefficient" and round the result.
+ *  - Reorder the coefficients in "typical order of amplitude" using the zigzag order.
+ *  - Encode the result for one component at a time
+ *      - The first amplitude coefficient (called DC) is encoded differently than the following 63 coefficients (called AC)
+ *      For the first block of 8x8:
+ *          - The value of the DC from the first 8x8 block is encoded fully (let's call it 'DC_i' to be used as a reference below)
+ *          - The 63 AC are encoded
+ *      Subsequent blocks of 8x8:
+ *          - The difference from the previous blocks' DC value is encoded that is: DC_{i+1}-DC_i (where DC_{i+1} is this blocks' DC and DC_i is the previous one)
+ *          - The next 63 AC coefficients are encoded.
+ *
  *
  *  Markers: (https://www.disktuna.com/list-of-jpeg-markers/)
  *      FFD8: start of image file
