@@ -1667,6 +1667,10 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
     return result;
 }
 
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#define LOC __FILE__ ":" XSTR(__LINE__)
+
 ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
 
@@ -1682,12 +1686,15 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     u64 processed_mcu = 0;
     for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
         s16 dc_pred[4] = {0};
+        s64 skips = 0;
 
         for (u32 mcu_idx=0; mcu_idx<restart_interval_size; mcu_idx++) {
             if (processed_mcu + mcu_idx >= total_n_mcu) {
                 break;
             }
 
+            // All these factors could be obtained more easily by just gradually incrementing
+            // And all blocks are contiguous so we probably don't need all of these.
             u32 mcu_block_start_y = (u32)((processed_mcu + mcu_idx) / n_mcu_width);
             u32 mcu_block_start_x =       (processed_mcu + mcu_idx) - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
 
@@ -1696,6 +1703,22 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             u32 idx_y = (mcu_block_start_y*1 + 0);
             u64 offset = idx_x + idx_y * (jpeg->sh.components[0]->xi*8);
             s16* zz_mcu = &jpeg->sh.components[0]->coeff[offset];
+
+            // Handle band skips (EOBn) in subsequent AC
+            if (skips>0) {
+                skips--;
+                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
+                    if (zz_mcu[idx]==0) {
+                        continue;
+                    }
+                    else {
+                        u8 bit;
+                        next_bit(bs, &bit);
+                        zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
+                    }
+                }
+                continue;
+            }
 
             // Decode AC
             if (jpeg->sh.approx_high == 0) {    // First time decoding AC
@@ -1710,10 +1733,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         // Fill 16 zeros
                         if (preceding_zeros==0xF) {
                             // Write 16 zeros but it should not be needed if we default initialize to 0
-                            // idx += 0xF;
-                            for (u8 j=0; j<0xF; j++) {
-                                zz_mcu[idx++] = 0;
-                            }
+                            idx += 0xF;
                             continue;
                         }
                         // Fill rest of band with 0
@@ -1731,20 +1751,64 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         }
                     }
                     else {
-                        for (u8 j=0; j<preceding_zeros; j++) {
-                            zz_mcu[idx++] = 0;
-                        }
+                        // Write preceding zeros (skips because 0 initialized)
+                        idx += preceding_zeros;
+                        // Write the value that was read
                         zz_mcu[idx] = ac << jpeg->sh.approx_low;
                         continue;
                     }
                 }
-
             } else {                            // Subsequent
-                break;
-                // TODO
-                // zz_mcu[0] |= (bit << jpeg->sh.approx_low);
+                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
+                    u8 symbol;
+                    decode_one_huffman_code(bs, ac_ht_root, &symbol);
+
+                    u8 preceeding_zeros = symbol >> 4;    // preceeding zeros
+                    u8 category = symbol & 0x0F;    // Number of bits to read to get the value
+                    if (category == 1 || (category == 0 && preceeding_zeros == 0xF)) {
+                        // TODO: Handle positive and negative
+                        u8 bit_read;
+                        if (category == 1) {
+                            next_bit(bs, &bit_read);
+                        }
+                        else if (category == 0 && preceeding_zeros == 0xF) {
+                            preceeding_zeros++;
+                        }
+                        while (preceeding_zeros > 0) {
+                            if (zz_mcu[idx] == 0) {
+                                preceeding_zeros--;
+                            } else {
+                                u8 bit;
+                                next_bit(bs, &bit);
+                                zz_mcu[idx] |= bit << jpeg->sh.approx_low;
+                            }
+                            idx++;
+                        }
+                        if (category == 1) {
+                            // TODO: Handle difference between if bit is 0 or 1. 1=>positive, 0=>negative
+                            // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                        }
+                    }
+                    else {
+                        skips = (1<<preceeding_zeros);
+                        skips += read_bits(bs, preceeding_zeros);
+                        // Finish this band and update skips
+                        // The rest of the blocks that are skipped are handled at the beginning.
+                        // and "skip" skips-1 more bands
+                        for (;idx<=jpeg->sh.spectral_end; idx++) {
+                            if (zz_mcu[idx] != 0) {
+                                u8 bit;
+                                next_bit(bs, &bit);
+                                zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
+                            }
+                        }
+                        skips--;
+                        break;
+                    }
+                }
             }
         }
+
         if (result.status != IMAGE_SUCCESS) {
             // TODO(alex): Here could check and move forward until next restart marker?
             return result;
@@ -1785,7 +1849,7 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
         result = decode_progressive_dc(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0) { // AC
-        if (jpeg->sh.approx_high == 0) {
+        if (1 || jpeg->sh.approx_high == 0) {
             result = decode_progressive_ac(bs, jpeg);
         }
     } else {
