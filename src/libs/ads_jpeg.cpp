@@ -1704,17 +1704,16 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             u64 offset = idx_x + idx_y * (jpeg->sh.components[0]->xi*8);
             s16* zz_mcu = &jpeg->sh.components[0]->coeff[offset];
 
+
             // Handle band skips (EOBn) in subsequent AC
+            // printf("total_mcu = %d \t restart_interval = %d \t processed_mcu = %d \t mcu_idx = %d \t skips = %d \n", total_n_mcu, restart_interval_size, processed_mcu+mcu_idx, mcu_idx, skips);
             if (skips>0) {
                 skips--;
                 for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
-                    if (zz_mcu[idx]==0) {
-                        continue;
-                    }
-                    else {
+                    if (zz_mcu[idx]!=0) {
                         u8 bit;
                         next_bit(bs, &bit);
-                        zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
+                        // zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
                     }
                 }
                 continue;
@@ -1760,50 +1759,70 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                 }
             } else {                            // Subsequent
                 for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
+                    printf("total_mcu = %d \t mcu_idx = %d \t idx = %d skips = %d \n", total_n_mcu, mcu_idx, idx, skips);
                     u8 symbol;
                     decode_one_huffman_code(bs, ac_ht_root, &symbol);
 
-                    u8 preceeding_zeros = symbol >> 4;    // preceeding zeros
-                    u8 category = symbol & 0x0F;    // Number of bits to read to get the value
-                    if (category == 1 || (category == 0 && preceeding_zeros == 0xF)) {
-                        // TODO: Handle positive and negative
+                    u8 preceding_zeros = symbol >> 4;
+                    u8 category = symbol & 0x0F;        // Number of bits to read to get the value
+
+                    if (category == 1) {
                         u8 bit_read;
-                        if (category == 1) {
-                            next_bit(bs, &bit_read);
-                        }
-                        else if (category == 0 && preceeding_zeros == 0xF) {
-                            preceeding_zeros++;
-                        }
-                        while (preceeding_zeros > 0) {
-                            if (zz_mcu[idx] == 0) {
-                                preceeding_zeros--;
-                            } else {
-                                u8 bit;
-                                next_bit(bs, &bit);
-                                zz_mcu[idx] |= bit << jpeg->sh.approx_low;
+                        next_bit(bs, &bit_read);
+                        if (preceding_zeros != 0) {
+                            for (; idx<=jpeg->sh.spectral_end; idx++) {
+                                if (zz_mcu[idx] == 0) {
+                                    preceding_zeros--;
+                                }
+                                else {
+                                    u8 bit;
+                                    next_bit(bs, &bit);
+                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                                }
+                                if (preceding_zeros == 0) {
+                                    idx++;
+                                    break;
+                                }
                             }
-                            idx++;
                         }
-                        if (category == 1) {
-                            // TODO: Handle difference between if bit is 0 or 1. 1=>positive, 0=>negative
-                            // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                        // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                    }
+                    else if (category == 0) {
+                        if (preceding_zeros == 0xF) {
+                            // preceding_zeros += 1;   // Actually 16 zeros when doing ZRL
+                            for (; idx<=jpeg->sh.spectral_end; idx++) {
+                                if (zz_mcu[idx] == 0) {
+                                    preceding_zeros--;
+                                }
+                                else {
+                                    u8 bit;
+                                    next_bit(bs, &bit);
+                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                                }
+                                if (preceding_zeros == 0) {
+                                    idx++;
+                                    break;
+                                }
+                            }
+                        }
+                        else {
+                            skips = 1<<preceding_zeros;
+                            skips += read_bits(bs, preceding_zeros);
+
+                            // Finish the current block
+                            for (;idx<=jpeg->sh.spectral_end; idx++) {
+                                if (zz_mcu[idx] != 0) {
+                                    u8 bit;
+                                    next_bit(bs, &bit);
+                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                                }
+                            }
+                            skips--;
+                            break;
                         }
                     }
                     else {
-                        skips = (1<<preceeding_zeros);
-                        skips += read_bits(bs, preceeding_zeros);
-                        // Finish this band and update skips
-                        // The rest of the blocks that are skipped are handled at the beginning.
-                        // and "skip" skips-1 more bands
-                        for (;idx<=jpeg->sh.spectral_end; idx++) {
-                            if (zz_mcu[idx] != 0) {
-                                u8 bit;
-                                next_bit(bs, &bit);
-                                zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
-                            }
-                        }
-                        skips--;
-                        break;
+                        return (ImageParsingResult){IMAGE_FAIL, "Bad category. Expected 0 or 1 for subsequent AC scans."};
                     }
                 }
             }
