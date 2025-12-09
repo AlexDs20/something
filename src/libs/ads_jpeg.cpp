@@ -210,11 +210,12 @@ void print_ht(HuffmanTable& ht, bool include_tree=false) {
 
     for (u8 i=0; i<4; i++) {
         printf("DC ptr %p:\n", ht.DCroot[i]);
-        printf("AC ptr %p:\n", ht.ACroot[i]);
-
         if (include_tree) {
             printf("    DCTree: \n    ");
             draw_huffman_tree(ht.DCroot[i]);
+        }
+        printf("AC ptr %p:\n", ht.ACroot[i]);
+        if (include_tree) {
             printf("    ACTree: \n    ");
             draw_huffman_tree(ht.ACroot[i]);
         }
@@ -1758,15 +1759,33 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                     }
                 }
             } else {                            // Subsequent
+                // Test search for the restart index
+                static bool show = true;
+                if (show) {
+                    u8 previous = read_byte(bs);
+                    u8 marker = read_byte(bs);
+                    printf("sx,sy = (%d,%d)\n", mcu_block_start_x, mcu_block_start_y);
+                    u64 initial = bs->byte_pos;
+                    while (! ((previous == 0xFF) && (marker >= 0xD0) && (marker <= 0xD7)) ) {
+                        previous = marker;
+                        marker = read_byte(bs);
+                    }
+                    u64 now = bs->byte_pos-2;
+                    printf("initial: %d  now %d %p \n", initial, now, &bs->data[now]);
+                    printf("Elements: %d\n", (now-initial));
+                    bs->byte_pos = initial;
+                    show = false;
+                }
+
                 for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
-                    printf("total_mcu = %d \t mcu_idx = %d \t idx = %d skips = %d \n", total_n_mcu, mcu_idx, idx, skips);
                     u8 symbol;
                     decode_one_huffman_code(bs, ac_ht_root, &symbol);
-
                     u8 preceding_zeros = symbol >> 4;
-                    u8 category = symbol & 0x0F;        // Number of bits to read to get the value
+                    u8 coeff_length = symbol & 0x0F;        // Number of bits to read to get the value
 
-                    if (category == 1) {
+                    // printf("total_mcu = %d \t mcu_idx = %d \t idx = %d   skips = %d   0s = %d  coefL = %d  symbol=%d\n", total_n_mcu, mcu_idx, idx, skips, preceding_zeros, coeff_length, symbol);
+
+                    if (coeff_length == 1) {
                         u8 bit_read;
                         next_bit(bs, &bit_read);
                         if (preceding_zeros != 0) {
@@ -1780,14 +1799,13 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                                     // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
                                 }
                                 if (preceding_zeros == 0) {
-                                    idx++;
                                     break;
                                 }
                             }
                         }
                         // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
                     }
-                    else if (category == 0) {
+                    else if (coeff_length == 0) {
                         if (preceding_zeros == 0xF) {
                             // preceding_zeros += 1;   // Actually 16 zeros when doing ZRL
                             for (; idx<=jpeg->sh.spectral_end; idx++) {
@@ -1800,7 +1818,6 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                                     // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
                                 }
                                 if (preceding_zeros == 0) {
-                                    idx++;
                                     break;
                                 }
                             }
@@ -1818,7 +1835,11 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                                 }
                             }
                             skips--;
-                            break;
+                            if (mcu_idx == 32255) {
+                                printf("here now: %d\n", bs->byte_pos);
+                            }
+
+
                         }
                     }
                     else {
@@ -1868,13 +1889,16 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
         result = decode_progressive_dc(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0) { // AC
-        if (1 || jpeg->sh.approx_high == 0) {
+        if (jpeg->sh.approx_high == 0) {
+            result = decode_progressive_ac(bs, jpeg);
+        } else {
+            print_ht(jpeg->ht, true);
             result = decode_progressive_ac(bs, jpeg);
         }
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
-#if 1
+#if 0
             u8 previous = read_byte(bs);
             u8 marker = read_byte(bs);
             while (true) {
