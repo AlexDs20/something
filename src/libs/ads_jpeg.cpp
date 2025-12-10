@@ -1685,6 +1685,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     HuffmanNode* ac_ht_root = jpeg->sh.components[0]->ACHuffmanTable;
 
     u64 processed_mcu = 0;
+    u64 restart_pos;
     for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
         s16 dc_pred[4] = {0};
         s64 skips = 0;
@@ -1709,7 +1710,6 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             // Handle band skips (EOBn) in subsequent AC
             // printf("total_mcu = %d \t restart_interval = %d \t processed_mcu = %d \t mcu_idx = %d \t skips = %d \n", total_n_mcu, restart_interval_size, processed_mcu+mcu_idx, mcu_idx, skips);
             if (skips>0) {
-                skips--;
                 for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
                     if (zz_mcu[idx]!=0) {
                         u8 bit;
@@ -1717,6 +1717,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         // zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
                     }
                 }
+                skips--;
                 continue;
             }
 
@@ -1744,9 +1745,9 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         // Skip several blocks of bands which are 0
                         else {
                             // Get amount of blocks to skip
-                            u64 skips = (1<<preceding_zeros) - 1;
+                            u64 skips = (1<<preceding_zeros);
                             skips += read_bits(bs, preceding_zeros);
-                            mcu_idx += skips;
+                            mcu_idx += skips - 1;
                             break;
                         }
                     }
@@ -1770,9 +1771,9 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         previous = marker;
                         marker = read_byte(bs);
                     }
-                    u64 now = bs->byte_pos-2;
-                    printf("initial: %d  now %d %p \n", initial, now, &bs->data[now]);
-                    printf("Elements: %d\n", (now-initial));
+                    restart_pos = bs->byte_pos-2;
+                    printf("initial: %d  restart_pos %d %p \n", initial, restart_pos, &bs->data[restart_pos]);
+                    printf("Elements: %d\n", (restart_pos-initial));
                     bs->byte_pos = initial;
                     show = false;
                 }
@@ -1807,7 +1808,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                     }
                     else if (coeff_length == 0) {
                         if (preceding_zeros == 0xF) {
-                            // preceding_zeros += 1;   // Actually 16 zeros when doing ZRL
+                            preceding_zeros += 1;       // For symbol 0xF0 => skip 16 zeros not 15
                             for (; idx<=jpeg->sh.spectral_end; idx++) {
                                 if (zz_mcu[idx] == 0) {
                                     preceding_zeros--;
@@ -1835,11 +1836,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                                 }
                             }
                             skips--;
-                            if (mcu_idx == 32255) {
-                                printf("here now: %d\n", bs->byte_pos);
-                            }
-
-
+                            break;
                         }
                     }
                     else {
@@ -1864,6 +1861,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
         u8 previous = read_byte(bs);
         u8 marker = read_byte(bs);
         if (0xFF != previous) {
+            printf("Now we are here: %d, while we should be at %d, diff = %d\n", bs->byte_pos-2, restart_pos, bs->byte_pos-2 - restart_pos);
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         // TODO(alex): check this
@@ -1892,13 +1890,13 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
         if (jpeg->sh.approx_high == 0) {
             result = decode_progressive_ac(bs, jpeg);
         } else {
-            print_ht(jpeg->ht, true);
+            // print_ht(jpeg->ht, true);
             result = decode_progressive_ac(bs, jpeg);
         }
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
-#if 0
+#if 1
             u8 previous = read_byte(bs);
             u8 marker = read_byte(bs);
             while (true) {
