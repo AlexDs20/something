@@ -1707,20 +1707,6 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             s16* zz_mcu = &jpeg->sh.components[0]->coeff[offset];
 
 
-            // Handle band skips (EOBn) in subsequent AC
-            // printf("total_mcu = %d \t restart_interval = %d \t processed_mcu = %d \t mcu_idx = %d \t skips = %d \n", total_n_mcu, restart_interval_size, processed_mcu+mcu_idx, mcu_idx, skips);
-            if (skips>0) {
-                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
-                    if (zz_mcu[idx]!=0) {
-                        u8 bit;
-                        next_bit(bs, &bit);
-                        // zz_mcu[idx] |= bit <<jpeg->sh.approx_low;
-                    }
-                }
-                skips--;
-                continue;
-            }
-
             // Decode AC
             if (jpeg->sh.approx_high == 0) {    // First time decoding AC
                 s16 ac;
@@ -1760,88 +1746,74 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                     }
                 }
             } else {                            // Subsequent
-                // Test search for the restart index
-                static bool show = true;
-                if (show) {
-                    u8 previous = read_byte(bs);
-                    u8 marker = read_byte(bs);
-                    printf("sx,sy = (%d,%d)\n", mcu_block_start_x, mcu_block_start_y);
-                    u64 initial = bs->byte_pos;
-                    while (! ((previous == 0xFF) && (marker >= 0xD0) && (marker <= 0xD7)) ) {
-                        previous = marker;
-                        marker = read_byte(bs);
-                    }
-                    restart_pos = bs->byte_pos-2;
-                    printf("initial: %d  restart_pos %d %p \n", initial, restart_pos, &bs->data[restart_pos]);
-                    printf("Elements: %d\n", (restart_pos-initial));
-                    bs->byte_pos = initial;
-                    show = false;
-                }
+                s16 shifted_bit = (s16) (1 << jpeg->sh.approx_low);
 
-                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
-                    u8 symbol;
-                    decode_one_huffman_code(bs, ac_ht_root, &symbol);
-                    u8 preceding_zeros = symbol >> 4;
-                    u8 coeff_length = symbol & 0x0F;        // Number of bits to read to get the value
-
-                    // printf("total_mcu = %d \t mcu_idx = %d \t idx = %d   skips = %d   0s = %d  coefL = %d  symbol=%d\n", total_n_mcu, mcu_idx, idx, skips, preceding_zeros, coeff_length, symbol);
-
-                    if (coeff_length == 1) {
-                        u8 bit_read;
-                        next_bit(bs, &bit_read);
-                        if (preceding_zeros != 0) {
-                            for (; idx<=jpeg->sh.spectral_end; idx++) {
-                                if (zz_mcu[idx] == 0) {
-                                    preceding_zeros--;
-                                }
-                                else {
-                                    u8 bit;
-                                    next_bit(bs, &bit);
-                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
-                                }
-                                if (preceding_zeros == 0) {
-                                    break;
-                                }
+                // Handle band skips (EOBn) in subsequent AC
+                if (skips>0) {
+                    for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
+                        if (zz_mcu[idx] != 0) {
+                            u8 bit;
+                            next_bit(bs, &bit);
+                            if (bit) {
+                                zz_mcu[idx] += (zz_mcu[idx]>0) ? shifted_bit : -shifted_bit;
                             }
                         }
-                        // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
                     }
-                    else if (coeff_length == 0) {
-                        if (preceding_zeros == 0xF) {
-                            preceding_zeros += 1;       // For symbol 0xF0 => skip 16 zeros not 15
-                            for (; idx<=jpeg->sh.spectral_end; idx++) {
-                                if (zz_mcu[idx] == 0) {
-                                    preceding_zeros--;
-                                }
-                                else {
-                                    u8 bit;
-                                    next_bit(bs, &bit);
-                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
-                                }
-                                if (preceding_zeros == 0) {
-                                    break;
-                                }
+                    skips--;
+                }
+                else {
+                    u8 idx = jpeg->sh.spectral_start ;
+                    do {
+                        u8 rrrrssss;
+                        decode_one_huffman_code(bs, ac_ht_root, &rrrrssss);
+                        u8  r = rrrrssss >> 4;
+                        s16 s = rrrrssss & 0x0F;        // Number of bits to read to get the value
+
+                        // EOBn
+                        if (s == 0) {
+                            if (r<0xF) {
+                                skips = (1 << r) - 1;
+                                skips += read_bits(bs, r);
+                                r = 64;     // Force finish the block
                             }
+                            // ZRL
+                            else /* if (r == 0xF) */ {
+                                // r = 0xF , s = 0 => skip 16 zeroes
+                            }
+                        }
+                        // Skips zeros + write 1 value
+                        else if (s == 1) {
+                            u8 sign_bit;
+                            next_bit(bs, &sign_bit);
+                            s = sign_bit ? shifted_bit : -shifted_bit;
                         }
                         else {
-                            skips = 1<<preceding_zeros;
-                            skips += read_bits(bs, preceding_zeros);
+                            return (ImageParsingResult){IMAGE_FAIL, "Bad category. Expected 0 or 1 for subsequent AC scans."};
+                        }
 
-                            // Finish the current block
-                            for (;idx<=jpeg->sh.spectral_end; idx++) {
-                                if (zz_mcu[idx] != 0) {
-                                    u8 bit;
-                                    next_bit(bs, &bit);
-                                    // zz_mcu[idx] |= bit_read << jpeg->sh.approx_low;
+                        while (idx <= jpeg->sh.spectral_end) {
+                            s16* p = &zz_mcu[idx];
+                            if (*p != 0) {
+                                u8 bit;
+                                next_bit(bs, &bit);
+                                if (bit) {
+                                    *p += (*p>0) ? shifted_bit : -shifted_bit;
                                 }
                             }
-                            skips--;
-                            break;
+                            else {
+                                // Skip the values that are 0
+                                // Except if it's the last when we write the s value we read
+                                if (r == 0) {
+                                    *p = s;
+                                    idx++;
+                                    break;
+                                }
+                                r--;
+                            }
+                            idx++;
                         }
-                    }
-                    else {
-                        return (ImageParsingResult){IMAGE_FAIL, "Bad category. Expected 0 or 1 for subsequent AC scans."};
-                    }
+
+                    } while (idx <= jpeg->sh.spectral_end);
                 }
             }
         }
@@ -1862,6 +1834,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
         u8 marker = read_byte(bs);
         if (0xFF != previous) {
             printf("Now we are here: %d, while we should be at %d, diff = %d\n", bs->byte_pos-2, restart_pos, bs->byte_pos-2 - restart_pos);
+            printf("Should've gotten a marker but got 0x%02X%02X\n", previous, marker);
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         // TODO(alex): check this
