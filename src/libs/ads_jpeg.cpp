@@ -79,6 +79,10 @@
  *
  */
 
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#define LOC __FILE__ ":" XSTR(__LINE__)
+
 // itu-t81.pdf page 32
 enum Markers {
     Temporary                     = 0x01,
@@ -447,13 +451,13 @@ u16 read_2bytes(BitStream* bs){
     return bs->data[bs->byte_pos++]<<8 | bs->data[bs->byte_pos++];
 }
 
-bool next_bit(BitStream* bs, u8* bit_out) {
-    bool error = false;
+ImageParsingResult next_bit(BitStream* bs, u8* bit_out) {
+    ImageParsingResult result = {IMAGE_SUCCESS, nullptr};
 
     if (overflow(bs)) {
-        printf("Next bit went beyond the bit stream data\n");
-        error = true;
-        return error;
+        const char* loc = LOC;
+        printf("%s\n", LOC);
+        return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
     }
 
     u8 byte = bs->data[bs->byte_pos];
@@ -461,26 +465,45 @@ bool next_bit(BitStream* bs, u8* bit_out) {
 
     // Update
     bs->bit_pos++;
+    if (overflow(bs)) {
+        const char* loc = LOC;
+        printf("%s\n", LOC);
+        return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+    }
+
     if (bs->bit_pos == 8) {
         bs->bit_pos = 0;
         bs->byte_pos++;
+        if (overflow(bs)) {
+            const char* loc = LOC;
+            printf("%s\n", LOC);
+            return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+        }
 
         // Skip 0xFF00
         if (byte == 0xFF && bs->data[bs->byte_pos] == 0x00) {
             bs->byte_pos++;
+            if (overflow(bs)) {
+                const char* loc = LOC;
+                printf("%s\n", LOC);
+                return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+            }
         }
     }
-    return error;
+    return result;
 }
 
-u8 read_bits(BitStream* bs, u8 n) {
-    u8 out = 0;
+ImageParsingResult read_bits(BitStream* bs, u8 n, s64* out) {
+    ImageParsingResult result = {IMAGE_SUCCESS, nullptr};
+
+    *out = 0;
     u8 bit;
     for (u8 i=0; i<n; i++) {
-        next_bit(bs, &bit);
-        out = (out<<1) | bit;
+        result = next_bit(bs, &bit);
+        if (result.status != IMAGE_SUCCESS) { return result; }
+        *out = (*out<<1) | bit;
     }
-    return out;
+    return result;
 }
 
 u8 peek_byte(BitStream* bs) {
@@ -1628,7 +1651,8 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
                             zz_mcu[0] = dc_pred[comp_idx] << jpeg->sh.approx_low;
                         } else {
                             u8 bit;
-                            bool FIXME_error = next_bit(bs, &bit);
+                            // TODO(alex): FIXME error
+                            next_bit(bs, &bit);
                             zz_mcu[0] |= (bit << jpeg->sh.approx_low);
                         }
                     }
@@ -1668,10 +1692,6 @@ ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
     return result;
 }
 
-#define STR(x) #x
-#define XSTR(x) STR(x)
-#define LOC __FILE__ ":" XSTR(__LINE__)
-
 ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
 
@@ -1687,6 +1707,27 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     u64 processed_mcu = 0;
     u64 restart_pos;
     for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
+        if (1)
+        {
+            u64 current_byte_pos = bs->byte_pos;
+            u64 current_bit_pos = bs->bit_pos;
+
+            u8 p = read_byte(bs);
+            u8 m = read_byte(bs);
+            while (true) {
+                if (p == 0xFF && (m != 0x00) ) {
+                    printf("MARKER FOUND: 0x%02X%02X\n", p, m);
+                    break;
+                }
+                p = m;
+                m = read_byte(bs);
+            }
+
+            restart_pos = bs->byte_pos-2;
+
+            bs->byte_pos = current_byte_pos;
+            bs->bit_pos  = current_bit_pos;
+        }
         s16 dc_pred[4] = {0};
         s64 skips = 0;
 
@@ -1709,40 +1750,56 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
 
             // Decode AC
             if (jpeg->sh.approx_high == 0) {    // First time decoding AC
-                s16 ac;
-                u8 preceding_zeros;
+                if (skips > 0) {
+                    skips--;
+                    continue;
+                }
+                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end;) {
+                    u8 rrrrssss;
 
-                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
-                    result = parse_ac_data_unit(bs, ac_ht_root, &preceding_zeros, &ac);
-                    if (result.status != IMAGE_SUCCESS) { return result; }
+                    result = decode_one_huffman_code(bs, ac_ht_root, &rrrrssss);
+                    if (bs->byte_pos > restart_pos){
+                        printf("ri idx: %d / %d / %d \n", 0, ri_idx, restart_interval_num);
+                        printf("mcu idx: %d / %d / %d \n", 0 , mcu_idx, restart_interval_size-1);
+                        printf("idx: %d / %d / %d \n", jpeg->sh.spectral_start, idx, jpeg->sh.spectral_end);
+                        if (result.error_message != nullptr) printf("failed with: %s\n", result.error_message);
+                        return (ImageParsingResult){IMAGE_FAIL, "\n---\nFailed :(\n---\n"};
+                    }
+                    if (result.status != IMAGE_SUCCESS) return result;
 
-                    if (ac == 0) {
+                    u8  r = rrrrssss >> 4;
+                    s16 s = rrrrssss & 0x0F;        // Number of bits to read to get the value
+
+                    if (s == 0) {
                         // Fill 16 zeros
-                        if (preceding_zeros==0xF) {
+                        if (r==0xF) {
                             // Write 16 zeros but it should not be needed if we default initialize to 0
-                            idx += 0xF;
+                            idx += 0x10;
                             continue;
                         }
                         // Fill rest of band with 0
-                        else if (preceding_zeros==0) {
+                        else if (r==0) {
                             // Assumes zero initialized
                             break;
                         }
                         // Skip several blocks of bands which are 0
                         else {
                             // Get amount of blocks to skip
-                            u64 skips = (1<<preceding_zeros);
-                            skips += read_bits(bs, preceding_zeros);
-                            mcu_idx += skips - 1;
+                            skips = (1<<r) - 1;
+                            s64 extra_skips = 0;
+                            result = read_bits(bs, r, &extra_skips);
+                            if (result.status != IMAGE_SUCCESS) return result;
+                            skips += extra_skips;
+                            // mcu_idx += skips;
                             break;
                         }
                     }
                     else {
                         // Write preceding zeros (skips because 0 initialized)
-                        idx += preceding_zeros;
-                        // Write the value that was read
-                        zz_mcu[idx] = ac << jpeg->sh.approx_low;
-                        continue;
+                        idx += r;
+                        // Write the value that we read
+                        s16 ac = decode_n_bits(bs, s);
+                        zz_mcu[idx++] = ac << jpeg->sh.approx_low;
                     }
                 }
             } else {                            // Subsequent
@@ -1762,8 +1819,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                     skips--;
                 }
                 else {
-                    u8 idx = jpeg->sh.spectral_start ;
-                    do {
+                    for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end;) {
                         u8 rrrrssss;
                         decode_one_huffman_code(bs, ac_ht_root, &rrrrssss);
                         u8  r = rrrrssss >> 4;
@@ -1773,7 +1829,10 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         if (s == 0) {
                             if (r<0xF) {
                                 skips = (1 << r) - 1;
-                                skips += read_bits(bs, r);
+                                s64 extra_skips = 0;
+                                result = read_bits(bs, r, &extra_skips);
+                                if (result.status != IMAGE_SUCCESS) return result;
+                                skips += extra_skips;
                                 r = 64;     // Force finish the block
                             }
                             // ZRL
@@ -1791,7 +1850,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                             return (ImageParsingResult){IMAGE_FAIL, "Bad category. Expected 0 or 1 for subsequent AC scans."};
                         }
 
-                        while (idx <= jpeg->sh.spectral_end) {
+                        for (;idx<=jpeg->sh.spectral_end;) {
                             s16* p = &zz_mcu[idx];
                             if (*p != 0) {
                                 u8 bit;
@@ -1813,7 +1872,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                             idx++;
                         }
 
-                    } while (idx <= jpeg->sh.spectral_end);
+                    }
                 }
             }
         }
@@ -1823,18 +1882,21 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             return result;
         }
 
+        printf("Expected: %d  %d ", restart_pos, bs->byte_pos);
         // Go through all the last bits until byte aligned (bit filling)
         u8 bit;
         while (bs->bit_pos != 0) {
             next_bit(bs, &bit);
         }
+        printf("%d  --  Diff: %d\n", bs->byte_pos, bs->byte_pos-restart_pos);
 
         u8 tmp;
         u8 previous = read_byte(bs);
         u8 marker = read_byte(bs);
         if (0xFF != previous) {
-            printf("Now we are here: %d, while we should be at %d, diff = %d\n", bs->byte_pos-2, restart_pos, bs->byte_pos-2 - restart_pos);
             printf("Should've gotten a marker but got 0x%02X%02X\n", previous, marker);
+            // bs->byte_pos = restart_pos+2;
+            // return result;
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         // TODO(alex): check this
@@ -1860,12 +1922,9 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
         result = decode_progressive_dc(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0) { // AC
-        if (jpeg->sh.approx_high == 0) {
-            result = decode_progressive_ac(bs, jpeg);
-        } else {
-            // print_ht(jpeg->ht, true);
-            result = decode_progressive_ac(bs, jpeg);
-        }
+        printf("=============\n");
+        print_sh(jpeg->sh);
+        result = decode_progressive_ac(bs, jpeg);
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
