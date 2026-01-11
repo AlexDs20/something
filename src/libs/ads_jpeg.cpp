@@ -493,7 +493,7 @@ ImageParsingResult next_bit(BitStream* bs, u8* bit_out) {
     return result;
 }
 
-ImageParsingResult read_bits(BitStream* bs, u8 n, s64* out) {
+ImageParsingResult read_bits(BitStream* bs, u8 n, u16* out) {
     ImageParsingResult result = {IMAGE_SUCCESS, nullptr};
 
     *out = 0;
@@ -534,8 +534,34 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, Jpeg* jpeg) {
     fh.src_height = read_2bytes(bs);
     length -= 2;
     if (fh.src_height == 0) {
-        // TODO(alex): Go through file until DNL and set the src_height directly here.
-        return (ImageParsingResult){IMAGE_FAIL, "NOT IMPLEMENTED: Got src_height of 0 but no support for using DefineNumberOfLines marker yet."};
+        // Save current position
+        u64 current_byte_pos = bs->byte_pos;
+        u64 current_bit_pos = bs->bit_pos;
+
+        u8 p = read_byte(bs);
+        u8 m = read_byte(bs);
+        while (true) {
+            if (overflow(bs)) {
+                return (ImageParsingResult){IMAGE_FAIL, "Did not find the image height."};
+            }
+            else if (p==0xFF && m==DefineNumberOfLines) {
+                u16 l = read_2bytes(bs);
+                if (l != 4) {
+                    return (ImageParsingResult){IMAGE_FAIL, "Length of DefineNumberOfLines should be 4."};
+                }
+                fh.src_height = read_2bytes(bs);
+                if (fh.src_height == 0) {
+                    return (ImageParsingResult){IMAGE_FAIL, "Could not find the image height."};
+                }
+                break;
+            }
+            p = m;
+            m = read_byte(bs);
+        }
+
+        // Reset the bitstream to where we were
+        bs->byte_pos = current_byte_pos;
+        bs->bit_pos  = current_bit_pos;
     }
 
     fh.src_width = read_2bytes(bs);
@@ -776,12 +802,8 @@ ImageParsingResult parse_define_number_of_lines(BitStream* bs, Jpeg* jpeg) {
     length -= 2;
 
     // Specifies the number of MCU in the restart interval
-    jpeg->fh.src_height = read_2bytes(bs);
+    read_2bytes(bs);
     length -= 2;
-
-    if (jpeg->fh.src_height == 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "NOT IMPLEMENTED: setting the number of lines from the DefineNumberOfLines marker."};
-    }
 
     if (length != 0) {
         return (ImageParsingResult){IMAGE_FAIL, "Expected length of DefineNumberOfLines and read data do not match."};
@@ -1707,29 +1729,8 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
     u64 processed_mcu = 0;
     u64 restart_pos;
     for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
-        if (1)
-        {
-            u64 current_byte_pos = bs->byte_pos;
-            u64 current_bit_pos = bs->bit_pos;
-
-            u8 p = read_byte(bs);
-            u8 m = read_byte(bs);
-            while (true) {
-                if (p == 0xFF && (m != 0x00) ) {
-                    printf("MARKER FOUND: 0x%02X%02X\n", p, m);
-                    break;
-                }
-                p = m;
-                m = read_byte(bs);
-            }
-
-            restart_pos = bs->byte_pos-2;
-
-            bs->byte_pos = current_byte_pos;
-            bs->bit_pos  = current_bit_pos;
-        }
         s16 dc_pred[4] = {0};
-        s64 skips = 0;
+        u16 skips = 0;
 
         for (u32 mcu_idx=0; mcu_idx<restart_interval_size; mcu_idx++) {
             if (processed_mcu + mcu_idx >= total_n_mcu) {
@@ -1786,7 +1787,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         else {
                             // Get amount of blocks to skip
                             skips = (1<<r) - 1;
-                            s64 extra_skips = 0;
+                            u16 extra_skips = 0;
                             result = read_bits(bs, r, &extra_skips);
                             if (result.status != IMAGE_SUCCESS) return result;
                             skips += extra_skips;
@@ -1829,7 +1830,7 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
                         if (s == 0) {
                             if (r<0xF) {
                                 skips = (1 << r) - 1;
-                                s64 extra_skips = 0;
+                                u16 extra_skips = 0;
                                 result = read_bits(bs, r, &extra_skips);
                                 if (result.status != IMAGE_SUCCESS) return result;
                                 skips += extra_skips;
@@ -1882,21 +1883,17 @@ ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
             return result;
         }
 
-        printf("Expected: %d  %d ", restart_pos, bs->byte_pos);
         // Go through all the last bits until byte aligned (bit filling)
         u8 bit;
         while (bs->bit_pos != 0) {
             next_bit(bs, &bit);
         }
-        printf("%d  --  Diff: %d\n", bs->byte_pos, bs->byte_pos-restart_pos);
 
         u8 tmp;
         u8 previous = read_byte(bs);
         u8 marker = read_byte(bs);
         if (0xFF != previous) {
             printf("Should've gotten a marker but got 0x%02X%02X\n", previous, marker);
-            // bs->byte_pos = restart_pos+2;
-            // return result;
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         // TODO(alex): check this
@@ -1922,26 +1919,10 @@ ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, J
         result = decode_progressive_dc(bs, jpeg);
     }
     else if (jpeg->sh.spectral_start > 0) { // AC
-        printf("=============\n");
-        print_sh(jpeg->sh);
         result = decode_progressive_ac(bs, jpeg);
     } else {
         return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
     }
-#if 1
-            u8 previous = read_byte(bs);
-            u8 marker = read_byte(bs);
-            while (true) {
-                if (previous == 0xFF && (marker != 0x00 && (marker < Restart0 || marker>Restart7)) ) {
-                    printf("MARKER: 0x%02X%02X\n", previous, marker);
-                    skip_nbytes(bs, -2);
-                    bs->bit_pos = 0;
-                    break;
-                }
-                previous = marker;
-                marker = read_byte(bs);
-            }
-#endif
     return result;
 }
 
@@ -1951,19 +1932,15 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
     ImageParsingResult result;
 
     while (EndOfImage != marker) {
-        print_mk(marker);
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
 
-            printf("Parsing scan\n");
-            printf("Spectral band: [%d,%d] Approx: [%d,%d] Components: %d Cid: %p\n", jpeg->sh.spectral_start, jpeg->sh.spectral_end, jpeg->sh.approx_high, jpeg->sh.approx_low, jpeg->sh.n_components, jpeg->sh.components[0]);
             if (StartOfFrame0 == jpeg->frame_type) {
                 result = parse_baseline_scan(persist_arena, bs, jpeg);
             } else if (StartOfFrame2 == jpeg->frame_type) {
                 result = parse_progressive_scan(persist_arena, bs, jpeg);
             }
-            printf("Done parsing scan\n");
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
@@ -2152,12 +2129,12 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     // Write data at correct place
                     u32 idx_x = block_id_x * 8;
                     u32 idx_y = block_id_y * 8;
-                    u32 base_offset = idx_y * jpeg.sh.components[i]->xi + idx_x;
+                    u32 base_offset = idx_y * jpeg.fh.components[i].xi + idx_x;
                     for (u8 y=0; y<8; y++) {
                         for (u8 x=0; x<8; x++) {
-                            u64 linear_index = base_offset + y * jpeg.sh.components[i]->xi + x;
+                            u64 linear_index = base_offset + y * jpeg.fh.components[i].xi + x;
                             u16 l = x + y*8;
-                            jpeg.sh.components[i]->buffer[linear_index] = idct[l];
+                            jpeg.fh.components[i].buffer[linear_index] = idct[l];
                         }
                     }
                 }
@@ -2169,9 +2146,9 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         int tmp = 0x000000FF;
         bool is_little_endian = (*(u8*)(&tmp) == 0xFF);
         if (3 == jpeg.fh.src_components) {
-            f32* comp0 = jpeg.sh.components[0]->buffer;
-            f32* comp1 = jpeg.sh.components[1]->buffer;
-            f32* comp2 = jpeg.sh.components[2]->buffer;
+            f32* comp0 = jpeg.fh.components[0].buffer;
+            f32* comp1 = jpeg.fh.components[1].buffer;
+            f32* comp2 = jpeg.fh.components[2].buffer;
 
             u64 l0, l0_x, l0_y;
             u64 l1, l1_x, l1_y;
@@ -2221,7 +2198,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 }
             }
         } else if (1 == jpeg.fh.src_components) {
-            f32* comp0 = jpeg.sh.components[0]->buffer;
+            f32* comp0 = jpeg.fh.components[0].buffer;
             for (u32 y=0; y<jpeg.fh.src_height; y++) {
                 for (u32 x=0; x<jpeg.fh.src_width; x++) {
                     u64 l = y * jpeg.fh.src_width + x;

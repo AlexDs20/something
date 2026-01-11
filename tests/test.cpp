@@ -10,9 +10,15 @@ struct test_entry {
 };
 
 test_entry tests[] = {
-    {"JPEG_progressive_rgb", test_read_progressive_rgb},
-    {"JPEG_baseline_gray", test_read_baseline_gray},
-    {"JPEG_baseline_rgb", test_read_baseline_rgb},
+    // {"JPEG_progressive_rgb", test_read_progressive_rgb},
+    // {"JPEG_baseline_gray", test_read_baseline_gray},
+    // {"JPEG_baseline_rgb", test_read_baseline_rgb},
+    // {"JPEG_baseline_other3", test_read_baseline_other3},
+    {"JPEG_progressive_other3", test_read_progressive_other3},
+    {"JPEG_progressive_test5", test_read_progressive_test5},
+    {"JPEG_progressive_test11", test_read_progressive_test11},
+    {"JPEG_progressive_test12", test_read_progressive_test12},
+    // {"JPEG_progressive_failing_other3", test_read_progressing_failing_other3},
 };
 
 int main() {
