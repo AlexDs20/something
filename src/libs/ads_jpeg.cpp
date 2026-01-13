@@ -2075,25 +2075,22 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, b
             return (ImageParsingResult){IMAGE_FAIL, "Did not find start of frame marker! (We should never get here...)"};
         }
 
-        //  PARSE FRAME
-        {
-            // FrameHeader
-            if (marker == StartOfFrame0 || marker == StartOfFrame2) {      // Baseline DCT or Progressive
-                jpeg.frame_type = (Markers)marker;
-                result = parse_frame_header(local_arena->arena, &bs, &jpeg);
-                if (result.status != IMAGE_SUCCESS) { return result; }
-            }
-            else {
-                return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
-            }
-
-            // TODO(alex): Allocate precisely the right amount and use u8* regardless
-            jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
-
-            // Parse all Scans
-            result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
+        // FrameHeader
+        if (marker == StartOfFrame0 || marker == StartOfFrame2) {      // Baseline DCT or Progressive
+            jpeg.frame_type = (Markers)marker;
+            result = parse_frame_header(local_arena->arena, &bs, &jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
         }
+        else {
+            return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
+        }
+
+        // TODO(alex): Allocate precisely the right amount and use u8* regardless
+        jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
+
+        // Parse all Scans
+        result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
+        if (result.status != IMAGE_SUCCESS) { return result; }
 
         // To go from flat zigzag order to flat unzigzag order
         const u8 unzigzag[64] = {
@@ -2234,10 +2231,9 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, b
 
 int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8* precision) {
     int success = 1;
-
+    // Note: Current goal is to support baseline DCT 8 bits
     LocalArena* local_arena = local_arena_alloc_create();
     string8 data = read_file(local_arena->arena, filename);
-
     BitStream bs = {
         .data = data.buffer,
         .size = data.size,
@@ -2259,32 +2255,39 @@ int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8
     else if (bs.data[bs.size-1] != EndOfImage) {
         success = 0;
     }
+    if (!success) {
+        local_arena_alloc_reset(local_arena);
+        return success;
+    }
+    previous = read_byte(&bs);
+    marker = read_byte(&bs);
 
-    if (success) {
-        while (true) {
-            if (overflow(&bs)) {
+    while (true) {
+        if (previous != 0xFF) {
+            success = 0;
+            break;
+        }
+        else if (overflow(&bs)) {
+            success = 0;
+            break;
+        }
+        else if (is_start_of_frame(marker)) {
+            u16 l = read_2bytes(&bs);
+            *precision = read_byte(&bs);
+            *height = read_2bytes(&bs);
+            *width = read_2bytes(&bs);
+            *components = read_byte(&bs);
+            break;
+        }
+        else {
+            u16 length = read_2bytes(&bs);
+            if (length < 2) {
                 success = 0;
                 break;
             }
-            previous = marker;
+            skip_nbytes(&bs, length-2);
+            previous = read_byte(&bs);
             marker = read_byte(&bs);
-            if (previous == 0xFF && is_start_of_frame(marker)) {
-                // Length of Frame
-                skip_nbytes(&bs, 2);
-
-                // Precision
-                *precision = read_byte(&bs);
-
-                // height
-                *height = read_2bytes(&bs);
-
-                // width
-                *width = read_2bytes(&bs);
-
-                // components
-                *components = read_byte(&bs);
-                break;
-            }
         }
     }
 
