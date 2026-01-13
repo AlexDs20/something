@@ -21,5 +21,9 @@ struct ImageParsingResult {
     const char* error_message;
 };
 
+
+int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8* precision);
+
 ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out);
+ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, bool flip_vertically);
 #endif // _LIBIMAGES_H

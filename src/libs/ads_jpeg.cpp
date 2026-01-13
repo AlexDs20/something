@@ -1,4 +1,5 @@
 #include "libs/ads_jpeg.h"
+#include "platform/io.h"
 #include <stdio.h>
 /*  ==================
  *  JPEG Documentation
@@ -1981,8 +1982,12 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-// TODO(alex): This should not use Arena and string8 but standard C types.
 ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
+    return decode_jpeg(persist_arena, data, out, true);
+}
+
+// TODO(alex): This should not use Arena and string8 but standard C types.
+ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, bool flip_vertically) {
     // Note: Current goal is to support baseline DCT 8 bits
     BitStream bs = {
         .data = data.buffer,
@@ -2145,7 +2150,6 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         // Convert to RGB
         int tmp = 0x000000FF;
         bool is_little_endian = (*(u8*)(&tmp) == 0xFF);
-        bool flip = true;
         if (3 == jpeg.fh.src_components) {
             f32* comp0 = jpeg.fh.components[0].buffer;
             f32* comp1 = jpeg.fh.components[1].buffer;
@@ -2178,7 +2182,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     l1_x = x / l1_x_ratio;
                     l2_x = x / l2_x_ratio;
 
-                    u64 l = !flip ? (y * jpeg.fh.src_width + x) : ((jpeg.fh.src_height-1 - y) * jpeg.fh.src_width + x);
+                    u64 l = !flip_vertically ? (y * jpeg.fh.src_width + x) : ((jpeg.fh.src_height-1 - y) * jpeg.fh.src_width + x);
                     l0 = (l0_y*jpeg.fh.components[0].xi) + l0_x;
                     l1 = (l1_y*jpeg.fh.components[1].xi) + l1_x;
                     l2 = (l2_y*jpeg.fh.components[2].xi) + l2_x;
@@ -2226,4 +2230,64 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     out->buffer      = (u32*)jpeg.buffer;
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
+}
+
+int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8* precision) {
+    int success = 1;
+
+    LocalArena* local_arena = local_arena_alloc_create();
+    string8 data = read_file(local_arena->arena, filename);
+
+    BitStream bs = {
+        .data = data.buffer,
+        .size = data.size,
+        .byte_pos = 0,
+        .bit_pos = 0
+    };
+    u8 previous = read_byte(&bs);
+    u8 marker = read_byte(&bs);
+
+    if (previous != 0xFF) {
+        success = 0;
+    }
+    else if (marker != StartOfImage) {
+        success = 0;
+    }
+    else if (bs.data[bs.size-2] != 0xFF) {
+        success = 0;
+    }
+    else if (bs.data[bs.size-1] != EndOfImage) {
+        success = 0;
+    }
+
+    if (success) {
+        while (true) {
+            if (overflow(&bs)) {
+                success = 0;
+                break;
+            }
+            previous = marker;
+            marker = read_byte(&bs);
+            if (previous == 0xFF && is_start_of_frame(marker)) {
+                // Length of Frame
+                skip_nbytes(&bs, 2);
+
+                // Precision
+                *precision = read_byte(&bs);
+
+                // height
+                *height = read_2bytes(&bs);
+
+                // width
+                *width = read_2bytes(&bs);
+
+                // components
+                *components = read_byte(&bs);
+                break;
+            }
+        }
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return success;
 }

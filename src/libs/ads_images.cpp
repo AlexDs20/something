@@ -23,21 +23,58 @@ void create_missing_image(Arena* arena, Image* out) {
     return;
 }
 
-// status = read_image_info(filename, &width, &height, &components);
+// TODO(alex)
+/*
+bool read_image_info(filename, &width, &height, &components){
+    bool success = true;
+    *width = 0;
+    *height = 0;
+    *components = 0;
+
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    string8 data = read_file(local_arena->arena, filename);
+    string8 extension = string_get_file_extension(filename);
+
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+    if (extension == ".jpg" || extension == ".jpeg") {
+        // result = read_jpeg_info(data, width, height, components);
+        result = {IMAGE_FAIL, "Not implemented"};
+    }
+    else {
+        printf("File format not supported: extension = ");
+        string_print(extension);
+        return false;
+    }
+
+    if (result.status != IMAGE_SUCCESS) {
+        return false;
+    }
+
+    return success;
+}
+*/
 
 Image read_image_file(Arena* persist_arena, string8 filename) {
     Image out = {};
     LocalArena* local_arena = local_arena_alloc_create();
     u64 checkpoint = arena_alloc_checkpoint(persist_arena);
 
-    printf("Reading file: ");
     string_print(filename);
-    printf("\n");
     string8 data = read_file(local_arena->arena, filename);
     string8 extension = string_get_file_extension(filename);
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
     if (extension == ".jpg" || extension == ".jpeg") {
+
+        u16 width;
+        u16 height;
+        u8 components;
+        u8 precision;
+        read_jpeg_info(filename, &width, &height, &components, &precision);
+
+        printf("width: %d, height: %d, components: %d, precision: %d\n", width, height, components, precision);
+
         // char* f = string_to_cstr(local_arena->arena, filename);
         // int w, h, c;
         // out.gray = stbi_load(f, &w, &h, &c, 4);
@@ -46,6 +83,12 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
         // out.components = c;
         // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
         // // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
+        // TODO(alex): Change the API to this
+        // u8* buffer = nullptr;
+        // u32 w;
+        // u32 h;
+        // u8 c;
+        // success = decode_jpeg(data, buffer, &w, &h, &c);
         result = decode_jpeg(persist_arena, data, &out);
         // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
     } else if (extension == ".png"){

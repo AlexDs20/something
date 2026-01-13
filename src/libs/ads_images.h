@@ -19,6 +19,10 @@ struct Image {
     u8 precision;
 };
 
+// /* bs*, jpeg*? as void* */void read_image_info(filename, &width, &height, &components, &precision);
+// void read_image_file(filename, &width, &height, &components);
+
 Image read_image_file(Arena* arena, string8 filename);
-// status = read_image_info(filename, &width, &height, &components);
+// bool read_image_info(filename, &width, &height, &components);
+// image_flip_vertically(Image* image);
 #endif
