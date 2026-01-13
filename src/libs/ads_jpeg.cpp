@@ -2145,6 +2145,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         // Convert to RGB
         int tmp = 0x000000FF;
         bool is_little_endian = (*(u8*)(&tmp) == 0xFF);
+        bool flip = true;
         if (3 == jpeg.fh.src_components) {
             f32* comp0 = jpeg.fh.components[0].buffer;
             f32* comp1 = jpeg.fh.components[1].buffer;
@@ -2177,7 +2178,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     l1_x = x / l1_x_ratio;
                     l2_x = x / l2_x_ratio;
 
-                    u64 l = y * jpeg.fh.src_width + x;
+                    u64 l = !flip ? (y * jpeg.fh.src_width + x) : ((jpeg.fh.src_height-1 - y) * jpeg.fh.src_width + x);
                     l0 = (l0_y*jpeg.fh.components[0].xi) + l0_x;
                     l1 = (l1_y*jpeg.fh.components[1].xi) + l1_x;
                     l2 = (l2_y*jpeg.fh.components[2].xi) + l2_x;
