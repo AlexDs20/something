@@ -2277,6 +2277,32 @@ int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8
             *height = read_2bytes(&bs);
             *width = read_2bytes(&bs);
             *components = read_byte(&bs);
+
+            if (*height == 0) {
+                u8 p = read_byte(&bs);
+                u8 m = read_byte(&bs);
+                while (true) {
+                    if (overflow(&bs)) {
+                        success = 0;
+                        break;
+                    }
+                    else if (p==0xFF && m==DefineNumberOfLines) {
+                        u16 l = read_2bytes(&bs);
+                        if (l != 4) {
+                            success = 0;
+                            break;
+                        }
+                        *height = read_2bytes(&bs);
+                        if (*height == 0) {
+                            success = 0;
+                            break;
+                        }
+                        break;
+                    }
+                    p = m;
+                    m = read_byte(&bs);
+                }
+            }
             break;
         }
         else {
