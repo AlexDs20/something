@@ -2243,35 +2243,19 @@ int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8
     u8 previous = read_byte(&bs);
     u8 marker = read_byte(&bs);
 
-    if (previous != 0xFF) {
-        success = 0;
-    }
-    else if (marker != StartOfImage) {
-        success = 0;
-    }
-    else if (bs.data[bs.size-2] != 0xFF) {
-        success = 0;
-    }
-    else if (bs.data[bs.size-1] != EndOfImage) {
-        success = 0;
-    }
-    if (!success) {
-        local_arena_alloc_reset(local_arena);
-        return success;
-    }
+    if (previous != 0xFF)                   { success = 0; goto cleanup; }
+    if (marker != StartOfImage)             { success = 0; goto cleanup; }
+    if (bs.data[bs.size-2] != 0xFF)         { success = 0; goto cleanup; }
+    if (bs.data[bs.size-1] != EndOfImage)   { success = 0; goto cleanup; }
+
     previous = read_byte(&bs);
     marker = read_byte(&bs);
 
     while (true) {
-        if (previous != 0xFF) {
-            success = 0;
-            break;
-        }
-        else if (overflow(&bs)) {
-            success = 0;
-            break;
-        }
-        else if (is_start_of_frame(marker)) {
+        if (previous != 0xFF) { success = 0; goto cleanup; }
+        if (overflow(&bs))    { success = 0; goto cleanup; }
+
+        if (is_start_of_frame(marker)) {
             u16 l = read_2bytes(&bs);
             *precision = read_byte(&bs);
             *height = read_2bytes(&bs);
@@ -2282,21 +2266,14 @@ int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8
                 u8 p = read_byte(&bs);
                 u8 m = read_byte(&bs);
                 while (true) {
-                    if (overflow(&bs)) {
-                        success = 0;
-                        break;
-                    }
-                    else if (p==0xFF && m==DefineNumberOfLines) {
+                    if (overflow(&bs)) { success = 0; goto cleanup; }
+                    if (p==0xFF && m==DefineNumberOfLines) {
                         u16 l = read_2bytes(&bs);
-                        if (l != 4) {
-                            success = 0;
-                            break;
-                        }
+                        if (l != 4) { success = 0; goto cleanup; }
+
                         *height = read_2bytes(&bs);
-                        if (*height == 0) {
-                            success = 0;
-                            break;
-                        }
+                        if (*height == 0) { success = 0; goto cleanup; }
+
                         break;
                     }
                     p = m;
@@ -2307,16 +2284,14 @@ int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8
         }
         else {
             u16 length = read_2bytes(&bs);
-            if (length < 2) {
-                success = 0;
-                break;
-            }
+            if (length < 2) { success = 0; goto cleanup; }
             skip_nbytes(&bs, length-2);
             previous = read_byte(&bs);
             marker = read_byte(&bs);
         }
     }
 
+cleanup:
     local_arena_alloc_reset(local_arena);
     return success;
 }
