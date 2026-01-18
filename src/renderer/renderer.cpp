@@ -488,7 +488,11 @@ static f32 ceilf32(f32 d) {
     }
 }
 
-void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+void shader_frag_color(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer) {
+    *framebuffer = ((ColorCtx*)shader_ctx)->color;
+}
+
+void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
     f32 ay = a->y;
     f32 by = b->y;
     f32 ax = a->x;
@@ -548,8 +552,9 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
             if (*zpix < z) {
                 *zpix = z;
                 u32* pixel = framebuffer + off;
-                *pixel = color;
-                // *pixel = (u32)(255 * z*z);
+                f32 w0, w1, w2;
+                frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
+                // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -560,7 +565,7 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     }
 }
 
-void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
     f32 ay = a->y;
     f32 by = b->y;
     f32 cy = c->y;
@@ -632,8 +637,12 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
             if (*zpix < z) {
                 *zpix = z;
                 u32* pixel = framebuffer + off;
-                *pixel = color;
-                // *pixel = (u32)(255 * z*z);
+
+                f32 w0 = 0;
+                f32 w1 = 0;
+                f32 w2 = 0;
+                frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
+                // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -644,7 +653,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
     }
 }
 
-void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, void* shader_context, FragmentShader frag_shader) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -711,11 +720,15 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
     if (xmax < 0) return;
     if (xmin >= w) return;
 
+    // Lower half triangle
     if (b->y == c->y) {
-        fill_flat_top_triangle(a, b, c, w, h, framebuffer, zbuffer, color);
-    } else if (a->y == b->y) {
-        fill_flat_bottom_triangle(a, b, c, w, h, framebuffer, zbuffer, color);
-    } else {
+        fill_flat_top_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+    }
+    // Upper half triangle
+    else if (a->y == b->y) {
+        fill_flat_bottom_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+    }
+    else {
         f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
         f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
 
@@ -729,16 +742,15 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
         };
 
         if (b->y > 0) {
-            fill_flat_top_triangle(a, b, &extra, w, h, framebuffer, zbuffer, color);
+            fill_flat_top_triangle(a, b, &extra, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         }
         if (b->y < h) {
-            fill_flat_bottom_triangle(&extra, b, c, w, h, framebuffer, zbuffer, color);
+            fill_flat_bottom_triangle(&extra, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         }
     }
 }
 
-
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
     static bool swapper = false;
 
     f32 minx =  10000;
@@ -801,13 +813,13 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         c.z = (c.z - minz) / (maxz-minz);
 
         // 0xAABBGGRR
-        u32 col = (0xFF & (u32)(220*(a.z + b.z + c.z)/3));
+        // u32 col = (0xFF & (u32)(220*(a.z + b.z + c.z)/3));
 
         // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // if (swapper)
         // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
         // else
-        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, shader_context, frag_shader);
     }
     swapper = !swapper;
 }

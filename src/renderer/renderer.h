@@ -65,10 +65,26 @@ void print(Normal* n);
 void print(TexCoord* t);
 void print(Face* t);
 
+
+typedef void (*FragmentShader)(
+    void* shader_ctx,
+    f32 w0,
+    f32 w1,
+    f32 w2,
+    u32 x,
+    u32 y,
+    f32* zbuffer,
+    u32* framebuffer
+);
+typedef struct {
+    u32 color;
+} ColorCtx;
+void shader_frag_color(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer);
+
 Model* read_obj_model_file(Arena* arena, string8 filepath);
 
 void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer);
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
 
 #endif

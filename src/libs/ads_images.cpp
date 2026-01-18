@@ -73,24 +73,7 @@ Image read_image_file(Arena* persist_arena, string8 filename) {
         u8 precision;
         read_jpeg_info(filename, &width, &height, &components, &precision);
 
-        printf("width: %d, height: %d, components: %d, precision: %d\n", width, height, components, precision);
-
-        // char* f = string_to_cstr(local_arena->arena, filename);
-        // int w, h, c;
-        // out.gray = stbi_load(f, &w, &h, &c, 4);
-        // out.width = w;
-        // out.height = h;
-        // out.components = c;
-        // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
-        // // NOTE(alex): slightly off for the current gray image (only by one, check clamp, ...)
-        // TODO(alex): Change the API to this
-        // u8* buffer = nullptr;
-        // u32 w;
-        // u32 h;
-        // u8 c;
-        // success = decode_jpeg(data, buffer, &w, &h, &c);
         result = decode_jpeg(persist_arena, data, &out);
-        // printf("%d %d %d %d\n", out.gray[0], out.gray[1], out.gray[2], out.gray[3]);
     } else if (extension == ".png"){
         char* f = string_to_cstr(local_arena->arena, filename);
         int w, h, c;
