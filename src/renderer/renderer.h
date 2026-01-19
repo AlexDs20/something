@@ -73,14 +73,21 @@ typedef void (*FragmentShader)(
     f32 w2,
     u32 x,
     u32 y,
+    u32 w,
+    u32 h,
     f32* zbuffer,
     u32* framebuffer
 );
 typedef struct {
     u32 color;
 } ColorContext;
-void shader_frag_color(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer);
-void shader_frag_depth(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer);
+typedef struct {
+    Image* texture;
+} TextureContext;
+
+void shader_frag_color  (void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
+void shader_frag_depth  (void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
+void shader_frag_texture(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
 
 Model* read_obj_model_file(Arena* arena, string8 filepath);
 

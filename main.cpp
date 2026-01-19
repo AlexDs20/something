@@ -39,7 +39,6 @@ int main() {
 
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
-    // const u32 bg_color = 0x777777;
     const u32 bg_color = 0x18181B;
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
@@ -48,8 +47,12 @@ int main() {
 
     u32 running = 1;
 
-    ColorContext frag_context = {
-        0xFF0000FF,
+    // ColorContext frag_context = {
+    //     0xFF777777,
+    // };
+
+    TextureContext frag_context = {
+        .texture = &model->material->map_Kd,
     };
 
     while (running) {
@@ -74,7 +77,7 @@ int main() {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
+        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
