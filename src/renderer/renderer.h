@@ -78,8 +78,9 @@ typedef void (*FragmentShader)(
 );
 typedef struct {
     u32 color;
-} ColorCtx;
+} ColorContext;
 void shader_frag_color(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer);
+void shader_frag_depth(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, f32* zbuffer, u32* framebuffer);
 
 Model* read_obj_model_file(Arena* arena, string8 filepath);
 
