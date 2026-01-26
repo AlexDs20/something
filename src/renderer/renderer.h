@@ -78,11 +78,14 @@ typedef void (*FragmentShader)(
     f32* zbuffer,
     u32* framebuffer
 );
+
 typedef struct {
     u32 color;
 } ColorContext;
+
 typedef struct {
     Image* texture;
+    u64 face_idx;
 } TextureContext;
 
 void shader_frag_color  (void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);

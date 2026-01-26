@@ -504,18 +504,28 @@ void shader_frag_texture(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y,
     // TextureContext* texture_context = ((TextureContex*)shader_ctx);
     // Check if ARGB ...
     // u32 color = texture_context[texture_x*texture_w + texture_y];
-    u32 color = 0xFF773377;
+    // u32 color = 0xFF773377;
+    u32 color = (0xFF << 24) | ((u8)(255*w0) << 16) | ((u8)(255*w1) << 8) | ((u8)(255*w2) << 0);
     Image* texture = ((TextureContext*)(shader_ctx))->texture;
     u32 texture_w = texture->width;
     u32 texture_y = texture->height;
 
-    framebuffer[y*w+x] = texture->data[y*texture_w+x];
+    // framebuffer[y*w+x] = texture->data[y*texture_w+x];
+    framebuffer[y*w+x] = color;
+}
+
+inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
+    return 0.5f * ( (by-ay) * (bx+ax) + (cy-by) * (cx+bx) + (ay-cy) * (ax+cx) );
 }
 
 
 void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    /*
+     * assert b->x <= c->x;
+     */
     f32 ay = a->y;
     f32 by = b->y;
+    f32 cy = c->y;
     f32 ax = a->x;
     f32 bx = b->x;
     f32 cx = c->x;
@@ -529,19 +539,11 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     f32 z_left_slope;
     f32 z_right_slope;
 
-    if (bx <= cx) {
-        ad_inv_slope = (bx - ax) * y_delta_inv;
-        ae_inv_slope = (cx - ax) * y_delta_inv;
+    ad_inv_slope = (bx - ax) * y_delta_inv;
+    ae_inv_slope = (cx - ax) * y_delta_inv;
 
-        z_left_slope  = (bz - az) * y_delta_inv;
-        z_right_slope = (cz - az) * y_delta_inv;
-    } else {
-        ad_inv_slope = (cx - ax) * y_delta_inv;
-        ae_inv_slope = (bx - ax) * y_delta_inv;
-
-        z_left_slope  = (cz - az) * y_delta_inv;
-        z_right_slope = (bz - az) * y_delta_inv;
-    }
+    z_left_slope  = (bz - az) * y_delta_inv;
+    z_right_slope = (cz - az) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
     u32 ye = by>h ? h : (u32)ceilf32(by);
@@ -552,6 +554,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     // z = A_z + (y-A_y) * (B_z-A_z)/(B_y-A_y)
     f32 zs = az + (ys - ay) * z_left_slope;
     f32 ze = az + (ys - ay) * z_right_slope;
+
+    f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
@@ -573,9 +577,12 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
             if (*zpix < z) {
                 *zpix = z;
                 u32* pixel = framebuffer + off;
-                f32 w0, w1, w2;
+                // Barycentric:
+                f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
+                f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
+                f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                frag_shader(shader_context, w0, w1, w2, x, y, w, h, zbuffer, framebuffer);
+                frag_shader(shader_context, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -587,6 +594,9 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
 }
 
 void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    /*
+     * assert a->x <= b->x
+     */
     f32 ay = a->y;
     f32 by = b->y;
     f32 cy = c->y;
@@ -608,27 +618,15 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
 
     f32 y_delta_inv = 1.0f / (cy - ay);
 
-    if (ax <= bx) {
-        dc_inv_slope = (cx - ax) * y_delta_inv;
-        ec_inv_slope = (cx - bx) * y_delta_inv;
-        dx = ax;
-        ex = bx;
-        dz = az;
-        ez = bz;
+    dc_inv_slope = (cx - ax) * y_delta_inv;
+    ec_inv_slope = (cx - bx) * y_delta_inv;
+    dx = ax;
+    ex = bx;
+    dz = az;
+    ez = bz;
 
-        z_left_slope  = (cz - az) * y_delta_inv;
-        z_right_slope = (cz - bz) * y_delta_inv;
-    } else {
-        dc_inv_slope = (cx - bx) * y_delta_inv;
-        ec_inv_slope = (cx - ax) * y_delta_inv;
-        dx = bx;
-        ex = ax;
-        dz = bz;
-        ez = az;
-
-        z_left_slope  = (cz - bz) * y_delta_inv;
-        z_right_slope = (cz - az) * y_delta_inv;
-    }
+    z_left_slope  = (cz - az) * y_delta_inv;
+    z_right_slope = (cz - bz) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
     u32 ye = cy>h ? h : (u32)ceilf32(cy);
@@ -639,6 +637,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
     // z = A_z + (y-A_y) * (B_z-A_z)/(B_y-A_y)
     f32 zs = dz + (ys - ay) * z_left_slope;
     f32 ze = ez + (ys - ay) * z_right_slope;
+
+    f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
@@ -659,11 +659,12 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
                 *zpix = z;
                 u32* pixel = framebuffer + off;
 
-                f32 w0 = 0;
-                f32 w1 = 0;
-                f32 w2 = 0;
+                // Barycentric
+                f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
+                f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
+                f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                frag_shader(shader_context, w0, w1, w2, x, y, w, h, zbuffer, framebuffer);
+                frag_shader(shader_context, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -743,11 +744,19 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
 
     // Lower half triangle
     if (b->y == c->y) {
-        fill_flat_top_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        if (b->x <= c->x) {
+            fill_flat_top_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        } else {
+            fill_flat_top_triangle(a, c, b, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        }
     }
     // Upper half triangle
     else if (a->y == b->y) {
-        fill_flat_bottom_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        if (a->x <= b->x) {
+            fill_flat_bottom_triangle(a, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        } else {
+            fill_flat_bottom_triangle(b, a, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        }
     }
     else {
         f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
@@ -763,10 +772,18 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
         };
 
         if (b->y > 0) {
-            fill_flat_top_triangle(a, b, &extra, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            if (b->x <= extra.x) {
+                fill_flat_top_triangle(a, b, &extra, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_top_triangle(a, &extra, b, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
         }
         if (b->y < h) {
-            fill_flat_bottom_triangle(&extra, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            if (extra.x <= b->x) {
+                fill_flat_bottom_triangle(&extra, b, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_bottom_triangle(b, &extra, c, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
         }
     }
 }

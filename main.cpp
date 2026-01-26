@@ -78,6 +78,7 @@ int main() {
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
