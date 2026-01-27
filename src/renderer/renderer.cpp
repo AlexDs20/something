@@ -488,19 +488,16 @@ static f32 ceilf32(f32 d) {
     }
 }
 
-void shader_frag_color(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
+void shader_frag_color(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
     framebuffer[y*w+x] = ((ColorContext*)shader_ctx)->color;
 }
 
-void shader_frag_depth(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
-    f32Bits c = {
-        // .f = -1234,         // depth
-        .u = 0xFF777777
-    };
-    framebuffer[y*w+x] = c.u;
+void shader_frag_depth(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
+    f32 depth = w0*a->z + w1*b->z + w2*c->z;
+    framebuffer[y*w+x] = (u32)(depth*128);
 }
 
-void shader_frag_texture(void* shader_ctx, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
+void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
     // TextureContext* texture_context = ((TextureContex*)shader_ctx);
     // Check if ARGB ...
     // u32 color = texture_context[texture_x*texture_w + texture_y];
@@ -582,7 +579,7 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                frag_shader(shader_context, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
+                frag_shader(shader_context, a, b, c, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -663,8 +660,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
                 f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
-                // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                frag_shader(shader_context, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
+                frag_shader(shader_context, a, b, c, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
