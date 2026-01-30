@@ -1983,7 +1983,7 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
 }
 
 ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
-    return decode_jpeg(persist_arena, data, out, true);
+    return decode_jpeg(persist_arena, data, out, false);
 }
 
 // TODO(alex): This should not use Arena and string8 but standard C types.

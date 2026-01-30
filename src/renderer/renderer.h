@@ -11,6 +11,12 @@ typedef struct {
 
 typedef struct {
     float u, v, w;
+    float nx, ny, nz;
+    // float r, g, b;
+} VertexAttrs;
+
+typedef struct {
+    float u, v, w;
 } TexCoord;
 
 typedef struct {
@@ -19,8 +25,6 @@ typedef struct {
 
 typedef struct {
     int v[3];
-    int vt[3];
-    int vn[3];
 } Face;
 
 typedef struct {
@@ -53,14 +57,15 @@ typedef struct {
 typedef struct {
     Material* material;             // TODO(alex): To change to a vector of materials
     Vector* vertices;
-    Vector* tex_coords;
-    Vector* normals;
+    Vector* vertex_attrs;
+    // Vector* tex_coords;
+    // Vector* normals;
     Vector* faces;
-    Vector* mat;
 } Model;
 
 // tmp?
 void print(Vertex* v);
+void print(VertexAttrs* va);
 void print(Normal* n);
 void print(TexCoord* t);
 void print(Face* t);
@@ -71,6 +76,9 @@ typedef void (*FragmentShader)(
     Vertex* a,
     Vertex* b,
     Vertex* c,
+    VertexAttrs* va,
+    VertexAttrs* vb,
+    VertexAttrs* vc,
     f32 w0,
     f32 w1,
     f32 w2,
@@ -91,9 +99,18 @@ typedef struct {
     u64 face_idx;
 } TextureContext;
 
-void shader_frag_color  (void* shader_ctx, Vertex* a, Vertex* b, Vertex* c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_depth  (void* shader_ctx, Vertex* a, Vertex* b, Vertex* c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c, f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
+void shader_frag_color  (void* shader_ctx,
+        Vertex* a, Vertex* b, Vertex* c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2,
+        u32 x, u32 y,
+        u32 w, u32 h, f32* zbuffer, u32* framebuffer);
+void shader_frag_depth  (void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
+void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
 
 Model* read_obj_model_file(Arena* arena, string8 filepath);
 
