@@ -48,6 +48,13 @@ u64 arena_alloc_used(Arena* arena) {
     return arena->top;
 }
 
+void* arena_alloc_used_location(Arena* arena) {
+    if (!arena || !arena->buffer) {
+        return nullptr;
+    }
+    return (void*) (arena->buffer + arena->top);
+}
+
 u64 arena_alloc_remaining(Arena* arena) {
     if (!arena || !arena->buffer) {
         return 0;
@@ -273,9 +280,9 @@ void arena_debug_print(Arena* arena) {
     if (!arena) return;
     printf("Arena Debug Info:\n");
     printf("  buffer:     %p\n", arena->buffer);
-    printf("  capacity:   %lu bytes\n", arena->capacity);
-    printf("  committed:  %lu bytes\n", arena->committed);
-    printf("  used:       %lu bytes\n", arena->top);
+    printf("  capacity:   %lu bytes   %p\n", arena->capacity, arena->buffer+arena->capacity);
+    printf("  committed:  %lu bytes   %p\n", arena->committed, arena->buffer+arena->committed);
+    printf("  used:       %lu bytes   %p\n", arena->top, arena->buffer+arena->top);
     printf("  free:       %lu bytes\n", arena->capacity - arena->top);
 }
 

@@ -16,7 +16,8 @@
 
 #include "gf_profiling.c"
 
-int main() {
+
+int main_main() {
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -81,7 +82,6 @@ int main() {
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
-        // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
     }
 
@@ -95,4 +95,186 @@ int main() {
         arena_alloc_free(frame_arena);
         arena_alloc_free(scene_arena);
     }
+}
+
+
+#include <stddef.h>
+
+typedef struct {
+    char* buffer;
+    size_t size;
+    size_t capacity;
+} String;
+
+String string_init_empty(Arena* arena, size_t capacity);
+String string_init(Arena* arena, const char* init);
+String string_init_concat(Arena* arena, const char* first, const char* second);
+// String string_init_from_fmt(Arena* arena, const char* fmt, ...);
+String string_init_from_buffer(Arena* arena, const char* buffer, size_t len);
+// int    string_append(Arena* arena, String* str, const char* post);
+int    string_append_len(Arena* arena, String* str, const char* buffer, size_t len);
+// int    string_append_char(Arena* arena, String* str, char c);
+// int    string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
+// int    string_prepend(Arena* arena, String* str, const char* pre);
+void   string_debug_print(String* string);
+
+
+int main() {
+    Arena* arena = arena_alloc_create(64);
+    arena_debug_print(arena);
+    // String s0 = string_init_empty(arena, 17);
+    // arena_debug_print(arena);
+    // string_debug_print(&s0);
+    // String s1 = string_init(arena, "Hellow there");
+    // printf("Size: %d\n", strlen("Hellow there"));
+    // arena_debug_print(arena);
+    // string_debug_print(&s1);
+    String s2 = string_init_from_buffer(arena, "Hellow I am there", 17);
+    printf("Size: %d\n", 17);
+    string_debug_print(&s2);
+    arena_debug_print(arena);
+    int s = string_append_len(arena, &s2, "This is me agaaaain there " , 26);
+    printf("Size: %d\n", 26);
+    string_debug_print(&s2);
+    arena_debug_print(arena);
+    printf("%s\n", s2.buffer);
+}
+
+#include <string.h>
+
+String string_init_empty(Arena* arena, size_t capacity) {
+    String str;
+
+    if (capacity <= 0) {
+        return (String){0};
+    }
+
+    str.buffer = (char*) arena_alloc_push_zero(arena, capacity);
+
+    if (str.buffer == NULL) {
+        return (String){0};
+    }
+
+    str.size = 0;
+    str.capacity = capacity;
+    str.buffer[0] = '\0';
+    return str;
+}
+
+String string_init(Arena* arena, const char* init) {
+    return string_init_from_buffer(arena, init, strlen(init));
+}
+
+String string_init_from_buffer(Arena* arena, const char* buffer, size_t len) {
+    String str;
+
+    if (buffer == NULL) {
+        return (String){0};
+    }
+
+    str.size = len;
+    str.capacity = str.size >= 16 ? (2*str.size)+1 : 16;
+
+    str.buffer = (char*) arena_alloc_push(arena, str.capacity);
+    if (str.buffer == NULL) {
+        return (String){0};
+    }
+    memcpy(str.buffer, buffer, len);
+    str.buffer[len] = '\0';
+
+    return str;
+}
+
+String string_init_concat(Arena* arena, const char* first, const char* second) {
+    String result;
+    size_t l1;
+    size_t l2;
+
+    if ((first == NULL) || (second == NULL)) {
+        return (String){0};
+    }
+
+    l1 = strlen(first);
+    l2 = strlen(second);
+
+    result = string_init_empty(arena, l1+l2+1);
+    if (result.buffer == NULL) {
+        return (String){0};
+    }
+    memcpy(result.buffer, first, l1);
+    memcpy(result.buffer+l1, second, l2);
+
+    result.size = l1+l2;
+    result.buffer[result.size] = '\0';
+    return result;
+}
+
+// String string_init_from_fmt(Arena* const char* fmt, ...) {
+// }
+
+int string_append_len(Arena* arena, String* str, const char* buffer, size_t len) {
+    char* arena_top;
+    char* string_end;
+    size_t new_size;
+    void* tmp;
+
+    if ((str == NULL) || buffer == NULL) {
+        return -1;
+    }
+
+    new_size = str->size + len;
+
+    // Need to "realloc"
+    if (new_size + 1 > str->capacity) {
+        size_t new_capacity = new_size >= 16 ? (2*new_size)+1 : 16;
+
+        arena_top = (char*)arena_alloc_used_location(arena);
+        if (arena_top == NULL) {
+            return -1;
+        }
+
+        // If our current string ends at the top of arena -> we are gucci!
+        // We just push onto the arena
+        string_end = str->buffer+str->capacity;
+        if (arena_top == string_end) {
+            size_t bytes_needed = (char*)(str->buffer + new_capacity) - (char*)arena_top;
+            tmp = arena_alloc_push_zero_unaligned(arena, bytes_needed);
+            if (tmp == NULL) {
+                return -1;
+            }
+        }
+        else {
+            tmp = arena_alloc_push(arena, new_capacity);
+            if (tmp == NULL) {
+                return -1;
+            }
+            if (str->buffer) {
+                memcpy(tmp, str->buffer, str->size);
+            }
+            str->buffer = (char*)tmp;
+        }
+        str->capacity = new_capacity;
+    }
+
+    memcpy(str->buffer+str->size, buffer, strlen(buffer) >= len ? len, strlen(buffer));
+    str->size = new_size;
+    str->buffer[new_size] = '\0';
+    return 0;
+}
+
+// static void grow_capacity();
+
+// int string_append(Arena* arena, String* str, const char* post) {
+//     // Check If this str has the capacity to append
+//     // If not => need to "realloc"
+//     // And append
+// }
+
+void string_debug_print(String* s) {
+    if ((s == NULL) || (s->buffer == NULL)) return;
+    printf("String Debug Info:\n");
+    printf("  buffer:     %p\n",             s->buffer);
+    printf("  used:       %lu bytes   %p\n", s->size, s->buffer+s->size+1);
+    printf("  capacity:   %lu bytes   %p\n", s->capacity, s->buffer+s->capacity);
+    printf("  free:       %lu bytes\n",      s->capacity - s->size - 1);
 }

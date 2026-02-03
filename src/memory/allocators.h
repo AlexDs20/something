@@ -20,6 +20,7 @@ typedef struct {
 Arena* arena_alloc_create(u64 capacity);
 Arena* arena_alloc_create_zero(u64 capacity);
 u64 arena_alloc_used(Arena* arena);
+void* arena_alloc_used_location(Arena* arena);
 u64 arena_alloc_remaining(Arena* arena);
 void* arena_alloc_get(Arena* arena, u64 pos);
 

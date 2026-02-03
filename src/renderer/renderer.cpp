@@ -317,8 +317,7 @@ void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
             continue;
         }
 
-        // h - y so that top left is 0, 0
-        u32 linear = (u32)(h-tmp.y)*w + (u32)tmp.x;
+        u32 linear = (u32)(tmp.y)*w + (u32)tmp.x;
         u32* pixel = framebuffer + linear;
         *pixel = c;
     }
@@ -539,6 +538,8 @@ void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
     // u32 color = (0xFF << 24) | ((u8)(255*u) << 16) | ((u8)(255*v) << 8) | ((u8)(255*w) << 0);
 
     Image* texture = ((TextureContext*)(shader_ctx))->texture;
+    // TODO: NEAREST or BILINEAR INTERP
+    //  LoD?
     u32 texture_x = (u32)(u * texture->width);
     u32 texture_y = (u32)(v * texture->height);
 
@@ -855,8 +856,6 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 }
 
 void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-    static bool swapper = false;
-
 #if 1
     f32 minx =  10000;
     f32 maxx = -10000;
@@ -926,5 +925,4 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }
-    swapper = !swapper;
 }
