@@ -109,13 +109,15 @@ typedef struct {
 String string_init_empty(Arena* arena, size_t capacity);
 String string_init(Arena* arena, const char* init);
 String string_init_concat(Arena* arena, const char* first, const char* second);
-// String string_init_from_fmt(Arena* arena, const char* fmt, ...);
+// String string_init_fmt(Arena* arena, const char* fmt, ...);
 String string_init_from_buffer(Arena* arena, const char* buffer, size_t len);
 // int    string_append(Arena* arena, String* str, const char* post);
 int    string_append_len(Arena* arena, String* str, const char* buffer, size_t len);
 // int    string_append_char(Arena* arena, String* str, char c);
 // int    string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
 // int    string_prepend(Arena* arena, String* str, const char* pre);
+// int    string_prepend_char(Arena* arena, String* str, char c);
+// int    string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
 void   string_debug_print(String* string);
 
 
@@ -141,6 +143,9 @@ int main() {
 }
 
 #include <string.h>
+static size_t get_new_capacity(size_t new_size) {
+    return new_size >= 16 ? (2*new_size)+1 : 16;
+}
 
 String string_init_empty(Arena* arena, size_t capacity) {
     String str;
@@ -173,7 +178,7 @@ String string_init_from_buffer(Arena* arena, const char* buffer, size_t len) {
     }
 
     str.size = len;
-    str.capacity = str.size >= 16 ? (2*str.size)+1 : 16;
+    str.capacity = get_new_capacity(str.size); // str.size >= 16 ? (2*str.size)+1 : 16;
 
     str.buffer = (char*) arena_alloc_push(arena, str.capacity);
     if (str.buffer == NULL) {
@@ -226,7 +231,7 @@ int string_append_len(Arena* arena, String* str, const char* buffer, size_t len)
 
     // Need to "realloc"
     if (new_size + 1 > str->capacity) {
-        size_t new_capacity = new_size >= 16 ? (2*new_size)+1 : 16;
+        size_t new_capacity = get_new_capacity(new_size); // new_size >= 16 ? (2*new_size)+1 : 16;
 
         arena_top = (char*)arena_alloc_used_location(arena);
         if (arena_top == NULL) {
@@ -256,13 +261,12 @@ int string_append_len(Arena* arena, String* str, const char* buffer, size_t len)
         str->capacity = new_capacity;
     }
 
-    memcpy(str->buffer+str->size, buffer, strlen(buffer) >= len ? len, strlen(buffer));
+    memcpy(str->buffer+str->size, buffer, strlen(buffer) >= len ? len : strlen(buffer));
     str->size = new_size;
     str->buffer[new_size] = '\0';
     return 0;
 }
 
-// static void grow_capacity();
 
 // int string_append(Arena* arena, String* str, const char* post) {
 //     // Check If this str has the capacity to append
