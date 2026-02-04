@@ -99,6 +99,7 @@ int main_main() {
 
 
 #include <stddef.h>
+#include "stdarg.h"     // for variadic number of args.
 
 typedef struct {
     char* buffer;
@@ -109,7 +110,7 @@ typedef struct {
 String string_init_empty(Arena* arena, size_t capacity);
 String string_init(Arena* arena, const char* init);
 String string_init_concat(Arena* arena, const char* first, const char* second);
-// String string_init_fmt(Arena* arena, const char* fmt, ...);
+String string_init_fmt(Arena* arena, const char* fmt, ...);
 String string_init_from_buffer(Arena* arena, const char* buffer, size_t len);
 int    string_append(Arena* arena, String* str, const char* post);
 int    string_append_len(Arena* arena, String* str, const char* buffer, size_t len);
@@ -147,6 +148,9 @@ int main() {
 
     s = string_prepend_char(arena, &s2, '?');
     printf("%s\n", s2.buffer);
+
+    String s3 = string_init_fmt(arena, "This is my string_init_fmt %d %.3f %s", 3, 3.14, "PI");
+    printf("%s\n", s3.buffer);
 }
 
 #include <string.h>
@@ -180,9 +184,9 @@ String string_init(Arena* arena, const char* init) {
 String string_init_from_buffer(Arena* arena, const char* buffer, size_t len) {
     String str;
 
-    if (buffer == NULL) {
-        return (String){0};
-    }
+    // if (buffer == NULL) {
+    //     return (String){0};
+    // }
 
     str.size = len;
     str.capacity = get_new_capacity(str.size);
@@ -191,7 +195,9 @@ String string_init_from_buffer(Arena* arena, const char* buffer, size_t len) {
     if (str.buffer == NULL) {
         return (String){0};
     }
-    memcpy(str.buffer, buffer, len);
+    if (buffer != NULL) {
+        memcpy(str.buffer, buffer, len);
+    }
     str.buffer[len] = '\0';
 
     return str;
@@ -221,8 +227,35 @@ String string_init_concat(Arena* arena, const char* first, const char* second) {
     return result;
 }
 
-// String string_init_from_fmt(Arena* const char* fmt, ...) {
-// }
+String string_init_fmt(Arena* arena, const char* fmt, ...) {
+    String str;
+
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
+    va_list ap;
+
+    // Sets ap to point before the first additional argument
+    va_start(ap, fmt);
+    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
+    // Fetch next additional argument
+    // const char* v = va_arg(ap, const char*);
+    va_end(ap);
+
+    if (n < 0) {
+        return (String){0};
+    }
+
+    size_t len = (size_t)n;
+
+    str = string_init_from_buffer(arena, NULL, len);
+    if (str.buffer == NULL) {
+        return (String){0};
+    }
+    va_start(ap, fmt);
+    vsnprintf(str.buffer, len+1, fmt, ap);
+    va_end(ap);
+
+    return str;
+}
 
 int string_append(Arena* arena, String* str, const char* post) {
     return string_append_len(arena, str, post, strlen(post));
