@@ -10,6 +10,10 @@ static size_t get_new_capacity(size_t new_size) {
     return new_size >= 16 ? (2*new_size)+1 : 16;
 }
 
+//==============================
+// STRING
+//==============================
+
 String string_init_empty(Arena* arena, size_t capacity) {
     String str;
 
@@ -29,11 +33,11 @@ String string_init_empty(Arena* arena, size_t capacity) {
     return str;
 }
 
-String string_init(Arena* arena, const char* init) {
-    return string_init_from_buffer(arena, init, strlen(init));
+String string_init_cstr(Arena* arena, const char* init) {
+    return string_init_buffer(arena, init, strlen(init));
 }
 
-String string_init_from_buffer(Arena* arena, const char* buffer, size_t len) {
+String string_init_buffer(Arena* arena, const char* buffer, size_t len) {
     String str;
 
     // if (buffer == NULL) {
@@ -98,7 +102,7 @@ String string_init_fmt(Arena* arena, const char* fmt, ...) {
 
     size_t len = (size_t)n;
 
-    str = string_init_from_buffer(arena, NULL, len);
+    str = string_init_buffer(arena, NULL, len);
     if (str.buffer == NULL) {
         return (String){0};
     }
@@ -109,11 +113,11 @@ String string_init_fmt(Arena* arena, const char* fmt, ...) {
     return str;
 }
 
-int string_append(Arena* arena, String* str, const char* post) {
-    return string_append_len(arena, str, post, strlen(post));
+int string_append_cstr(Arena* arena, String* str, const char* post) {
+    return string_append_buffer(arena, str, post, strlen(post));
 }
 
-int string_append_len(Arena* arena, String* str, const char* buffer, size_t len) {
+int string_append_buffer(Arena* arena, String* str, const char* buffer, size_t len) {
     char* arena_top;
     char* string_end;
     size_t new_size;
@@ -164,14 +168,14 @@ int string_append_len(Arena* arena, String* str, const char* buffer, size_t len)
 }
 
 int string_append_char(Arena* arena, String* str, char c) {
-    return string_append_len(arena, str, &c, 1);
+    return string_append_buffer(arena, str, &c, 1);
 }
 
-int string_prepend(Arena* arena, String* str, const char* buffer) {
-    return string_prepend_len(arena, str, buffer, strlen(buffer));
+int string_prepend_cstr(Arena* arena, String* str, const char* buffer) {
+    return string_prepend_buffer(arena, str, buffer, strlen(buffer));
 }
 
-int string_prepend_len(Arena* arena, String* str, const char* buffer, size_t len) {
+int string_prepend_buffer(Arena* arena, String* str, const char* buffer, size_t len) {
     size_t new_size;
     void* arena_top;
     void* tmp;
@@ -221,9 +225,8 @@ int string_prepend_len(Arena* arena, String* str, const char* buffer, size_t len
 }
 
 int string_prepend_char(Arena* arena, String* str, char c) {
-    return string_prepend_len(arena, str, &c, 1);
+    return string_prepend_buffer(arena, str, &c, 1);
 }
-
 
 void string_debug_print(String* s) {
     if ((s == NULL) || (s->buffer == NULL)) return;
@@ -232,4 +235,18 @@ void string_debug_print(String* s) {
     printf("  used:       %lu bytes   %p\n", s->size, s->buffer+s->size+1);
     printf("  capacity:   %lu bytes   %p\n", s->capacity, s->buffer+s->capacity);
     printf("  free:       %lu bytes\n",      s->capacity - s->size - 1);
+}
+
+//==============================
+// STRING VIEW
+//==============================
+
+StringView string_slice(String str, size_t start, size_t len) {
+    if (start + len > str.size) {
+        return (StringView){0};
+    }
+    return (StringView){
+        .buffer = str.buffer + start,
+        .size = len,
+    };
 }

@@ -14,10 +14,13 @@
 #include "utils/io.h"
 #include "platform/memory.h"
 
+#include "libs/ads_string.h"
+
 #include "gf_profiling.c"
 
 
-int main_main() {
+#if 0
+int main() {
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -96,29 +99,28 @@ int main_main() {
         arena_alloc_free(scene_arena);
     }
 }
-
-#include "libs/ads_string.h"
+#else
 int main() {
     Arena* arena = arena_alloc_create(64);
     arena_debug_print(arena);
     String s0 = string_init_empty(arena, 17);
-    String s1 = string_init(arena, "Hello world s1");
+    String s1 = string_init_cstr(arena, "Hello world s1");
     printf("S1: %s\n", s1.buffer);
 
-    String s2 = string_init_from_buffer(arena, "Init from buffer", strlen("Init from buffer"));
+    String s2 = string_init_buffer(arena, "Init from buffer", strlen("Init from buffer"));
 
-    int s = string_append_len(arena, &s2, " !Append_len! " , 14);
+    int s = string_append_buffer(arena, &s2, " !Append_buffer! " , 14);
     printf("%s\n", s2.buffer);
-    s = string_append(arena, &s2, " !append! ");
+    s = string_append_cstr(arena, &s2, " !append! ");
     printf("%s\n", s2.buffer);
 
     s = string_append_char(arena, &s2, '=');
     printf("%s\n", s2.buffer);
 
-    s = string_prepend_len(arena, &s2, "!prepend_len! ", strlen("!prepend_len! "));
+    s = string_prepend_buffer(arena, &s2, "!prepend_buffer! ", strlen("!prepend_buffer! "));
     printf("%s\n", s2.buffer);
 
-    s = string_prepend(arena, &s2, "!prepend! ");
+    s = string_prepend_cstr(arena, &s2, "!prepend! ");
     printf("%s\n", s2.buffer);
 
     s = string_prepend_char(arena, &s2, '?');
@@ -127,3 +129,4 @@ int main() {
     String s3 = string_init_fmt(arena, "This is my string_init_fmt %d %.3f %s", 3, 3.14, "PI");
     printf("%s\n", s3.buffer);
 }
+#endif
