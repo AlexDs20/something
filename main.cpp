@@ -103,6 +103,11 @@ int main_main() {
 
 typedef struct {
     char* buffer;
+    size_t len;
+} StringView;
+
+typedef struct {
+    char* buffer;
     size_t size;
     size_t capacity;
 } String;
@@ -122,6 +127,12 @@ int    string_prepend_char(Arena* arena, String* str, char c);
 // int    string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
 void   string_debug_print(String* string);
 
+String string_copy_slice(Arena* arena, String* str, size_t start, size_t len);
+
+StringView string_slice(String str, size_t start, size_t len);
+StringView string_to_sv(String str);
+StringView sv_from_string(String str);
+StringView sv_from_cstr(const char* cstr);
 
 int main() {
     Arena* arena = arena_alloc_create(64);
