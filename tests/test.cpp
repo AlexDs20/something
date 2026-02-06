@@ -1,38 +1,46 @@
 #include <stdio.h>
 #include <time.h>
 #include "tests/macros.h"
-#include "tests/decode_jpeg.h"
+#include "tests/test_decode_jpeg.h"
+#include "tests/test_ads_string.h"
 
-typedef struct test_entry test_entry;
-struct test_entry {
+typedef struct {
     char* name;
     int (*function)(void);
-};
+} test_entry;
 
 test_entry tests[] = {
-    // {"JPEG_progressive_rgb", test_read_progressive_rgb},
-    // {"JPEG_baseline_gray", test_read_baseline_gray},
     // {"JPEG_baseline_rgb", test_read_baseline_rgb},
-    // {"JPEG_baseline_other3", test_read_baseline_other3},
-    {"JPEG_progressive_other3", test_read_progressive_other3},
-    {"JPEG_progressive_test5", test_read_progressive_test5},
-    {"JPEG_progressive_test11", test_read_progressive_test11},
-    {"JPEG_progressive_test12", test_read_progressive_test12},
-    // {"JPEG_progressive_failing_other3", test_read_progressing_failing_other3},
+    // {"JPEG_baseline_gray", test_read_baseline_gray},
+    // {"JPEG_baseline_gray_2", test_read_baseline_gray_2},
+
+    {"test_string_init_empty", test_string_init_empty},
+    {"test_string_init_cstr", test_string_init_cstr},
+    {"test_string_init_buffer", test_string_init_buffer},
+    {"test_string_init_concat", test_string_init_concat},
+    {"test_string_init_fmt", test_string_init_fmt},
+    {"test_string_init_sv", test_string_init_sv},
+
+    {"test_string_append_fmt", test_string_append_fmt},
+    {"test_string_prepend_fmt", test_string_prepend_fmt},
+
+    // {"test_string_insert_buffer", test_string_insert_buffer},
+    {"test_string_insert_fmt", test_string_insert_fmt},
 };
 
 int main() {
     int failed = 0;
 
     for (int i=0; i<ARRAY_SIZE(tests); i++) {
-        printf("%s started (%d/%d)", tests[i].name, i, ARRAY_SIZE(tests));
+        printf("%s started (%d/%d)", tests[i].name, i+1, ARRAY_SIZE(tests));
         clock_t start = clock();
         int r = tests[i].function();
+        arena_alloc_reset(arena);
         clock_t stop = clock();
         printf(" (%.4fs) ", (double)(stop - start) / CLOCKS_PER_SEC);
         if (r!=0) {
             failed++;
-            printf("\tFailed");
+            printf("\tFailed at line: %d\n", r);
         }
         printf("\n");
     }
