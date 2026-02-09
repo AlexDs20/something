@@ -24,26 +24,26 @@ String  string_init_sv(Arena* arena, StringView sv);
 const char* string_as_cstr(const String* str);
 int     string_grow_capacity(Arena* arena, String* str, size_t amount);
 
-int     string_append_sv(Arena* arena, String* str, StringView append);
 int     string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
+int     string_append_sv(Arena* arena, String* str, StringView append);
 #define string_append_string(arena, str, str_p_append)      string_append_sv(arena, str, sv_from_string(*(str_p_append)))
 #define string_append_cstr(arena, str, cstr_append)         string_append_sv(arena, str, sv_from_cstr(cstr_append))
 #define string_append_buffer(arena, str, buf_append, len)   string_append_sv(arena, str, sv_from_buffer(buf_append, len))
 #define string_append_char(arena, str, c)                   do { char t=c; string_append_sv(arena, str, sv_from_char(t)); } while (0)
 
-int     string_prepend_sv(Arena* arena, String* str, StringView pre);
 int     string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
+int     string_prepend_sv(Arena* arena, String* str, StringView pre);
 #define string_prepend_string(arena, str, str_p_pre)        string_prepend_sv(arena, str, sv_from_string(*(str_p_pre)))
 #define string_prepend_cstr(arena, str, cstr_pre)           string_prepend_sv(arena, str, sv_from_cstr(cstr_pre))
 #define string_prepend_buffer(arena, str, buf_pre, len)     string_prepend_sv(arena, str, sv_from_buffer(buf_pre, len))
 #define string_prepend_char(arena, str, c)                  do { char t=c; string_prepend_sv(arena, str, sv_from_char(t)); } while (0)
 
-int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
-int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
-int    string_insert_string(Arena* arena, String* str, size_t pos, const String* ins);
 int    string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
-int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
 int    string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
+int    string_insert_string(Arena* arena, String* str, size_t pos, const String* ins);
+int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
+int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
+int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
 
 /**
  * The overwrite functions allow for growth and thus include an arena because if we overwrite beyond the string capacity we need to maybe "realloc"

@@ -125,26 +125,41 @@ int test_string_grow_capacity(void) {
     size_t init_size = s.size;
     size_t init_capacity = s.capacity;
     size_t amount = 2;
-    string_grow_capacity(arena, &s, amount);
+    int r = string_grow_capacity(arena, &s, amount);
 
+    ASSERT_EQ(r, 0);
     ASSERT_EQ(s.capacity,   init_capacity+amount);
 
 
     s = string_init_cstr(arena, cstr);
     amount = 100;
-    string_grow_capacity(arena, &s, amount);
+    r = string_grow_capacity(arena, &s, amount);
+    ASSERT_EQ(r, 0);
     ASSERT_EQ(s.capacity,   init_capacity+amount);
     ASSERT_EQ(s.size,       init_size);
     return 0;
 }
 
-
 int test_string_append_fmt(void) {
     const char* cstr =  "This is test_string_append_fmt";
     String s1 = string_init_cstr(arena, cstr);
     const char* post =  "APPENDING WITH A ! in the end!";
-    string_append_fmt(arena, &s1, "%s", post);
-    string_print(&s1);
+    int r = string_append_fmt(arena, &s1, "%s", post);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(post));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(post));
+
+    //------------------------------
+    s1 = string_init_cstr(arena, cstr);
+    r = string_append_fmt(arena, &s1, NULL);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr));
+    ASSERT_GE(s1.capacity,  strlen(cstr));
+
     return 0;
 }
 
@@ -152,36 +167,52 @@ int test_string_append_sv(void) {
     const char* cstr =  "This is test_string_append_sv";
     String s1 = string_init_cstr(arena, cstr);
     const char* post =  " APPENDING 1! in the end!";
-    string_append_sv(arena, &s1, sv_from_cstr(post));
+    StringView sv1 = sv_from_cstr(post);
+    int r = string_append_sv(arena, &s1, sv1);
 
+    ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
-    ASSERT_EQ(s1.size, strlen(cstr)+strlen(post));
-    ASSERT_GE(s1.capacity, strlen(cstr)+strlen(post));
+    ASSERT_EQ(s1.size, strlen(cstr)+sv1.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv1.size);
 
     //------------------------------
 
     s1 = string_init_cstr(arena, cstr);
-
     const char* post2 =  " APPENDING VERY MUCH STUFF IN THE END TO ABOVE THE CAPACITY WITH A ! in the end!";
-    string_append_sv(arena, &s1, sv_from_cstr(post2));
+    StringView sv2 = sv_from_cstr(post2);
+    r = string_append_sv(arena, &s1, sv2);
 
+    ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
-    ASSERT_EQ(s1.size, strlen(cstr)+strlen(post2));
-    ASSERT_GE(s1.capacity, strlen(cstr)+strlen(post2));
+    ASSERT_EQ(s1.size, strlen(cstr)+sv2.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv2.size);
 
     //------------------------------
 
     s1 = string_init_cstr(arena, cstr);
     arena_alloc_push(arena, 42);
+    r = string_append_sv(arena, &s1, sv2);
 
-    string_append_sv(arena, &s1, sv_from_cstr(post2));
-
+    ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
-    ASSERT_EQ(s1.size, strlen(cstr)+strlen(post2));
-    ASSERT_GE(s1.capacity, strlen(cstr)+strlen(post2));
+    ASSERT_EQ(s1.size, strlen(cstr)+sv2.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv2.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    StringView sv3 = {.buffer=NULL, .size=0};
+    r = string_append_sv(arena, &s1, sv3);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr));
+    ASSERT_GE(s1.capacity, strlen(cstr));
+
     return 0;
 }
 
+/*
 int test_string_append_string(void) {
     const char* cstr =  "This is test_string_append_string";
     String s1 = string_init_cstr(arena, cstr);
@@ -296,22 +327,108 @@ int test_string_append_char(void) {
     ASSERT_GE(s1.capacity, strlen(cstr)+1);
     return 0;
 }
+*/
 
 int test_string_prepend_fmt(void) {
-    const char* cstr =  "This is test_string_prepend_fmt";
+    const char* cstr =  "This is test_string_prepend_fmt\n";
     String s1 = string_init_cstr(arena, cstr);
-    const char* pre =  "PREPENDING THIS ";
-    string_prepend_fmt(arena, &s1, "%s", pre);
+    const char* pre =  "PREPENDING WITH A ! in the end!";
+    int r = string_prepend_fmt(arena, &s1, "%s", pre);
+
     string_print(&s1);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(pre));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_prepend_fmt(arena, &s1, NULL);
+    string_print(&s1);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr));
+    ASSERT_GE(s1.capacity,  strlen(cstr));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    const char* pre_long =  "THIS IS A VERY LONG THING I WANT TO PREPEND TO HAVE TO INCREASE THE CAPACITY! ";
+    r = string_prepend_fmt(arena, &s1, "%s", pre_long);
+
+    string_print(&s1);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(pre_long));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    r = string_prepend_fmt(arena, &s1, "%s", pre_long);
+
+    string_print(&s1);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(pre_long));
+
     return 0;
 }
 
 int test_string_prepend_sv(void) {
-    const char* cstr = "This is test_string_prepend_sv";
-    String s = string_init_cstr(arena, cstr);
+    const char* cstr =  "This is test_string_prepend_sv";
+    String s1 = string_init_cstr(arena, cstr);
+    const char* pre =  "PREPENDING 1! in the end!";
+    StringView sv1 = sv_from_cstr(pre);
+    int r = string_prepend_sv(arena, &s1, sv1);
 
-    int r = string_prepend_sv(arena, &s, sv_from_cstr("Prepending to: "));
-    string_print(&s);
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr)+sv1.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv1.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    const char* pre2 =  "PREPENDING VERY MUCH STUFF IN THE END TO ABOVE THE CAPACITY WITH A ! in the end!";
+    StringView sv2 = sv_from_cstr(pre2);
+    r = string_prepend_sv(arena, &s1, sv2);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr)+sv2.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv2.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    r = string_prepend_sv(arena, &s1, sv2);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr)+sv2.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv2.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    StringView sv3 = {.buffer=NULL, .size=0};
+    r = string_prepend_sv(arena, &s1, sv3);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr));
+    ASSERT_GE(s1.capacity, strlen(cstr));
+
+    return 0;
 }
 
 int test_string_insert_buffer() {

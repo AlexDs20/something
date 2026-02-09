@@ -86,6 +86,38 @@ const char* string_as_cstr(const String* str) {
     return str->buffer;
 }
 
+int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
+    va_list ap;
+    if (str == NULL || str->buffer == NULL || fmt == NULL) {
+        return -1;
+    }
+
+    // Sets ap to point before the first additional argument
+    va_start(ap, fmt);
+    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
+    va_end(ap);
+
+    if (n < 0) {
+        return -1;
+    }
+
+    size_t len = (size_t)n;
+
+    if (str->size+1+len > str->capacity) {
+        int fail = string_grow_capacity(arena, str, len);
+        if (fail) {
+            return fail;
+        }
+    }
+
+    va_start(ap, fmt);
+    vsnprintf(str->buffer+str->size, len+1, fmt, ap);
+    va_end(ap);
+    str->size += len;
+    return 0;
+}
+
 // TODO(alex): Check whether the StringView overlaps the str! in that case use memmove and not memcopy
 int string_append_sv(Arena* arena, String* str, StringView append) {
     char* arena_top;
@@ -137,39 +169,15 @@ int string_append_sv(Arena* arena, String* str, StringView append) {
     return 0;
 }
 
-int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
-    va_list ap;
-
-    // Sets ap to point before the first additional argument
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
-    va_end(ap);
-
-    if (n < 0) {
+int string_grow_capacity(Arena* arena, String* str, size_t amount) {
+    if (str == NULL || str->buffer == NULL) {
         return -1;
     }
 
-    size_t len = (size_t)n;
-
-    if (str->size+1+len > str->capacity) {
-        int fail = string_grow_capacity(arena, str, len);
-        if (fail) {
-            return fail;
-        }
-    }
-
-    va_start(ap, fmt);
-    vsnprintf(str->buffer+str->size, len+1, fmt, ap);
-    va_end(ap);
-    str->size += len;
-    return 0;
-}
-
-int string_grow_capacity(Arena* arena, String* str, size_t amount) {
-    if (str == NULL || str->buffer == NULL) return -1;
-
     char* arena_top = (char*)arena_alloc_used_location(arena);
+    if (arena_top == NULL) {
+        return -1;
+    }
     if (arena_top == str->buffer + str->capacity) {
         void* tmp = arena_alloc_push_unaligned(arena, amount);
         if (tmp == NULL) return -1;
@@ -187,16 +195,60 @@ int string_grow_capacity(Arena* arena, String* str, size_t amount) {
     return 0;
 }
 
+int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
+    va_list ap;
+    if (str == NULL || str->buffer == NULL || fmt == NULL) {
+        return -1;
+    }
+
+    va_start(ap, fmt);
+    int n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    if (n<0) {
+        return -1;
+    }
+
+    size_t len = (size_t) n;
+
+    const char save_char = str->buffer[0];
+
+    if (str->size+1+len > str->capacity) {
+        size_t new_capacity = get_new_capacity(str->size+len);
+        const char* arena_top = (char*)arena_alloc_used_location(arena);
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) return -1;
+            memmove(str->buffer+len, str->buffer, str->size+1);
+        }
+        else {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) return -1;
+            memcpy(t+len, str->buffer, str->size+1);
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
+    }
+    else {
+        memmove(str->buffer+len, str->buffer, str->size+1);
+    }
+
+    va_start(ap, fmt);
+    vsnprintf(str->buffer, len+1, fmt, ap);
+    va_end(ap);
+
+    str->buffer[len] = save_char;
+    str->size += len;
+    return 0;
+}
+
 // TODO(alex): Handle if the StringView is in the current string!!
 int string_prepend_sv(Arena* arena, String* str, StringView pre) {
     size_t new_size;
     char* arena_top;
-    void* tmp;
+    char* tmp;
 
-    if ((str == NULL) || (str->buffer == NULL)) {
-        return -1;
-    }
-    if (pre.buffer == NULL) {
+    if ((str == NULL) || (str->buffer == NULL) || (pre.buffer == NULL)) {
         return -1;
     }
 
@@ -211,22 +263,21 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
             return -1;
         }
 
-        // If our string is already the last one in the arena, then we can keep on working on this one
         if (arena_top == str->buffer + str->capacity) {
             size_t bytes_needed = new_capacity - str->capacity;
-            tmp = arena_alloc_push_unaligned(arena, bytes_needed);
+            tmp = (char*)arena_alloc_push_unaligned(arena, bytes_needed);
             if (tmp == NULL) {
                 return -1;
             }
             memmove(str->buffer+pre.size, str->buffer, str->size+1);
         }
         else {
-            tmp = arena_alloc_push(arena, new_capacity);
+            tmp = (char*)arena_alloc_push(arena, new_capacity);
             if (tmp == NULL) {
                 return -1;
             }
-            memcpy((char*)tmp+pre.size, str->buffer, str->size+1);
-            str->buffer = (char*)tmp;
+            memcpy(tmp+pre.size, str->buffer, str->size+1);
+            str->buffer = tmp;
         }
         str->capacity = new_capacity;
     }
@@ -234,44 +285,8 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
         memmove(str->buffer+pre.size, str->buffer, str->size+1);
     }
 
-    // TODO(alex): Check if SV is within the original string here!
     memcpy(str->buffer, pre.buffer, pre.size);
     str->size = new_size;
-    return 0;
-}
-
-int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
-    va_list ap;
-    if (str == NULL || str->buffer == NULL) return -1;
-    if (fmt == NULL) return -1;
-
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
-
-    if (n<0) {
-        return -1;
-    }
-
-    size_t len = (size_t) n;
-
-    if (str->size+1+len > str->capacity) {
-        // TODO: Make this better because this may already make a copy if not on top of arena
-        int fail = string_grow_capacity(arena, str, len);
-        if (fail) {
-            return -1;
-        }
-    }
-
-    const char save_char = str->buffer[0];
-    memmove(str->buffer+len, str->buffer, str->size+1);
-
-    va_start(ap, fmt);
-    vsnprintf(str->buffer, len+1, fmt, ap);
-    va_end(ap);
-
-    str->buffer[len] = save_char;
-    str->size += len;
     return 0;
 }
 
