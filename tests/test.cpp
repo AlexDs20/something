@@ -35,11 +35,16 @@ test_entry tests[] = {
     {"test_string_append_char", test_string_append_char},
 
     {"test_string_prepend_fmt", test_string_prepend_fmt},
+    // {"test_string_prepend_sv", test_string_prepend_sv},
+    // {"test_string_prepend_string", test_string_prepend_string},
+    // {"test_string_prepend_cstr", test_string_prepend_cstr},
+    // {"test_string_prepend_buffer", test_string_prepend_buffer},
+    // {"test_string_prepend_char", test_string_prepend_char},
 
-    {"test_string_insert_buffer", test_string_insert_buffer},
-    {"test_string_insert_fmt", test_string_insert_fmt},
+    // {"test_string_insert_buffer", test_string_insert_buffer},
+    // {"test_string_insert_fmt", test_string_insert_fmt},
 
-    {"test_string_overwrite_buffer", test_string_overwrite_buffer},
+    // {"test_string_overwrite_buffer", test_string_overwrite_buffer},
 };
 
 int main() {

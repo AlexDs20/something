@@ -86,32 +86,6 @@ const char* string_as_cstr(const String* str) {
     return str->buffer;
 }
 
-int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
-    va_list ap;
-
-    // Sets ap to point before the first additional argument
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
-    va_end(ap);
-
-    if (n < 0) {
-        return -1;
-    }
-
-    size_t len = (size_t)n;
-
-    int fail = string_append_buffer(arena, str, NULL, len);
-    if (fail) {
-        return fail;
-    }
-
-    va_start(ap, fmt);
-    vsnprintf(str->buffer, len+1, fmt, ap);
-    va_end(ap);
-    return 0;
-}
-
 // TODO(alex): Check whether the StringView overlaps the str! in that case use memmove and not memcopy
 int string_append_sv(Arena* arena, String* str, StringView append) {
     char* arena_top;
@@ -163,6 +137,35 @@ int string_append_sv(Arena* arena, String* str, StringView append) {
     return 0;
 }
 
+int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
+    va_list ap;
+
+    // Sets ap to point before the first additional argument
+    va_start(ap, fmt);
+    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
+    va_end(ap);
+
+    if (n < 0) {
+        return -1;
+    }
+
+    size_t len = (size_t)n;
+
+    if (str->size+1+len > str->capacity) {
+        int fail = string_grow_capacity(arena, str, len);
+        if (fail) {
+            return fail;
+        }
+    }
+
+    va_start(ap, fmt);
+    vsnprintf(str->buffer+str->size, len+1, fmt, ap);
+    va_end(ap);
+    str->size += len;
+    return 0;
+}
+
 int string_grow_capacity(Arena* arena, String* str, size_t amount) {
     if (str == NULL || str->buffer == NULL) return -1;
 
@@ -184,75 +187,63 @@ int string_grow_capacity(Arena* arena, String* str, size_t amount) {
     return 0;
 }
 
-int string_prepend_buffer(Arena* arena, String* str, const char* buffer, size_t len) {
+// TODO(alex): Handle if the StringView is in the current string!!
+int string_prepend_sv(Arena* arena, String* str, StringView pre) {
     size_t new_size;
-    void* arena_top;
+    char* arena_top;
     void* tmp;
 
-    if (str == NULL) {
+    if ((str == NULL) || (str->buffer == NULL)) {
+        return -1;
+    }
+    if (pre.buffer == NULL) {
         return -1;
     }
 
-    new_size = str->size + len;
+    new_size = str->size + pre.size;
 
     // Need to realloc
     if (new_size + 1 > str->capacity) {
         size_t new_capacity = get_new_capacity(new_size);
 
-        arena_top = arena_alloc_used_location(arena);
+        arena_top = (char*)arena_alloc_used_location(arena);
         if (arena_top == NULL) {
             return -1;
         }
 
-        void* string_end = str->buffer + str->capacity;
         // If our string is already the last one in the arena, then we can keep on working on this one
-        if (arena_top == string_end) {
-            size_t bytes_needed = (char*)(str->buffer + new_capacity) - (char*)arena_top;
-            tmp = arena_alloc_push_zero_unaligned(arena, bytes_needed);
+        if (arena_top == str->buffer + str->capacity) {
+            size_t bytes_needed = new_capacity - str->capacity;
+            tmp = arena_alloc_push_unaligned(arena, bytes_needed);
             if (tmp == NULL) {
                 return -1;
             }
-            memmove(str->buffer+len, str->buffer, str->size+1);
+            memmove(str->buffer+pre.size, str->buffer, str->size+1);
         }
         else {
             tmp = arena_alloc_push(arena, new_capacity);
             if (tmp == NULL) {
                 return -1;
             }
-            memcpy((char*)tmp+len, str->buffer, str->size+1);
+            memcpy((char*)tmp+pre.size, str->buffer, str->size+1);
             str->buffer = (char*)tmp;
         }
         str->capacity = new_capacity;
     }
     else {
-        memmove(str->buffer+len, str->buffer, str->size+1);
+        memmove(str->buffer+pre.size, str->buffer, str->size+1);
     }
 
-    if (buffer) {
-        memcpy(str->buffer, buffer, len);
-    }
+    // TODO(alex): Check if SV is within the original string here!
+    memcpy(str->buffer, pre.buffer, pre.size);
     str->size = new_size;
     return 0;
 }
 
-int string_prepend_cstr(Arena* arena, String* str, const char* buffer) {
-    return string_prepend_buffer(arena, str, buffer, strlen(buffer));
-}
-
-int string_prepend_string(Arena* arena, String* str, const String* pre) {
-    return string_prepend_buffer(arena, str, pre->buffer, pre->size);
-}
-
-int string_prepend_sv(Arena* arena, String* str, StringView pre) {
-    return string_prepend_buffer(arena, str, pre.buffer, pre.size);
-}
-
-int string_prepend_char(Arena* arena, String* str, char c) {
-    return string_prepend_buffer(arena, str, &c, 1);
-}
-
 int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
     va_list ap;
+    if (str == NULL || str->buffer == NULL) return -1;
+    if (fmt == NULL) return -1;
 
     va_start(ap, fmt);
     int n = vsnprintf(NULL, 0, fmt, ap);
@@ -263,17 +254,33 @@ int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
     }
 
     size_t len = (size_t) n;
-    int fail = string_prepend_buffer(arena, str, NULL, len);
-    if (fail) {
-        return fail;
+
+    if (str->size+1+len > str->capacity) {
+        // TODO: Make this better because this may already make a copy if not on top of arena
+        int fail = string_grow_capacity(arena, str, len);
+        if (fail) {
+            return -1;
+        }
     }
 
-    const char save_char = str->buffer[len];
+    const char save_char = str->buffer[0];
+    memmove(str->buffer+len, str->buffer, str->size+1);
+
     va_start(ap, fmt);
     vsnprintf(str->buffer, len+1, fmt, ap);
-    str->buffer[len] = save_char;
     va_end(ap);
+
+    str->buffer[len] = save_char;
+    str->size += len;
     return 0;
+}
+
+// TODO(alex): Handle if StringView intersect the String
+int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
+    if (ins.buffer) {
+        return -1;
+    }
+    return string_insert_buffer(arena, str, pos, ins.buffer, ins.size);
 }
 
 int string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len) {
@@ -349,13 +356,6 @@ int string_insert_string(Arena* arena, String* str, size_t pos, const String* in
         return -1;
     }
     return string_insert_buffer(arena, str, pos, ins->buffer, ins->size);
-}
-
-int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
-    if (ins.buffer) {
-        return -1;
-    }
-    return string_insert_buffer(arena, str, pos, ins.buffer, ins.size);
 }
 
 int string_insert_char(Arena* arena, String* str, size_t pos, char c) {

@@ -124,8 +124,7 @@ int test_string_grow_capacity(void) {
     String s = string_init_cstr(arena, cstr);
     size_t init_size = s.size;
     size_t init_capacity = s.capacity;
-    char* buf =
-    int amount = 2;
+    size_t amount = 2;
     string_grow_capacity(arena, &s, amount);
 
     ASSERT_EQ(s.capacity,   init_capacity+amount);
@@ -145,6 +144,7 @@ int test_string_append_fmt(void) {
     String s1 = string_init_cstr(arena, cstr);
     const char* post =  "APPENDING WITH A ! in the end!";
     string_append_fmt(arena, &s1, "%s", post);
+    string_print(&s1);
     return 0;
 }
 
@@ -302,7 +302,16 @@ int test_string_prepend_fmt(void) {
     String s1 = string_init_cstr(arena, cstr);
     const char* pre =  "PREPENDING THIS ";
     string_prepend_fmt(arena, &s1, "%s", pre);
+    string_print(&s1);
     return 0;
+}
+
+int test_string_prepend_sv(void) {
+    const char* cstr = "This is test_string_prepend_sv";
+    String s = string_init_cstr(arena, cstr);
+
+    int r = string_prepend_sv(arena, &s, sv_from_cstr("Prepending to: "));
+    string_print(&s);
 }
 
 int test_string_insert_buffer() {
