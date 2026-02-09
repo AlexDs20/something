@@ -1,5 +1,6 @@
 #ifndef _ADS_STRING_H_
 #define _ADS_STRING_H_
+#include <stdarg.h>     // for variadic number of args.
 
 typedef struct {
     const char* buffer;
@@ -25,6 +26,7 @@ const char* string_as_cstr(const String* str);
 int     string_grow_capacity(Arena* arena, String* str, size_t amount);
 
 int     string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
+int     string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args);
 int     string_append_sv(Arena* arena, String* str, StringView append);
 #define string_append_string(arena, str, str_p_append)      string_append_sv(arena, str, sv_from_string(*(str_p_append)))
 #define string_append_cstr(arena, str, cstr_append)         string_append_sv(arena, str, sv_from_cstr(cstr_append))
@@ -32,6 +34,7 @@ int     string_append_sv(Arena* arena, String* str, StringView append);
 #define string_append_char(arena, str, c)                   do { char t=c; string_append_sv(arena, str, sv_from_char(t)); } while (0)
 
 int     string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
+int     string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args);
 int     string_prepend_sv(Arena* arena, String* str, StringView pre);
 #define string_prepend_string(arena, str, str_p_pre)        string_prepend_sv(arena, str, sv_from_string(*(str_p_pre)))
 #define string_prepend_cstr(arena, str, cstr_pre)           string_prepend_sv(arena, str, sv_from_cstr(cstr_pre))

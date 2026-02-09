@@ -1,5 +1,4 @@
 #include <stddef.h>
-#include <stdarg.h>     // for variadic number of args.
 #include <string.h>
 #include <stdio.h>
 
@@ -87,16 +86,26 @@ const char* string_as_cstr(const String* str) {
 }
 
 int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
     va_list ap;
+    va_start(ap, fmt);
+    int r = string_append_vfmt(arena, str, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args){
+    va_list args2;
+    va_copy(args2, args);
+
+    //==================================================
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
     if (str == NULL || str->buffer == NULL || fmt == NULL) {
         return -1;
     }
 
     // Sets ap to point before the first additional argument
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);        // Return the "written" size without '\0'
-    va_end(ap);
+    int n = vsnprintf(NULL, 0, fmt, args2);        // Return the "written" size without '\0'
+    va_end(args2);
 
     if (n < 0) {
         return -1;
@@ -111,10 +120,12 @@ int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
         }
     }
 
-    va_start(ap, fmt);
-    vsnprintf(str->buffer+str->size, len+1, fmt, ap);
-    va_end(ap);
+    va_copy(args2, args);
+    vsnprintf(str->buffer+str->size, len+1, fmt, args2);
+    va_end(args2);
     str->size += len;
+    //==================================================
+
     return 0;
 }
 
@@ -197,13 +208,23 @@ int string_grow_capacity(Arena* arena, String* str, size_t amount) {
 
 int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
     va_list ap;
+    va_start(ap, fmt);
+    int r = string_prepend_vfmt(arena, str, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args) {
+    va_list args2;
+    va_copy(args2, args);
+
+    //==============================
     if (str == NULL || str->buffer == NULL || fmt == NULL) {
         return -1;
     }
 
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
+    int n = vsnprintf(NULL, 0, fmt, args2);
+    va_end(args2);
 
     if (n<0) {
         return -1;
@@ -233,12 +254,13 @@ int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
         memmove(str->buffer+len, str->buffer, str->size+1);
     }
 
-    va_start(ap, fmt);
-    vsnprintf(str->buffer, len+1, fmt, ap);
-    va_end(ap);
+    va_copy(args2, args);
+    vsnprintf(str->buffer, len+1, fmt, args2);
+    va_end(args2);
 
     str->buffer[len] = save_char;
     str->size += len;
+    //==============================
     return 0;
 }
 
@@ -297,14 +319,18 @@ int string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ..
         return -1;
     }
 
-    // TODO(alex): handle va_list
-    // if (pos == 0) {
-    //     return string_prepend_fmt(arena, str, fmt, ...);
-    // } else if (pos == str->size) {
-    //     return string_append_fmt(arena, str, fmt, ...);
-    // }
-
     va_start(ap, fmt);
+
+    if (pos == 0) {
+        int r = string_prepend_vfmt(arena, str, fmt, ap);
+        va_end(ap);
+        return r;
+    } else if (pos == str->size) {
+        int r = string_append_vfmt(arena, str, fmt, ap);
+        va_end(ap);
+        return r;
+    }
+
     int n = vsnprintf(NULL, 0, fmt, ap);
     va_end(ap);
 
@@ -357,7 +383,12 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         return -1;
     }
 
-    // TODO: if pos == 0 or pos == str->size
+    if (pos == 0) {
+        return string_prepend_sv(arena, str, ins);
+    }
+    else if (pos == str->size) {
+        return string_append_sv(arena, str, ins);
+    }
 
 
     size_t new_size = str->size + ins.size;
