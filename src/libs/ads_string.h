@@ -3,7 +3,7 @@
 
 typedef struct {
     const char* buffer;
-    const size_t size;              // bytes excluding \0
+    size_t size;                    // bytes excluding \0
 } StringView;
 
 typedef struct {
@@ -15,26 +15,28 @@ typedef struct {
 //==============================
 // STRING
 //==============================
-String string_init_empty(Arena* arena, size_t capacity);
-String string_init_cstr(Arena* arena, const char* init);
-String string_init_buffer(Arena* arena, const char* buffer, size_t len);
-String string_init_concat(Arena* arena, const char* first, const char* second);
-String string_init_fmt(Arena* arena, const char* fmt, ...);
-String string_init_sv(Arena* arena, StringView sv);
+String  string_init_empty(Arena* arena, size_t capacity);
+String  string_init_fmt(Arena* arena, const char* fmt, ...);
+String  string_init_sv(Arena* arena, StringView sv);
+#define string_init_buffer(arena, buffer, len)  string_init_sv(arena, sv_from_buffer(buffer, len))
+#define string_init_cstr(arena, cstr)           string_init_sv(arena, sv_from_cstr(cstr))
 
-int    string_append_buffer(Arena* arena, String* str, const char* buffer, size_t len);
-int    string_append_cstr(Arena* arena, String* str, const char* post);
-int    string_append_string(Arena* arena, String* str, const String* append);
-int    string_append_sv(Arena* arena, String* str, StringView append);
-int    string_append_char(Arena* arena, String* str, char c);
-int    string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
+const char* string_as_cstr(const String* str);
+int     string_grow_capacity(Arena* arena, String* str, size_t amount);
 
+int     string_append_sv(Arena* arena, String* str, StringView append);
+int     string_append_fmt(Arena* arena, String* str, const char* fmt, ...);
+#define string_append_string(arena, str, str_p_append)      string_append_sv(arena, str, sv_from_string(*(str_p_append)))
+#define string_append_cstr(arena, str, cstr_append)         string_append_sv(arena, str, sv_from_cstr(cstr_append))
+#define string_append_buffer(arena, str, buf_append, len)   string_append_sv(arena, str, sv_from_buffer(buf_append, len))
+#define string_append_char(arena, str, c)                   do { char t=c; string_append_sv(arena, str, sv_from_char(t)); } while (0)
+
+int    string_prepend_sv(Arena* arena, String* str, StringView pre);
+int    string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
 int    string_prepend_buffer(Arena* arena, String* str, const char* pre, size_t len);
 int    string_prepend_cstr(Arena* arena, String* str, const char* pre);
 int    string_prepend_string(Arena* arena, String* str, const String* pre);
-int    string_prepend_sv(Arena* arena, String* str, StringView pre);
 int    string_prepend_char(Arena* arena, String* str, char c);
-int    string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...);
 
 int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
 int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
@@ -43,27 +45,22 @@ int    string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
 int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
 int    string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
 
-// int    string_overwrite_cstr
+/**
+ * The overwrite functions allow for growth and thus include an arena because if we overwrite beyond the string capacity we need to maybe "realloc"
+ * One could consider a version which does not allow for growth
+ */
+int    string_overwrite_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
+int    string_overwrite_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
+int    string_overwrite_char(String* str, size_t pos, char c);
+int    string_overwrite_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
 // int    string_overwrite_string
 // int    string_overwrite_sv
-// int    string_overwrite_buffer
-// int    string_overwrite_char
-// int    string_overwrite_fmt
 
-// int    string_erase
+int    string_erase(String* str, size_t pos, size_t len);
+// int    string_erase_and_insert(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
+int    string_clear(String* str);
 
-// String string_shallow_copy()
-// String string_deep_copy()
-
-// bool string_eq
-// bool string_starts_with(const String* str, StringView prefix);
-// bool string_ends_with(const String* str, StringView suffix);
-// size_t string_find(const String* str, StringView needle);
-// size_t string_rfind(const String* str, StringView needle);
-// size_t string_find_from(const String* str, StringView needle, size_t start);
-// size_t string_rfind_from(const String* str, StringView needle, size_t start);
-
-// int string_clear();
+String string_deep_copy(Arena* arena, const String* str);
 
 void   string_debug_print(const String* string);
 void   string_debug_print(String string);
@@ -72,9 +69,11 @@ void   string_print(const String* str);
 //==============================
 // STRING VIEW
 //==============================
+StringView sv_from_buffer(const char* buffer, size_t len);
 StringView sv_from_string(String str);
 StringView sv_from_cstr(const char* cstr);
-// StringView sv_from_buffer(const char* buffer, size_t len);
+#define     sv_from_char(c)     (StringView){&(c), 1}
+
 StringView sv_slice(StringView sv, size_t start, size_t len);
 StringView sv_prefix(StringView sv, size_t len);
 StringView sv_suffix(StringView sv, size_t len);

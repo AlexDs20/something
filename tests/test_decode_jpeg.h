@@ -3,8 +3,6 @@
 #include "utils/types.h"
 #include "utils/defines.h"
 
-Arena* arena = arena_alloc_create_zero(1*GiB);
-
 int test_read_baseline_rgb() {
     string8 filename = string_from_cstr(arena, "assets/backpack/diffuse.jpg");
     read_image_file(arena, filename);
