@@ -38,12 +38,12 @@ int     string_prepend_sv(Arena* arena, String* str, StringView pre);
 #define string_prepend_buffer(arena, str, buf_pre, len)     string_prepend_sv(arena, str, sv_from_buffer(buf_pre, len))
 #define string_prepend_char(arena, str, c)                  do { char t=c; string_prepend_sv(arena, str, sv_from_char(t)); } while (0)
 
-int    string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
 int    string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
-int    string_insert_string(Arena* arena, String* str, size_t pos, const String* ins);
-int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
-int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
-int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
+int    string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
+// int    string_insert_string(Arena* arena, String* str, size_t pos, const String* ins);
+// int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
+// int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
+// int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
 
 /**
  * The overwrite functions allow for growth and thus include an arena because if we overwrite beyond the string capacity we need to maybe "realloc"

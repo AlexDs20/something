@@ -290,12 +290,107 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
     return 0;
 }
 
-// TODO(alex): Handle if StringView intersect the String
-int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
-    if (ins.buffer) {
+int string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...){
+    va_list ap;
+
+    if (str == NULL || str->buffer == NULL || fmt == NULL || pos > str->size) {
         return -1;
     }
-    return string_insert_buffer(arena, str, pos, ins.buffer, ins.size);
+
+    // TODO(alex): handle va_list
+    // if (pos == 0) {
+    //     return string_prepend_fmt(arena, str, fmt, ...);
+    // } else if (pos == str->size) {
+    //     return string_append_fmt(arena, str, fmt, ...);
+    // }
+
+    va_start(ap, fmt);
+    int n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    if (n<0) {
+        return -1;
+    }
+
+    size_t len = (size_t) n;
+
+    // Save first char of what is after the insert because vsnprintf always puts a \0 ...
+    char save_char = str->buffer[pos];
+
+    if (str->size+1+len > str->capacity) {
+        size_t new_capacity = get_new_capacity(str->size+len);
+        char* arena_top = (char*)arena_alloc_used_location(arena);
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memmove(str->buffer+pos+len, str->buffer+pos, str->size+1 - pos);
+        }
+        else {
+            char* t = (char*) arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memcpy(t, str->buffer, pos);
+            memcpy(t+pos+len, str->buffer+pos, str->size+1 - pos);
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
+    }
+    else {
+        memmove(str->buffer+pos+len, str->buffer+pos, str->size+1 - pos);
+    }
+
+
+    va_start(ap, fmt);
+    vsnprintf(str->buffer+pos, len+1, fmt, ap);
+    va_end(ap);
+    str->buffer[pos+len] = save_char;
+    str->size += len;
+    return 0;
+}
+
+// TODO(alex): Handle if StringView intersect the String
+int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
+    if ((str == NULL) || (str->buffer == NULL) || (pos > str->size) || (ins.buffer == NULL)) {
+        return -1;
+    }
+
+    // TODO: if pos == 0 or pos == str->size
+
+
+    size_t new_size = str->size + ins.size;
+
+    if (str->size+1+ins.size > str->capacity) {
+        size_t new_capacity = get_new_capacity(new_size);
+        const char* arena_top = (char*) arena_alloc_used_location(arena);
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
+        }
+        else {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memcpy(t, str->buffer, pos);
+            memcpy(t+pos+ins.size, str->buffer+pos, str->size+1 - pos);
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
+    }
+    else {
+        memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
+    }
+
+    memcpy(str->buffer+pos, ins.buffer, ins.size);
+
+    str->size += ins.size;
+    return 0;
 }
 
 int string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len) {
@@ -375,34 +470,6 @@ int string_insert_string(Arena* arena, String* str, size_t pos, const String* in
 
 int string_insert_char(Arena* arena, String* str, size_t pos, char c) {
     return string_insert_buffer(arena, str, pos, &c, 1);
-}
-
-int string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...){
-    va_list ap;
-
-    va_start(ap, fmt);
-    int n = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
-
-    if (n<0) {
-        return -1;
-    }
-
-    size_t len = (size_t) n;
-
-    int fail = string_insert_buffer(arena, str, pos, NULL, len);
-    if (fail) {
-        return fail;
-    }
-
-    // Save first char of what is after the insert because vsnprintf always puts a \0 ...
-    char save_char = str->buffer[pos+len];
-
-    va_start(ap, fmt);
-    vsnprintf(str->buffer+pos, len+1, fmt, ap);
-    str->buffer[pos+len] = save_char;
-    va_end(ap);
-    return 0;
 }
 
 int string_overwrite_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len) {

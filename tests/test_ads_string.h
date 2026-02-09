@@ -335,8 +335,6 @@ int test_string_prepend_fmt(void) {
     const char* pre =  "PREPENDING WITH A ! in the end!";
     int r = string_prepend_fmt(arena, &s1, "%s", pre);
 
-    string_print(&s1);
-
     ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
     ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre));
@@ -346,7 +344,6 @@ int test_string_prepend_fmt(void) {
 
     s1 = string_init_cstr(arena, cstr);
     r = string_prepend_fmt(arena, &s1, NULL);
-    string_print(&s1);
 
     ASSERT_EQ(r, -1);
     ASSERT_NOT_NULL(s1.buffer);
@@ -359,8 +356,6 @@ int test_string_prepend_fmt(void) {
     const char* pre_long =  "THIS IS A VERY LONG THING I WANT TO PREPEND TO HAVE TO INCREASE THE CAPACITY! ";
     r = string_prepend_fmt(arena, &s1, "%s", pre_long);
 
-    string_print(&s1);
-
     ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
     ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre_long));
@@ -371,8 +366,6 @@ int test_string_prepend_fmt(void) {
     s1 = string_init_cstr(arena, cstr);
     arena_alloc_push(arena, 42);
     r = string_prepend_fmt(arena, &s1, "%s", pre_long);
-
-    string_print(&s1);
 
     ASSERT_EQ(r, 0);
     ASSERT_NOT_NULL(s1.buffer);
@@ -431,6 +424,142 @@ int test_string_prepend_sv(void) {
     return 0;
 }
 
+int test_string_insert_fmt(void) {
+    const char* cstr =  "This is test_string_insert_fmt\n";
+    String s1 = string_init_cstr(arena, cstr);
+    const char* ins =  "INSERTING WITH A ! in the end! ";
+    int r = string_insert_fmt(arena, &s1, 8, "%s", ins);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(ins));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(ins));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_insert_fmt(arena, &s1, 8, NULL);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr));
+    ASSERT_GE(s1.capacity,  strlen(cstr));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    const char* ins_long =  "THIS IS A VERY LONG THING I WANT TO INSERT TO HAVE TO INCREASE THE CAPACITY! ";
+    r = string_insert_fmt(arena, &s1, 8, "%s", ins_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(ins_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(ins_long));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    r = string_insert_fmt(arena, &s1, 8, "%s", ins_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(ins_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(ins_long));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_insert_fmt(arena, &s1, 0, "%s", ins_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(ins_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(ins_long));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_insert_fmt(arena, &s1, strlen(cstr), "%s", ins_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(ins_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(ins_long));
+
+    return 0;
+}
+
+int test_string_insert_sv(void) {
+    const char* cstr =  "This is test_string_insert_sv\n";
+    String s1 = string_init_cstr(arena, cstr);
+    const char* ins =  "INSERTING WITH A ! in the end! ";
+    StringView sv = sv_from_cstr(ins);
+    int r = string_insert_sv(arena, &s1, 8, sv);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    sv = {.buffer=NULL, .size=0};
+    r = string_insert_sv(arena, &s1, 8, sv);
+
+    ASSERT_EQ(r, -1);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr));
+    ASSERT_GE(s1.capacity,  strlen(cstr));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    const char* ins_long =  "THIS IS A VERY LONG THING I WANT TO INSERT TO HAVE TO INCREASE THE CAPACITY! ";
+    StringView sv_long = sv_from_cstr(ins_long);
+    r = string_insert_sv(arena, &s1, 8, sv_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv_long.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv_long.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    r = string_insert_sv(arena, &s1, 8, sv_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv_long.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv_long.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_insert_sv(arena, &s1, 0, sv_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv_long.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv_long.size);
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    r = string_insert_sv(arena, &s1, strlen(cstr), sv_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv_long.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv_long.size);
+
+    return 0;
+}
+
+/*
 int test_string_insert_buffer() {
     const char* cstr =  "This is my initial string\n";
 
@@ -499,14 +628,7 @@ int test_string_insert_buffer() {
 
     return 0;
 }
-
-int test_string_insert_fmt(void) {
-    const char* cstr =  "This is test_string_insert_fmt";
-    String s1 = string_init_cstr(arena, cstr);
-    const char* ins =  " INSERTED BEFORE";
-    string_insert_fmt(arena, &s1, 7, "%s", ins);
-    return 0;
-}
+*/
 
 int test_string_overwrite_buffer(void) {
     const char* cstr =  "This  is test_string_overwrite_buffer";
