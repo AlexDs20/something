@@ -45,7 +45,15 @@ test_entry tests[] = {
     {"test_string_insert_sv", test_string_insert_sv},
     // {"test_string_insert_buffer", test_string_insert_buffer},
 
+    {"test_string_overwrite_fmt", test_string_overwrite_fmt},
+    {"test_string_overwrite_sv", test_string_overwrite_sv},
     // {"test_string_overwrite_buffer", test_string_overwrite_buffer},
+
+    {"test_string_erase_and_insert_sv", test_string_erase_and_insert_sv},
+
+    // {"test_string_erase", test_string_erase},
+    // {"test_string_clear", test_string_clear},
+
 };
 
 int main() {

@@ -424,150 +424,12 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
     return 0;
 }
 
-int string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len) {
-    if ((str == NULL) || (str->buffer == NULL)) {
-        return -1;
-    }
-    if (pos > str->size) {
-        return -1;
-    }
-
-    size_t new_size = str->size + len;
-
-    // If enough space
-    if (new_size < str->capacity) {
-        memmove(str->buffer+pos+len, str->buffer+pos, str->size - pos+1);
-        if (buffer) {
-            memcpy(str->buffer+pos, buffer, len);
-        }
-        else {
-            memset(str->buffer+pos, ' ', len);
-        }
-        str->buffer[new_size] = '\0';
-        str->size = new_size;
-        return 0;
-    }
-    size_t new_capacity = get_new_capacity(new_size);
-    // If not enough space
-    //  And not at end of arena => Need to copy everything
-    char* arena_top = (char*)arena_alloc_used_location(arena);
-    if (str->buffer + str->capacity != arena_top) {
-        char* p = (char*)arena_alloc_push(arena, new_capacity);
-        if (p == NULL) return -1;
-
-        memcpy(p, str->buffer, pos);
-        if (buffer) {
-            memcpy(p+pos, buffer, len);
-        }
-        else {
-            memset(p+pos, ' ', len);
-        }
-        memcpy(p+pos+len, str->buffer+pos, str->size - pos);
-        str->buffer = p;
-        str->buffer[new_size] = '\0';
-        str->size = new_size;
-        str->capacity = new_capacity;
-        return 0;
-    }
-    // If not enough space
-    //  and at the end of the arena
-    // Do "in place" insert. Only need to move what's after the position
-    void* p = arena_alloc_push(arena, str->buffer+new_capacity - arena_top);
-    if (p == NULL) return -1;
-    memmove(str->buffer+pos+len, str->buffer+pos, str->size - pos);
-    if (buffer) {
-        memcpy(str->buffer+pos, buffer, len);
-    }
-    else {
-        memset(str->buffer+pos, ' ', len);
-    }
-    str->buffer[new_size] = '\0';
-    str->size = new_size;
-    str->capacity = new_capacity;
-    return 0;
-}
-
-int string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr) {
-    if (cstr == NULL) return -1;
-    return string_insert_buffer(arena, str, pos, cstr, strlen(cstr));
-}
-
-int string_insert_string(Arena* arena, String* str, size_t pos, const String* ins) {
-    if ((ins == NULL) || (ins->buffer)) {
-        return -1;
-    }
-    return string_insert_buffer(arena, str, pos, ins->buffer, ins->size);
-}
-
-int string_insert_char(Arena* arena, String* str, size_t pos, char c) {
-    return string_insert_buffer(arena, str, pos, &c, 1);
-}
-
-int string_overwrite_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len) {
-    if ((str == NULL) || (str->buffer == NULL)) {
-        return -1;
-    }
-
-    // If we have enough capacity
-    if (pos+len+1 <= str->capacity) {
-        if (pos+len > str->size) {
-            str->size = pos+len;
-        }
-
-        if (buffer) {
-            memcpy(str->buffer+pos, buffer, len);
-        }
-        else {
-            memset(str->buffer+pos, ' ', len);
-        }
-        str->buffer[str->size] = '\0';
-        return 0;
-    }
-
-    // If we don't have enough capacity
-    size_t new_size = pos + len;
-    size_t new_capacity = get_new_capacity(new_size);
-    char* arena_top = (char*)arena_alloc_used_location(arena);
-
-    //  but if we are at the top of arena => move the arena forward
-    if (arena_top == str->buffer+str->capacity) {
-        void* p = arena_alloc_push_unaligned(arena, (str->buffer+new_capacity) - arena_top);
-        if (p == NULL) return -1;
-    } else {
-        void* p = arena_alloc_push(arena, new_capacity);
-        if (p == NULL) return -1;
-        memcpy(p, str->buffer, str->size);
-        str->buffer = (char*) p;
-    }
-
-    if (buffer) {
-        memcpy(str->buffer+pos, buffer, len);
-    }
-    else {
-        memset(str->buffer+pos, ' ', len);
-    }
-
-    str->size = new_size;
-    str->capacity = new_capacity;
-    str->buffer[str->size] = '\0';
-    return 0;
-}
-
-int string_overwrite_cstr(Arena* arena, String* str, size_t pos, const char* cstr) {
-    if (cstr == NULL) return -1;
-    return string_overwrite_buffer(arena, str, pos, cstr, strlen(cstr));
-}
-
-int string_overwrite_char(String* str, size_t pos, char c) {
-    if (pos < str->size) {
-        str->buffer[pos] = c;
-        return 0;
-    }
-    return -1;
-}
-
-int string_overwrite_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...) {
+int string_overwrite_fmt(String* str, size_t pos, const char* fmt, ...) {
     va_list ap;
+
+    if (str == NULL || str->buffer == NULL || fmt == NULL) {
+        return -1;
+    }
 
     va_start(ap, fmt);
     int n = vsnprintf(NULL, 0, fmt, ap);
@@ -577,14 +439,27 @@ int string_overwrite_fmt(Arena* arena, String* str, size_t pos, const char* fmt,
 
     size_t len = (size_t) n;
 
-    char save_char = str->buffer[pos+len];
+    size_t end = pos+len > str->size ? str->size : pos+len;
 
-    string_overwrite_buffer(arena, str, pos, NULL, len);
+    char save_char = str->buffer[end];
 
     va_start(ap, fmt);
-    vsnprintf(str->buffer+pos, len+1, fmt, ap);
-    str->buffer[pos+len] = save_char;
+    vsnprintf(str->buffer+pos, end+1-pos, fmt, ap);
     va_end(ap);
+    str->buffer[end] = save_char;
+    return 0;
+}
+
+int string_overwrite_sv(String* str, size_t pos, StringView sv) {
+    if (str == NULL || str->buffer == NULL || pos > str->size || sv.buffer == NULL) {
+        return -1;
+    }
+
+    // NOTE: This allows to have a sv too big but erase_and_insert_sv does not
+    size_t end = pos+sv.size > str->size ? str->size : pos+sv.size;
+
+    memcpy(str->buffer+pos, sv.buffer, end - pos);
+
     return 0;
 }
 
@@ -606,8 +481,59 @@ int string_erase(String* str, size_t pos, size_t len) {
     return 0;
 }
 
+int string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv) {
+    if (str == NULL || str->buffer == NULL || sv.buffer == NULL || pos+len > str->size) {
+        return -1;
+    }
+
+    if (len == 0) {
+        if (pos == 0) {
+            return string_prepend_sv(arena, str, sv);
+        }
+        if (pos == str->size) {
+            return string_append_sv(arena, str, sv);
+        }
+        return string_insert_sv(arena, str, pos, sv);
+    }
+
+    // Check the size difference between what is removed and what is added
+    int size_difference = len - sv.size;
+    if (size_difference == 0) {
+        memcpy(str->buffer + pos, sv.buffer, sv.size);
+        return 0;
+    }
+
+    size_t new_size = str->size + size_difference;
+
+    // If we grow beyond the current capacity => need more space
+    if (str->size+1+size_difference > str->capacity) {
+        size_t new_capacity = get_new_capacity(str->size+size_difference);
+        char* arena_top = (char*)arena_alloc_used_location(arena);
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) return -1;
+            memmove(str->buffer+pos+sv.size, str->buffer+pos+len, str->size+1 - (pos+len));
+        }
+        else {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) return -1;
+            memcpy(t, str->buffer, pos);
+            memcpy(t+pos+sv.size, str->buffer+pos+len, str->size+1-(pos+len));
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
+    }
+    else {
+        memmove(str->buffer+pos+sv.size, str->buffer+pos+len, str->size+1 - (pos+len));
+    }
+
+    memcpy(str->buffer+pos, sv.buffer, sv.size);
+    str->size = new_size;
+    return 0;
+}
+
 int string_clear(String* str) {
-    if ((str == NULL) || (str->buffer)) return -1;
+    if ((str == NULL) || (str->buffer == NULL)) return -1;
     str->size = 0;
     str->buffer[0] = '\0';
     return 0;
@@ -626,7 +552,6 @@ String string_deep_copy(Arena* arena, const String* str) {
         .capacity = str->capacity,
     };
 }
-
 
 void string_debug_print(const String* s) {
     printf("String Debug Info:\n");

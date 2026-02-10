@@ -41,26 +41,24 @@ int     string_prepend_sv(Arena* arena, String* str, StringView pre);
 #define string_prepend_buffer(arena, str, buf_pre, len)     string_prepend_sv(arena, str, sv_from_buffer(buf_pre, len))
 #define string_prepend_char(arena, str, c)                  do { char t=c; string_prepend_sv(arena, str, sv_from_char(t)); } while (0)
 
-int    string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
-int    string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
-// int    string_insert_string(Arena* arena, String* str, size_t pos, const String* ins);
-// int    string_insert_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
-// int    string_insert_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
-// int    string_insert_char(Arena* arena, String* str, size_t pos, char c);
+int     string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
+int     string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
+#define string_insert_string(arena, str, pos, str_p_ins)    string_insert_sv(arena, str, pos, sv_from_string(*(str_p_ins)))
+#define string_insert_cstr(arena, str, pos, cstr)           string_insert_sv(arena, str, pos, sv_from_cstr(cstr))
+#define string_insert_buffer(arena, str, pos, buffer, len)  string_insert_sv(arena, str, pos, sv_from_buffer(buffer, len))
+#define string_insert_char(arena, str, c)                   do { char t=c; string_insert_sv(arena, str, pos, sv_from_char(t)); } while (0)
 
-/**
- * The overwrite functions allow for growth and thus include an arena because if we overwrite beyond the string capacity we need to maybe "realloc"
- * One could consider a version which does not allow for growth
- */
-int    string_overwrite_buffer(Arena* arena, String* str, size_t pos, const char* buffer, size_t len);
-int    string_overwrite_cstr(Arena* arena, String* str, size_t pos, const char* cstr);
-int    string_overwrite_char(String* str, size_t pos, char c);
-int    string_overwrite_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
-// int    string_overwrite_string
-// int    string_overwrite_sv
+int     string_overwrite_fmt(String* str, size_t pos, const char* fmt, ...);
+int     string_overwrite_sv(String* str, size_t pos, StringView sv);
+#define string_overwrite_buffer(str, pos, buffer, len)      string_overwrite_sv(str, pos, sv_from_buffer(buffer, len))
+#define string_overwrite_cstr(str, pos, cstr)               string_overwrite_sv(str, pos, sv_from_cstr(cstr))
+#define string_overwrite_string(str, pos, str_p_over)       string_overwrite_sv(str, pos, sv_from_string(*(str_p_over)))
+#define string_overwrite_char(str, pos, c)                  do { char t=c; string_overwrite_sv(str, pos, sv_from_char(c)); } while (0)
+
+// int     string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, ...);
+int     string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
 
 int    string_erase(String* str, size_t pos, size_t len);
-// int    string_erase_and_insert(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
 int    string_clear(String* str);
 
 String string_deep_copy(Arena* arena, const String* str);
@@ -72,9 +70,9 @@ void   string_print(const String* str);
 //==============================
 // STRING VIEW
 //==============================
-StringView sv_from_buffer(const char* buffer, size_t len);
-StringView sv_from_string(String str);
-StringView sv_from_cstr(const char* cstr);
+StringView  sv_from_buffer(const char* buffer, size_t len);
+StringView  sv_from_string(String str);
+StringView  sv_from_cstr(const char* cstr);
 #define     sv_from_char(c)     (StringView){&(c), 1}
 
 StringView sv_slice(StringView sv, size_t start, size_t len);
