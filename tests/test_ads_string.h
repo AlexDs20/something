@@ -562,9 +562,11 @@ int test_string_insert_sv(void) {
 int test_string_overwrite_fmt(void) {
     const char* cstr = "This is the normal version of test_string_overwrite_fmt!";
     String s = string_init_cstr(arena, cstr);
-    string_print(&s);
-    string_overwrite_fmt(&s, 12, "%s", "edited");
-    string_print(&s);
+    string_overwrite_fmt(arena, &s, 12, "%s", "super edited");
+
+
+    s = string_init_cstr(arena, cstr);
+    string_overwrite_fmt(arena, &s, 12, "%s", "super edited version of this and a lot of stuff........................................\n");
 
     return 0;
 }
@@ -574,9 +576,26 @@ int test_string_overwrite_sv(void) {
 
     String s = string_init_cstr(arena, cstr);
     StringView sv = sv_from_cstr("edited");
-    string_print(&s);
-    string_overwrite_sv(&s, 12, sv);
-    string_print(&s);
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    s = string_init_cstr(arena, cstr);
+    sv = sv_from_cstr("edited with a very long but not so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    const char* cstr2 = "Short test_string_overwrite_sv";
+
+    s = string_init_cstr(arena, cstr2);
+    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    s = string_init_cstr(arena, cstr2);
+    arena_alloc_push(arena, 42);
+    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
 
     return 0;
 }
@@ -672,36 +691,49 @@ int test_string_overwrite_buffer(void) {
 */
 
 int test_string_erase_and_insert_sv(void) {
-    printf("\n");
     const char* cstr = "This is a cstr for test_string_erase_and_insert_sv!\n";
 
     String s = string_init_cstr(arena, cstr);
-    string_print(&s);
     StringView sv = sv_from_cstr("erased and inserted");
     string_erase_and_insert_sv(arena, &s, 8, 6, sv);
-    string_print(&s);
 
 
     s = string_init_cstr(arena, cstr);
-    string_print(&s);
     sv = sv_from_cstr("Inserted before: t");
     string_erase_and_insert_sv(arena, &s, 0, 1, sv);
-    string_print(&s);
 
 
     s = string_init_cstr(arena, cstr);
-    string_print(&s);
     sv = sv_from_cstr("inserting a lot of stuff here so that we have to touch the arena");
     string_erase_and_insert_sv(arena, &s, 8, 1, sv);
-    string_print(&s);
 
 
     s = string_init_cstr(arena, cstr);
     arena_alloc_push(arena, 42);
-    string_print(&s);
     sv = sv_from_cstr("inserting a lot of stuff here so that we have to touch the arena");
     string_erase_and_insert_sv(arena, &s, 8, 1, sv);
-    string_print(&s);
+
+    return 0;
+}
+
+int test_string_erase_and_insert_fmt(void) {
+    const char* cstr = "This is a cstr for test_string_erase_and_insert_fmt!\n";
+
+    String s = string_init_cstr(arena, cstr);
+    string_erase_and_insert_fmt(arena, &s, 8, 6, "%s", "erased and inserted");
+
+
+    s = string_init_cstr(arena, cstr);
+    string_erase_and_insert_fmt(arena, &s, 0, 1, "%s", "Inserted before: t");
+
+
+    s = string_init_cstr(arena, cstr);
+    string_erase_and_insert_fmt(arena, &s, 8, 1, "%s", "inserting a lot of stuff here so that we have to touch the arena");
+
+
+    s = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    string_erase_and_insert_fmt(arena, &s, 8, 1, "%s", "inserting a lot of stuff here so that we have to touch the arena");
 
     return 0;
 }
@@ -709,9 +741,7 @@ int test_string_erase_and_insert_sv(void) {
 int test_string_erase(void) {
     const char* cstr = "This is the full string test_string_erase!";
     String s = string_init_cstr(arena, cstr);
-    string_print(&s);
     string_erase(&s, 11, 12);
-    string_print(&s);
     return 0;
 }
 
