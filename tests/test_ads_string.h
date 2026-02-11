@@ -751,3 +751,97 @@ int test_string_clear(void) {
     string_clear(&s);
     return 0;
 }
+
+int test_sv_equal(void) {
+    const char* cstr = "This is test_sv_equal!";
+    StringView sv1 = sv_from_cstr(cstr);
+    StringView sv2 = sv_from_cstr(cstr);
+
+    bool r = sv_equal(sv1, sv2);
+
+    ASSERT_EQ(r, true);
+
+    StringView sv3 = sv_from_cstr("This is another cstr");
+    r = sv_equal(sv1, sv3);
+    ASSERT_EQ(r, false);
+
+    return 0;
+}
+
+int test_sv_compare(void) {
+    const char* cstr = "This is test_sv_equal!";
+    int r;
+    StringView sv1 = sv_from_cstr(cstr);
+    StringView sv2 = sv_from_cstr(cstr);
+
+    r = sv_compare(&sv1, &sv2);
+    ASSERT_EQ(r, 0);
+
+    StringView sv3 = sv_from_cstr("This is another cstr");
+    r = sv_compare(&sv1, &sv3);
+    ASSERT_EQ(r, 1);
+
+    r = sv_compare(&sv3, &sv1);
+    ASSERT_EQ(r, -1);
+
+    String s = string_init_cstr(arena, cstr);
+    int m = string_append_cstr(arena, &s, " with some extras");
+    ASSERT_EQ(m, 0);
+    StringView sv4 = sv_from_string(s);
+
+    r = sv_compare(&sv1, &sv4);
+    ASSERT_EQ(r, -1);
+
+    r = sv_compare(&sv4, &sv1);
+    ASSERT_EQ(r, 1);
+
+    return 0;
+}
+
+int test_sv_starts_with(void) {
+    const char* cstr = "This is test_sv_starts_with!";
+    bool r;
+
+    StringView sv1 = sv_from_cstr(cstr);
+
+    r = sv_starts_with(sv1, sv_from_cstr("This"));
+    ASSERT_EQ(r, true);
+
+    r = sv_starts_with(sv1, sv_from_cstr("This#"));
+    ASSERT_EQ(r, false);
+
+    r = sv_starts_with(sv1, (StringView){0});
+    ASSERT_EQ(r, false);
+
+    r = sv_starts_with((StringView){0}, sv_from_cstr("This"));
+    ASSERT_EQ(r, false);
+
+    r = sv_starts_with((StringView){0}, (StringView){0});
+    ASSERT_EQ(r, false);
+
+    return 0;
+}
+
+int test_sv_ends_with(void) {
+    const char* cstr = "This is test_sv_ends_with!";
+    bool r;
+
+    StringView sv1 = sv_from_cstr(cstr);
+
+    r = sv_ends_with(sv1, sv_from_cstr("with!"));
+    ASSERT_EQ(r, true);
+
+    r = sv_ends_with(sv1, sv_from_cstr("#with!"));
+    ASSERT_EQ(r, false);
+
+    r = sv_ends_with(sv1, (StringView){0});
+    ASSERT_EQ(r, false);
+
+    r = sv_ends_with((StringView){0}, sv_from_cstr("with!"));
+    ASSERT_EQ(r, false);
+
+    r = sv_ends_with((StringView){0}, (StringView){0});
+    ASSERT_EQ(r, false);
+
+    return 0;
+}

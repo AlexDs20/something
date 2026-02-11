@@ -836,6 +836,70 @@ StringView sv_slice(StringView sv, size_t start, size_t len) {
     };
 }
 
+bool sv_equal(StringView sv1, StringView sv2) {
+    if (sv1.size != sv2.size) return false;
+
+    for (size_t i=0; i<sv1.size; ++i) {
+        if (sv1.buffer[i] != sv2.buffer[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int sv_compare(const StringView* sv1, const StringView* sv2) {
+    // -1 if sv1 < sv2
+    // 0 if sv1 == sv2
+    // 1 if sv1 > sv2
+    size_t end = sv1->size<sv2->size ? sv1->size : sv2->size;
+    for (size_t i=0; i<end; ++i) {
+        if (sv1->buffer[i] == sv2->buffer[i]) {
+            continue;
+        }
+        else if (sv1->buffer[i] < sv2->buffer[i]) {
+            return -1;
+        }
+        else if (sv1->buffer[i] > sv2->buffer[i]) {
+            return 1;
+        }
+    }
+
+    if (sv1->size < sv2->size) {
+        return -1;
+    }
+    else if (sv1->size > sv2->size) {
+        return 1;
+    }
+    return 0;
+}
+
+bool sv_starts_with(StringView sv, StringView pre) {
+    if (sv.buffer == NULL || pre.buffer == NULL) {
+        return false;
+    }
+
+    for (size_t i = 0; i<pre.size; ++i) {
+        if (sv.buffer[i] != pre.buffer[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool sv_ends_with(StringView sv, StringView pre) {
+    if (sv.buffer == NULL || pre.buffer == NULL || sv.size < pre.size) {
+        return false;
+    }
+
+    const char* buf = sv.buffer + sv.size-pre.size;
+    for (size_t i = 0; i<pre.size; ++i) {
+        if (buf[i] != pre.buffer[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void sv_print(StringView sv) {
     if (sv.buffer) {
         printf("%.*s\n", sv.size, sv.buffer);

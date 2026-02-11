@@ -55,6 +55,12 @@ test_entry tests[] = {
     // {"test_string_erase", test_string_erase},
     // {"test_string_clear", test_string_clear},
 
+    {"test_sv_equal", test_sv_equal},
+    {"test_sv_compare", test_sv_compare},
+
+    {"test_sv_starts_with", test_sv_starts_with},
+    {"test_sv_ends_with", test_sv_ends_with},
+
 };
 
 int main() {

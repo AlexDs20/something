@@ -83,10 +83,10 @@ StringView sv_slice(StringView sv, size_t start, size_t len);
 StringView sv_prefix(StringView sv, size_t len);
 StringView sv_suffix(StringView sv, size_t len);
 
-// bool sv_eq(StringView sv1, StringView sv2);
-// int  sv_compare(StringView sv1, StringView sv2);         // For usage with e.g. qsort or binary search
-// bool sv_starts_with(StringView sv, StringView prefix);
-// bool sv_ends_with(StringView sv, StringView suffix);
+bool sv_equal(StringView sv1, StringView sv2);
+int  sv_compare(const StringView* sv1, const StringView* sv2);         // For usage with e.g. qsort or binary search
+bool sv_starts_with(StringView sv, StringView prefix);
+bool sv_ends_with(StringView sv, StringView suffix);
 // size_t sv_find(StringView sv, StringView needle);
 // size_t sv_rfind(StringView sv, StringView needle);
 // size_t sv_find_from(StringView sv, StringView needle, size_t start);
