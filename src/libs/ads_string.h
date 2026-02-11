@@ -60,7 +60,7 @@ int     string_overwrite_sv(Arena* arena, String* str, size_t pos, StringView sv
 #define string_overwrite_char(arena, str, pos, c)                  do { char _c=(c); string_overwrite_sv(arena, str, pos, sv_from_buffer(&(_c), 1)); } while (0)
 
 int     string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, ...);
-// int     string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, va_list args);
+int     string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, va_list args);
 int     string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
 
 int    string_grow_capacity(Arena* arena, String* str, size_t amount);

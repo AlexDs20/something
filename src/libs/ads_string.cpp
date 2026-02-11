@@ -675,25 +675,25 @@ int string_erase_and_insert_sv_v0(Arena* arena, String* str, size_t pos, size_t 
     return 0;
 }
 
-int string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, ...) {
-    va_list ap;
+int string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, va_list args) {
+    va_list args2;
 
-    va_start(ap, fmt);
+    va_copy(args2, args);
     if (len == 0) {
         int r;
         if (pos == 0) {
-            r = string_prepend_vfmt(arena, str, fmt, ap);
+            r = string_prepend_vfmt(arena, str, fmt, args2);
         } else if (pos == str->size) {
-            r = string_append_vfmt(arena, str, fmt, ap);
+            r = string_append_vfmt(arena, str, fmt, args2);
         } else {
-            r = string_insert_vfmt(arena, str, pos, fmt, ap);
+            r = string_insert_vfmt(arena, str, pos, fmt, args2);
         }
-        va_end(ap);
+        va_end(args2);
         return r;
     }
 
-    int n = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
+    int n = vsnprintf(NULL, 0, fmt, args2);
+    va_end(args2);
     if (n<0) {
         return -1;
     }
@@ -702,10 +702,10 @@ int string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t le
     // Check the size difference between what is removed and what is added
     if (insert_len == len) {
         char save_char = str->buffer[pos+len];
-        va_start(ap, fmt);
-        int m = vsnprintf(str->buffer+pos, len+1, fmt, ap);
+        va_copy(args2, args);
+        int m = vsnprintf(str->buffer+pos, len+1, fmt, args2);
         // TODO: check m
-        va_end(ap);
+        va_end(args2);
         str->buffer[pos+len] = save_char;
         return 0;
     }
@@ -717,14 +717,22 @@ int string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t le
     }
 
     char save_char = str->buffer[pos+insert_len];
-    va_start(ap, fmt);
-    int m = vsnprintf(str->buffer+pos, insert_len+1, fmt, ap);
+    va_copy(args2, args);
+    int m = vsnprintf(str->buffer+pos, insert_len+1, fmt, args2);
     // TODO check m
-    va_end(ap);
+    va_end(args2);
 
     str->buffer[pos+insert_len] = save_char;
     str->size += (insert_len-len);
     return 0;
+}
+
+int string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int r = string_erase_and_insert_vfmt(arena, str, pos, len, fmt, ap);
+    va_end(ap);
+    return r;
 }
 
 int string_clear(String* str) {
