@@ -789,13 +789,6 @@ StringView sv_from_buffer(const char* buffer, size_t len) {
     };
 }
 
-StringView sv_from_string(String str) {
-    return (StringView){
-        .buffer = str.buffer,
-        .size = str.size,
-    };
-}
-
 StringView sv_from_cstr(const char* cstr) {
     if (cstr == NULL) {
         return (StringView){0};
@@ -806,27 +799,7 @@ StringView sv_from_cstr(const char* cstr) {
     };
 }
 
-StringView sv_slice_string(String str, size_t start, size_t len) {
-    if (start > str.size) {
-        return (StringView){0};
-    }
-    return (StringView){
-        .buffer = str.buffer + start,
-        .size = start+len < str.size ? len : str.size-start,
-    };
-}
-
-StringView sv_slice_buffer(const char* buffer, size_t start, size_t len) {
-    if (buffer == NULL) {
-        return (StringView){0};
-    }
-    return (StringView) {
-        .buffer = buffer+start,
-        .size = start+len < strlen(buffer) ? len : strlen(buffer)-start,
-    };
-}
-
-StringView sv_slice(StringView sv, size_t start, size_t len) {
+StringView sv_slice_sv(StringView sv, size_t start, size_t len) {
     if (start > sv.size) {
         return (StringView){0};
     }
@@ -836,40 +809,91 @@ StringView sv_slice(StringView sv, size_t start, size_t len) {
     };
 }
 
-bool sv_equal(StringView sv1, StringView sv2) {
-    if (sv1.size != sv2.size) return false;
+StringView sv_truncate_front(StringView sv, size_t len) {
+    if (len > sv.size) return (StringView){0};
+    return (StringView){
+        .buffer = sv.buffer+len,
+        .size = sv.size-len,
+    };
+}
 
-    for (size_t i=0; i<sv1.size; ++i) {
-        if (sv1.buffer[i] != sv2.buffer[i]) {
-            return false;
+StringView sv_truncate_back(StringView sv, size_t len) {
+    if (len > sv.size) return (StringView){0};
+    return (StringView){
+        .buffer = sv.buffer,
+        .size = sv.size-len,
+    };
+}
+
+StringView sv_trim_front(StringView sv) {
+    /*
+     *  '\t': 9
+     *  '\n': 10
+     *  '\v': 11
+     *  '\f': 12
+     *  '\r': 13
+     *  ' ': 32
+     */
+    size_t i = 0;
+    for (; i<sv.size; ++i) {
+        char c = sv.buffer[i];
+        if ((c >= 9 && c <= 13) || c == 32) {
+            continue;
         }
     }
-    return true;
+    return (StringView){
+        .buffer = sv.buffer+i,
+        .size = sv.size-i,
+    };
+}
+
+StringView sv_trim_back(StringView sv) {
+    /*
+     *  '\t': 9
+     *  '\n': 10
+     *  '\v': 11
+     *  '\f': 12
+     *  '\r': 13
+     *  ' ': 32
+     */
+    while (sv.size > 0) {
+        char c = sv.buffer[sv.size-1];
+        if (!((c>=9 && c<=13) || (c == 32))) {
+            break;
+        }
+        sv.size--;
+    }
+    return sv;
+}
+
+int compare(const void* v1, const void* v2, size_t len) {
+    const char* s1 = (const char*)v1;
+    const char* s2 = (const char*)v2;
+    while (len-- > 0) {
+        if (*s1++ != *s2++) {
+            return s1[-1] < s2[-1] ? -1 : 1;
+        }
+    }
+    return 0;
+}
+
+bool sv_equal(StringView sv1, StringView sv2) {
+    if (sv1.size != sv2.size) return false;
+    int cmp = compare(sv1.buffer, sv2.buffer, sv1.size);
+    return cmp == 0;
 }
 
 int sv_compare(const StringView* sv1, const StringView* sv2) {
     // -1 if sv1 < sv2
     // 0 if sv1 == sv2
     // 1 if sv1 > sv2
-    size_t end = sv1->size<sv2->size ? sv1->size : sv2->size;
-    for (size_t i=0; i<end; ++i) {
-        if (sv1->buffer[i] == sv2->buffer[i]) {
-            continue;
-        }
-        else if (sv1->buffer[i] < sv2->buffer[i]) {
-            return -1;
-        }
-        else if (sv1->buffer[i] > sv2->buffer[i]) {
-            return 1;
-        }
-    }
+    size_t len = sv1->size<sv2->size ? sv1->size : sv2->size;
 
-    if (sv1->size < sv2->size) {
-        return -1;
-    }
-    else if (sv1->size > sv2->size) {
-        return 1;
-    }
+    int cmp = compare(sv1->buffer, sv2->buffer, len);
+    if (cmp != 0) return cmp;
+
+    if (sv1->size < sv2->size) return -1;
+    if (sv1->size > sv2->size) return 1;
     return 0;
 }
 

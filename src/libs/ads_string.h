@@ -76,12 +76,15 @@ void   string_print(const String* str);
 // STRING VIEW
 //==============================
 StringView  sv_from_buffer(const char* buffer, size_t len);
-StringView  sv_from_string(String str);
 StringView  sv_from_cstr(const char* cstr);
+#define     sv_from_string(str)     (StringView){.buffer=(str).buffer, .size=(str).size}
 
-StringView sv_slice(StringView sv, size_t start, size_t len);
-StringView sv_prefix(StringView sv, size_t len);
-StringView sv_suffix(StringView sv, size_t len);
+StringView  sv_slice_sv(StringView sv, size_t start, size_t len);
+#define     sv_slice_string(str, start, len)        sv_slice_sv(sv_from_string(str), start, len)
+StringView sv_truncate_front(StringView sv, size_t len);
+StringView sv_truncate_back(StringView sv, size_t len);
+StringView sv_trim_front(StringView sv);         // removes ' ', '\t', '\n', '\r', '\v'. '\f'
+StringView sv_trim_back(StringView sv);
 
 bool sv_equal(StringView sv1, StringView sv2);
 int  sv_compare(const StringView* sv1, const StringView* sv2);         // For usage with e.g. qsort or binary search
@@ -91,11 +94,8 @@ bool sv_ends_with(StringView sv, StringView suffix);
 // size_t sv_rfind(StringView sv, StringView needle);
 // size_t sv_find_from(StringView sv, StringView needle, size_t start);
 // size_t sv_rfind_from(StringView sv, StringView needle, size_t start);
-// StringView sv_trim_front(StringView sv);
-// StringView sv_trim_back(StringView sv);
 
 void sv_print(StringView sv);
-
 void sv_debug_print(StringView sv);
 
 #endif

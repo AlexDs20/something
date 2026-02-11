@@ -752,6 +752,123 @@ int test_string_clear(void) {
     return 0;
 }
 
+int test_sv_from_buffer(void) {
+    const char* buffer = "This is a test of test_sv_from_buffer";
+    StringView sv = sv_from_buffer(buffer, strlen(buffer));
+
+    ASSERT_NOT_NULL(sv.buffer);
+    ASSERT_EQ(sv.buffer, buffer);
+
+    sv = sv_from_buffer(buffer, 10);
+    ASSERT_EQ(sv.buffer, buffer);
+    ASSERT_EQ(sv.size, 10);
+
+    return 0;
+}
+
+int test_sv_from_cstr(void) {
+    const char* cstr = "This is a test of test_sv_from_cstr";
+    StringView sv = sv_from_cstr(cstr);
+
+    ASSERT_NOT_NULL(sv.buffer);
+    ASSERT_EQ(sv.buffer, cstr);
+
+    return 0;
+}
+
+int test_sv_slice_sv(void) {
+    const char* cstr = "This is not slice of test_sv_slice_sv!";
+    StringView slice;
+    StringView sv = sv_from_cstr(cstr);
+
+    slice = sv_slice_sv(sv, 12, sv.size-12);
+    ASSERT_EQ(sv_equal(slice, sv_from_cstr("slice of test_sv_slice_sv!")), true);
+
+
+    slice = sv_slice_sv(sv, 12, 5);
+    ASSERT_EQ(sv_equal(slice, sv_from_cstr("slice")), true);
+
+    return 0;
+}
+
+int test_sv_slice_string(void) {
+    const char* cstr = "This is not slice of test_sv_slice_string!";
+    StringView slice;
+    String str = string_init_cstr(arena, cstr);
+
+    slice = sv_slice_string(str, 12, str.size-12);
+    ASSERT_TRUE(sv_equal(slice, sv_from_cstr("slice of test_sv_slice_string!")));
+
+    slice = sv_slice_string(str, 12, 5);
+    ASSERT_TRUE(sv_equal(slice, sv_from_cstr("slice")));
+
+    return 0;
+}
+
+int test_sv_truncate_front(void) {
+    const char* cstr = "This is test_sv_truncate_front!";
+
+    StringView sv = sv_from_cstr(cstr);
+
+    sv = sv_truncate_front(sv, 8);
+    ASSERT_TRUE(sv_equal(sv, sv_from_cstr("test_sv_truncate_front!")));
+
+    sv = sv_truncate_front(sv, strlen(cstr));
+    ASSERT_NULL(sv.buffer);
+
+    sv = sv_truncate_front(sv, strlen(cstr)+1);
+    ASSERT_NULL(sv.buffer);
+    return 0;
+}
+
+int test_sv_truncate_back(void) {
+    const char* cstr = "This is test_sv_truncate_back!";
+
+    StringView sv = sv_from_cstr(cstr);
+
+    sv = sv_truncate_back(sv, 26);
+    ASSERT_TRUE(sv_equal(sv, sv_from_cstr("This")));
+
+    sv = sv_truncate_back(sv, strlen(cstr));
+    ASSERT_NULL(sv.buffer);
+
+    sv = sv_truncate_back(sv, strlen(cstr)+1);
+    ASSERT_NULL(sv.buffer);
+    return 0;
+}
+
+int test_sv_trim_front(void) {
+    const char* cstr = "This is without spaces at the front test_sv_trim_front!";
+    StringView sv = sv_from_cstr(cstr);
+    StringView r;
+
+    r = sv_trim_front(sv);
+    ASSERT_TRUE(sv_equal(r, sv));
+
+    const char* cstr2 = "   \t This is with spaces at the front test_sv_trim_front!";
+    sv = sv_from_cstr(cstr);
+
+    r = sv_trim_front(sv);
+    ASSERT_TRUE(sv_equal(r, sv_from_cstr("This is with spaces at the front test_sv_trim_front!")));
+    return 0;
+}
+
+int test_sv_trim_back(void) {
+    const char* cstr = "This is without spaces at the back test_sv_trim_back!";
+    StringView sv = sv_from_cstr(cstr);
+    StringView r;
+
+    r = sv_trim_back(sv);
+    ASSERT_TRUE(sv_equal(r, sv));
+
+    const char* cstr2 = "   \t This is with spaces at the back test_sv_trim_back! \v \f";
+    sv = sv_from_cstr(cstr);
+
+    r = sv_trim_back(sv);
+    ASSERT_TRUE(sv_equal(r, sv_from_cstr("   \t This is with spaces at the back test_sv_trim_back!")));
+    return 0;
+}
+
 int test_sv_equal(void) {
     const char* cstr = "This is test_sv_equal!";
     StringView sv1 = sv_from_cstr(cstr);

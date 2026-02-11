@@ -55,9 +55,20 @@ test_entry tests[] = {
     // {"test_string_erase", test_string_erase},
     // {"test_string_clear", test_string_clear},
 
+
+    {"test_sv_from_buffer", test_sv_from_buffer},
+    {"test_sv_from_cstr", test_sv_from_cstr},
+    // {"test_sv_from_string", test_sv_from_string},
+
+    {"test_sv_slice_sv", test_sv_slice_sv},
+    {"test_sv_slice_string", test_sv_slice_string},
+    {"test_sv_truncate_front", test_sv_truncate_front},
+    {"test_sv_truncate_back", test_sv_truncate_back},
+    {"test_sv_trim_front", test_sv_truncate_front},
+    {"test_sv_trim_back", test_sv_truncate_back},
+
     {"test_sv_equal", test_sv_equal},
     {"test_sv_compare", test_sv_compare},
-
     {"test_sv_starts_with", test_sv_starts_with},
     {"test_sv_ends_with", test_sv_ends_with},
 
