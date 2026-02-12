@@ -962,3 +962,36 @@ int test_sv_ends_with(void) {
 
     return 0;
 }
+
+int test_sv_find(void) {
+    const char* cstr = "This is a test to find a needle in a haystack test_sv_find!";
+    StringView sv = sv_from_cstr(cstr);
+    size_t r;
+
+    r = sv_find(sv, sv_from_cstr("This"));
+    ASSERT_EQ(r, 0);
+
+    r = sv_find(sv, sv_from_cstr("test"));
+    ASSERT_EQ(r, 10);
+    ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("test")));
+
+    return 0;
+}
+
+int test_sv_rfind(void) {
+    const char* cstr = "This is a test to find a needle in a haystack test_sv_rfind!";
+    StringView sv = sv_from_cstr(cstr);
+    size_t r;
+
+    r = sv_rfind(sv, sv_from_cstr("This"));
+    ASSERT_EQ(r, 0);
+
+    r = sv_rfind(sv, sv_from_cstr("rfind!"));
+    ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("rfind!")));
+
+    r = sv_rfind(sv, sv_from_cstr("test"));
+    ASSERT_EQ(r, 46);
+    ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("test")));
+
+    return 0;
+}

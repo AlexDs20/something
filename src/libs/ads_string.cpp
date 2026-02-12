@@ -9,6 +9,24 @@ static size_t get_new_capacity(size_t new_size) {
     return new_size >= 16 ? (2*new_size)+1 : 16;
 }
 
+static int compare(const void* v1, const void* v2, size_t len) {
+    const char* s1 = (const char*)v1;
+    const char* s2 = (const char*)v2;
+    while (len-- > 0) {
+        if (*s1++ != *s2++) {
+            return s1[-1] < s2[-1] ? -1 : 1;
+        }
+    }
+    return 0;
+}
+
+typedef void* (*MemCopyFunc)(
+    void* dest,
+    const void* src,
+    size_t n
+);
+
+
 //==============================
 // STRING
 //==============================
@@ -144,6 +162,8 @@ int string_append_sv(Arena* arena, String* str, StringView append) {
     char* arena_top;
     size_t new_size;
     void* tmp;
+
+    MemCopyFunc safe_cpy = memcpy;
 
     if (str == NULL || str->buffer == NULL) {
         return -1;
@@ -866,17 +886,6 @@ StringView sv_trim_back(StringView sv) {
     return sv;
 }
 
-int compare(const void* v1, const void* v2, size_t len) {
-    const char* s1 = (const char*)v1;
-    const char* s2 = (const char*)v2;
-    while (len-- > 0) {
-        if (*s1++ != *s2++) {
-            return s1[-1] < s2[-1] ? -1 : 1;
-        }
-    }
-    return 0;
-}
-
 bool sv_equal(StringView sv1, StringView sv2) {
     if (sv1.size != sv2.size) return false;
     int cmp = compare(sv1.buffer, sv2.buffer, sv1.size);
@@ -922,6 +931,43 @@ bool sv_ends_with(StringView sv, StringView pre) {
         }
     }
     return true;
+}
+
+size_t sv_find(StringView haystack, StringView needle) {
+    if (haystack.buffer == NULL || needle.buffer == NULL) {
+        return 0;
+    }
+
+    const unsigned char* s1 = (const unsigned char*) haystack.buffer;
+    const unsigned char* s2 = (const unsigned char*) needle.buffer;
+
+    size_t len = haystack.size-needle.size;
+    size_t i = 0;
+    for (size_t i = 0; i<len; i++, s1++) {
+        if (compare(s1, s2, needle.size) == 0) {
+            return i;
+        }
+    }
+
+    return haystack.size;
+}
+
+size_t sv_rfind(StringView haystack, StringView needle) {
+    if (haystack.buffer == NULL || needle.buffer == NULL) {
+        return 0;
+    }
+
+    size_t len = haystack.size-needle.size;
+    const unsigned char* s1 = (const unsigned char*) haystack.buffer + len;
+
+    while(len >= 0) {
+        if (compare(s1--, needle.buffer, needle.size) == 0) {
+            return len;
+        }
+        len--;
+    }
+
+    return haystack.size;
 }
 
 void sv_print(StringView sv) {

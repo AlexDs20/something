@@ -71,6 +71,9 @@ test_entry tests[] = {
     {"test_sv_compare", test_sv_compare},
     {"test_sv_starts_with", test_sv_starts_with},
     {"test_sv_ends_with", test_sv_ends_with},
+    {"test_sv_find", test_sv_find},
+    {"test_sv_rfind", test_sv_rfind},
+
 
 };
 
