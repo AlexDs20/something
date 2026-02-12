@@ -133,18 +133,36 @@ int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args)
 
     size_t len = (size_t)n;
 
-    if (str->size+1+len > str->capacity) {
-        int fail = string_grow_capacity(arena, str, len);
-        if (fail) {
-            return fail;
+    if (str->size + len + 1 > str->capacity) {
+        void* arena_top = arena_alloc_used_location(arena);
+        if (arena_top == NULL) return -1;
+
+        size_t new_size = str->size + len;
+        size_t new_capacity = get_new_capacity(new_size);
+
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
+                return -1;
+            }
         }
+        else {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memcpy(t, str->buffer, str->size);
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
     }
 
     va_copy(args2, args);
     vsnprintf(str->buffer+str->size, len+1, fmt, args2);
     va_end(args2);
+
     str->size += len;
-    //==================================================
+    str->buffer[str->size] = '\0';
 
     return 0;
 }
@@ -157,81 +175,38 @@ int string_append_fmt(Arena* arena, String* str, const char* fmt, ...) {
     return r;
 }
 
-// TODO(alex): Check whether the StringView overlaps the str! in that case use memmove and not memcopy
 int string_append_sv(Arena* arena, String* str, StringView append) {
-    char* arena_top;
-    size_t new_size;
-    void* tmp;
-
-    MemCopyFunc safe_cpy = memcpy;
-
-    if (str == NULL || str->buffer == NULL) {
-        return -1;
-    }
-    if (append.buffer == NULL){
+    if (str == NULL || str->buffer == NULL || append.buffer == NULL) {
         return -1;
     }
 
-    new_size = str->size + append.size;
+    if (str->size + append.size + 1 > str->capacity) {
+        void* arena_top = arena_alloc_used_location(arena);
+        if (arena_top == NULL) return -1;
 
-    // Need to "realloc"
-    if (new_size + 1 > str->capacity) {
+        size_t new_size = str->size + append.size;
         size_t new_capacity = get_new_capacity(new_size);
 
-        arena_top = (char*)arena_alloc_used_location(arena);
-        if (arena_top == NULL) {
-            return -1;
-        }
-
-        // If our current string ends at the top of arena -> we are gucci!
-        // We just push onto the arena
         if (arena_top == str->buffer+str->capacity) {
-            size_t bytes_needed = new_capacity - str->capacity;
-            tmp = arena_alloc_push_unaligned(arena, bytes_needed);
-            if (tmp == NULL) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
                 return -1;
             }
         }
         else {
-            tmp = arena_alloc_push(arena, new_capacity);
-            if (tmp == NULL) {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
                 return -1;
             }
-            memcpy(tmp, str->buffer, str->size);
-            str->buffer = (char*)tmp;
+            memcpy(t, str->buffer, str->size);
+            str->buffer = t;
         }
         str->capacity = new_capacity;
     }
-    else
 
     memcpy(str->buffer+str->size, append.buffer, append.size);
-    str->size = new_size;
-    str->buffer[new_size] = '\0';
-    return 0;
-}
-
-int string_grow_capacity(Arena* arena, String* str, size_t amount) {
-    if (str == NULL || str->buffer == NULL) {
-        return -1;
-    }
-
-    char* arena_top = (char*)arena_alloc_used_location(arena);
-    if (arena_top == NULL) {
-        return -1;
-    }
-    if (arena_top == str->buffer + str->capacity) {
-        void* tmp = arena_alloc_push_unaligned(arena, amount);
-        if (tmp == NULL) return -1;
-    }
-    else {
-        void* tmp = arena_alloc_push(arena, str->capacity+amount);
-        if (tmp == NULL) return -1;
-
-        memcpy(tmp, str->buffer, str->size+1);
-
-        str->buffer = (char*)tmp;
-    }
-    str->capacity += amount;
+    str->size += append.size;
+    str->buffer[str->size] = '\0';
 
     return 0;
 }

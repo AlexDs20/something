@@ -12,6 +12,22 @@
 - Renderer:
     - [ ] Add another implementation for rasterizing using bounding box
     - [ ] Add rendering texture on mesh
+- Libs:
+    - [ ] String
+    - [ ] Image
+        - [X] JPEG
+        - [ ] PNG
+    - [ ] DataStructures
+        - [ ] Vector
+        - [ ] HashMap
+    - [ ] LIBC
+    - [ ] IMGUI
+    - [ ] Network
+    - [ ] Audio
+    - [ ] Math
+    - [ ] Window
+    - [ ] Threads
+    - [ ] Text format: true type?
 
 # Implemented
 - Window using Xlib with scaling nearest / bilinear or no scaling
