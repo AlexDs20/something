@@ -212,7 +212,6 @@ int test_string_append_sv(void) {
     return 0;
 }
 
-/*
 int test_string_append_string(void) {
     const char* cstr =  "This is test_string_append_string";
     String s1 = string_init_cstr(arena, cstr);
@@ -327,7 +326,6 @@ int test_string_append_char(void) {
     ASSERT_GE(s1.capacity, strlen(cstr)+1);
     return 0;
 }
-*/
 
 int test_string_prepend_fmt(void) {
     const char* cstr =  "This is test_string_prepend_fmt\n";
@@ -559,47 +557,6 @@ int test_string_insert_sv(void) {
     return 0;
 }
 
-int test_string_overwrite_fmt(void) {
-    const char* cstr = "This is the normal version of test_string_overwrite_fmt!";
-    String s = string_init_cstr(arena, cstr);
-    string_overwrite_fmt(arena, &s, 12, "%s", "super edited");
-
-
-    s = string_init_cstr(arena, cstr);
-    string_overwrite_fmt(arena, &s, 12, "%s", "super edited version of this and a lot of stuff........................................\n");
-
-    return 0;
-}
-
-int test_string_overwrite_sv(void) {
-    const char* cstr = "This is the normal version of test_string_overwrite_sv!";
-
-    String s = string_init_cstr(arena, cstr);
-    StringView sv = sv_from_cstr("edited");
-    string_overwrite_sv(arena, &s, 12, sv);
-
-
-    s = string_init_cstr(arena, cstr);
-    sv = sv_from_cstr("edited with a very long but not so long as we need to realloc");
-    string_overwrite_sv(arena, &s, 12, sv);
-
-
-    const char* cstr2 = "Short test_string_overwrite_sv";
-
-    s = string_init_cstr(arena, cstr2);
-    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
-    string_overwrite_sv(arena, &s, 12, sv);
-
-
-    s = string_init_cstr(arena, cstr2);
-    arena_alloc_push(arena, 42);
-    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
-    string_overwrite_sv(arena, &s, 12, sv);
-
-
-    return 0;
-}
-
 /*
 int test_string_insert_buffer() {
     const char* cstr =  "This is my initial string\n";
@@ -669,6 +626,49 @@ int test_string_insert_buffer() {
 
     return 0;
 }
+*/
+
+int test_string_overwrite_fmt(void) {
+    const char* cstr = "This is the normal version of test_string_overwrite_fmt!";
+    String s = string_init_cstr(arena, cstr);
+    string_overwrite_fmt(arena, &s, 12, "%s", "super edited");
+
+
+    s = string_init_cstr(arena, cstr);
+    string_overwrite_fmt(arena, &s, 12, "%s", "super edited version of this and a lot of stuff........................................\n");
+
+    return 0;
+}
+
+int test_string_overwrite_sv(void) {
+    const char* cstr = "This is the normal version of test_string_overwrite_sv!";
+
+    String s = string_init_cstr(arena, cstr);
+    StringView sv = sv_from_cstr("edited");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    s = string_init_cstr(arena, cstr);
+    sv = sv_from_cstr("edited with a very long but not so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    const char* cstr2 = "Short test_string_overwrite_sv";
+
+    s = string_init_cstr(arena, cstr2);
+    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    s = string_init_cstr(arena, cstr2);
+    arena_alloc_push(arena, 42);
+    sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
+    string_overwrite_sv(arena, &s, 12, sv);
+
+
+    return 0;
+}
+/*
 
 int test_string_overwrite_buffer(void) {
     const char* cstr =  "This  is test_string_overwrite_buffer";
@@ -846,7 +846,7 @@ int test_sv_trim_front(void) {
     ASSERT_TRUE(sv_equal(r, sv));
 
     const char* cstr2 = "   \t This is with spaces at the front test_sv_trim_front!";
-    sv = sv_from_cstr(cstr);
+    sv = sv_from_cstr(cstr2);
 
     r = sv_trim_front(sv);
     ASSERT_TRUE(sv_equal(r, sv_from_cstr("This is with spaces at the front test_sv_trim_front!")));
@@ -862,7 +862,7 @@ int test_sv_trim_back(void) {
     ASSERT_TRUE(sv_equal(r, sv));
 
     const char* cstr2 = "   \t This is with spaces at the back test_sv_trim_back! \v \f";
-    sv = sv_from_cstr(cstr);
+    sv = sv_from_cstr(cstr2);
 
     r = sv_trim_back(sv);
     ASSERT_TRUE(sv_equal(r, sv_from_cstr("   \t This is with spaces at the back test_sv_trim_back!")));

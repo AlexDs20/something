@@ -96,4 +96,4 @@ size_t sv_rfind(StringView haystack, StringView needle);
 void sv_print(StringView sv);
 void sv_debug_print(StringView sv);
 
-#endif
+#endif  // _ADS_STRING_H_

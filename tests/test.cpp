@@ -21,18 +21,18 @@ test_entry tests[] = {
 
     {"test_string_init_empty", test_string_init_empty},
     {"test_string_init_fmt", test_string_init_fmt},
-    // {"test_string_init_sv", test_string_init_sv},
-    // {"test_string_init_cstr", test_string_init_cstr},
-    // {"test_string_init_buffer", test_string_init_buffer},
+    {"test_string_init_sv", test_string_init_sv},
+    {"test_string_init_cstr", test_string_init_cstr},
+    {"test_string_init_buffer", test_string_init_buffer},
 
     {"test_string_grow_capacity", test_string_grow_capacity},
 
     {"test_string_append_fmt", test_string_append_fmt},
     {"test_string_append_sv", test_string_append_sv},
-    // {"test_string_append_string", test_string_append_string},
-    // {"test_string_append_cstr", test_string_append_cstr},
-    // {"test_string_append_buffer", test_string_append_buffer},
-    // {"test_string_append_char", test_string_append_char},
+    {"test_string_append_string", test_string_append_string},
+    {"test_string_append_cstr", test_string_append_cstr},
+    {"test_string_append_buffer", test_string_append_buffer},
+    {"test_string_append_char", test_string_append_char},
 
     {"test_string_prepend_fmt", test_string_prepend_fmt},
     {"test_string_prepend_sv", test_string_prepend_sv},
@@ -64,8 +64,8 @@ test_entry tests[] = {
     {"test_sv_slice_string", test_sv_slice_string},
     {"test_sv_truncate_front", test_sv_truncate_front},
     {"test_sv_truncate_back", test_sv_truncate_back},
-    {"test_sv_trim_front", test_sv_truncate_front},
-    {"test_sv_trim_back", test_sv_truncate_back},
+    {"test_sv_trim_front", test_sv_trim_front},
+    {"test_sv_trim_back", test_sv_trim_back},
 
     {"test_sv_equal", test_sv_equal},
     {"test_sv_compare", test_sv_compare},

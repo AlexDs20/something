@@ -857,8 +857,8 @@ StringView sv_trim_front(StringView sv) {
     size_t i = 0;
     for (; i<sv.size; ++i) {
         char c = sv.buffer[i];
-        if ((c >= 9 && c <= 13) || c == 32) {
-            continue;
+        if (!((c >= 9 && c <= 13) || c == 32)) {
+            break;
         }
     }
     return (StringView){
@@ -972,7 +972,7 @@ size_t sv_rfind(StringView haystack, StringView needle) {
 
 void sv_print(StringView sv) {
     if (sv.buffer) {
-        printf("%.*s\n", sv.size, sv.buffer);
+        printf("%.*s", sv.size, sv.buffer);
     }
 }
 
