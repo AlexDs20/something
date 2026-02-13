@@ -279,6 +279,33 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
         return -1;
     }
 
+    LocalArena* local_arena;
+    const char* pre_buffer = pre.buffer;
+
+    // If the StringView is a part the string we prepend
+    // Copy to a side buffer
+    if ((str->buffer<=pre.buffer && pre.buffer<str->buffer+str->size) ||
+        (str->buffer<=pre.buffer+pre.size && pre.buffer+pre.size<str->buffer+str->size)) {
+
+        // Note that because the string owns the memory the StringView should be fully contained in the String
+        // If that is not the case -> user error!
+        if (pre.buffer < str->buffer || str->buffer+str->size<pre.buffer+pre.size) {
+            return -1;
+        }
+
+        local_arena = local_arena_alloc_create();
+        if (local_arena == NULL) {
+            return -1;
+        }
+
+        char* t = (char*)arena_alloc_push_struct(local_arena->arena, (void*)pre.buffer, pre.size);
+        if (t == NULL) {
+            local_arena_alloc_reset(local_arena);
+            return -1;
+        }
+        pre_buffer = t;
+    }
+
     new_size = str->size + pre.size;
 
     // Need to realloc
@@ -287,6 +314,9 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
 
         arena_top = (char*)arena_alloc_used_location(arena);
         if (arena_top == NULL) {
+            if (local_arena == NULL) {
+                local_arena_alloc_reset(local_arena);
+            }
             return -1;
         }
 
@@ -294,6 +324,9 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
             size_t bytes_needed = new_capacity - str->capacity;
             tmp = (char*)arena_alloc_push_unaligned(arena, bytes_needed);
             if (tmp == NULL) {
+                if (local_arena == NULL) {
+                    local_arena_alloc_reset(local_arena);
+                }
                 return -1;
             }
             memmove(str->buffer+pre.size, str->buffer, str->size+1);
@@ -301,6 +334,9 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
         else {
             tmp = (char*)arena_alloc_push(arena, new_capacity);
             if (tmp == NULL) {
+                if (local_arena == NULL) {
+                    local_arena_alloc_reset(local_arena);
+                }
                 return -1;
             }
             memcpy(tmp+pre.size, str->buffer, str->size+1);
@@ -312,7 +348,10 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
         memmove(str->buffer+pre.size, str->buffer, str->size+1);
     }
 
-    memcpy(str->buffer, pre.buffer, pre.size);
+    memcpy(str->buffer, pre_buffer, pre.size);
+    if (local_arena == NULL) {
+        local_arena_alloc_reset(local_arena);
+    }
     str->size = new_size;
     return 0;
 }
@@ -436,6 +475,7 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
     return 0;
 }
 
+// TODO(alex): Handle if StringView intersect the String
 int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
     va_list args2;
 
@@ -559,6 +599,7 @@ int string_erase(String* str, size_t pos, size_t len) {
     return 0;
 }
 
+// TODO(alex): Handle if StringView intersect the String
 static int erase_and_insert_main_logic(Arena* arena, String* str, size_t pos, size_t len, size_t insert_len) {
     // Check the size difference between what is removed and what is added
     int size_difference = len - insert_len;
@@ -616,57 +657,6 @@ int string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len
 
     memcpy(str->buffer+pos, sv.buffer, sv.size);
     str->size += (sv.size-len);
-    return 0;
-}
-
-int string_erase_and_insert_sv_v0(Arena* arena, String* str, size_t pos, size_t len, StringView sv) {
-    if (str == NULL || str->buffer == NULL || sv.buffer == NULL || pos+len > str->size) {
-        return -1;
-    }
-
-    if (len == 0) {
-        if (pos == 0) {
-            return string_prepend_sv(arena, str, sv);
-        }
-        if (pos == str->size) {
-            return string_append_sv(arena, str, sv);
-        }
-        return string_insert_sv(arena, str, pos, sv);
-    }
-
-    // Check the size difference between what is removed and what is added
-    int size_difference = len - sv.size;
-    if (size_difference == 0) {
-        memcpy(str->buffer + pos, sv.buffer, sv.size);
-        return 0;
-    }
-
-    size_t new_size = str->size + size_difference;
-
-    // If we grow beyond the current capacity => need more space
-    if (str->size+1+size_difference > str->capacity) {
-        size_t new_capacity = get_new_capacity(str->size+size_difference);
-        char* arena_top = (char*)arena_alloc_used_location(arena);
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) return -1;
-            memmove(str->buffer+pos+sv.size, str->buffer+pos+len, str->size+1 - (pos+len));
-        }
-        else {
-            char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) return -1;
-            memcpy(t, str->buffer, pos);
-            memcpy(t+pos+sv.size, str->buffer+pos+len, str->size+1-(pos+len));
-            str->buffer = t;
-        }
-        str->capacity = new_capacity;
-    }
-    else {
-        memmove(str->buffer+pos+sv.size, str->buffer+pos+len, str->size+1 - (pos+len));
-    }
-
-    memcpy(str->buffer+pos, sv.buffer, sv.size);
-    str->size = new_size;
     return 0;
 }
 

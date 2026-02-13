@@ -119,27 +119,6 @@ int test_string_init_buffer(void) {
     return 0;
 }
 
-int test_string_grow_capacity(void) {
-    const char* cstr = "This is test_string_grow_capacity!";
-    String s = string_init_cstr(arena, cstr);
-    size_t init_size = s.size;
-    size_t init_capacity = s.capacity;
-    size_t amount = 2;
-    int r = string_grow_capacity(arena, &s, amount);
-
-    ASSERT_EQ(r, 0);
-    ASSERT_EQ(s.capacity,   init_capacity+amount);
-
-
-    s = string_init_cstr(arena, cstr);
-    amount = 100;
-    r = string_grow_capacity(arena, &s, amount);
-    ASSERT_EQ(r, 0);
-    ASSERT_EQ(s.capacity,   init_capacity+amount);
-    ASSERT_EQ(s.size,       init_size);
-    return 0;
-}
-
 int test_string_append_fmt(void) {
     const char* cstr =  "This is test_string_append_fmt";
     String s1 = string_init_cstr(arena, cstr);
@@ -418,6 +397,17 @@ int test_string_prepend_sv(void) {
     ASSERT_NOT_NULL(s1.buffer);
     ASSERT_EQ(s1.size, strlen(cstr));
     ASSERT_GE(s1.capacity, strlen(cstr));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    StringView sv4 = sv_slice_string(s1, 8, s1.size-8);
+    r = string_prepend_sv(arena, &s1, sv4);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size, strlen(cstr)+sv4.size);
+    ASSERT_GE(s1.capacity, strlen(cstr)+sv4.size);
 
     return 0;
 }

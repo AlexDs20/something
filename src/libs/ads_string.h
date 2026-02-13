@@ -2,6 +2,16 @@
 #define _ADS_STRING_H_
 #include <stdarg.h>     // for variadic number of args.
 
+// TODO?
+typedef enum {
+    STRING_SUCCESS = 0,
+    // STRING_NULL,
+    // STRING_ARENA_FAIL,
+    // STRING_OUT_OF_MEMORY,
+    // STRING_OUT_OF_BOUNDS,
+    STRING_FAIL,
+} StringError;
+
 typedef struct {
     const char* buffer;
     size_t size;                    // bytes excluding \0
@@ -63,7 +73,6 @@ int     string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_
 int     string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, va_list args);
 int     string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
 
-int    string_grow_capacity(Arena* arena, String* str, size_t amount);
 int    string_clear(String* str);
 int    string_erase(String* str, size_t pos, size_t len);
 String string_deep_copy(Arena* arena, const String* str);

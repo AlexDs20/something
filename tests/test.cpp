@@ -10,7 +10,7 @@ Arena* arena = arena_alloc_create_zero(1*GiB);
 #include "tests/test_ads_string.h"
 
 typedef struct {
-    char* name;
+    const char* name;
     int (*function)(void);
 } test_entry;
 
@@ -24,8 +24,6 @@ test_entry tests[] = {
     {"test_string_init_sv", test_string_init_sv},
     {"test_string_init_cstr", test_string_init_cstr},
     {"test_string_init_buffer", test_string_init_buffer},
-
-    {"test_string_grow_capacity", test_string_grow_capacity},
 
     {"test_string_append_fmt", test_string_append_fmt},
     {"test_string_append_sv", test_string_append_sv},
