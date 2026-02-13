@@ -269,7 +269,6 @@ int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
     return r;
 }
 
-// TODO(alex): Handle if the StringView is in the current string!!
 int string_prepend_sv(Arena* arena, String* str, StringView pre) {
     size_t new_size;
     char* arena_top;
@@ -284,12 +283,12 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
 
     // If the StringView is a part the string we prepend
     // Copy to a side buffer
-    if ((str->buffer<=pre.buffer && pre.buffer<str->buffer+str->size) ||
-        (str->buffer<=pre.buffer+pre.size && pre.buffer+pre.size<str->buffer+str->size)) {
+    if ((str->buffer <= pre.buffer            && pre.buffer            <  str->buffer+str->size) ||
+        (str->buffer <= pre.buffer + pre.size && pre.buffer + pre.size <= str->buffer+str->size)) {
 
         // Note that because the string owns the memory the StringView should be fully contained in the String
         // If that is not the case -> user error!
-        if (pre.buffer < str->buffer || str->buffer+str->size<pre.buffer+pre.size) {
+        if (pre.buffer < str->buffer || str->buffer+str->size < pre.buffer+pre.size) {
             return -1;
         }
 
@@ -428,7 +427,6 @@ int string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ..
     return r;
 }
 
-// TODO(alex): Handle if StringView intersect the String
 int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
     if ((str == NULL) || (str->buffer == NULL) || (pos > str->size) || (ins.buffer == NULL)) {
         return -1;
@@ -441,6 +439,33 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         return string_append_sv(arena, str, ins);
     }
 
+    LocalArena* local_arena;
+    const char* ins_buffer = ins.buffer;
+
+    // If the StringView is partly after where we insert
+    // Copy to a side buffer
+    if ((str->buffer+pos <= ins.buffer           && ins.buffer          <  str->buffer+str->size) ||
+        (str->buffer+pos <  ins.buffer+ins.size  && ins.buffer+ins.size <= str->buffer+str->size)) {
+
+        // Note that because the string owns the memory the StringView should be fully contained in the String
+        // If that is not the case -> user error!
+        if (ins.buffer < str->buffer || str->buffer+str->size < ins.buffer+ins.size) {
+            return -1;
+        }
+
+        local_arena = local_arena_alloc_create();
+        if (local_arena == NULL) {
+            return -1;
+        }
+
+        // TODO: Optimization ? Only copy the part intersecting what moves
+        char* t = (char*)arena_alloc_push_struct(local_arena->arena, (void*)ins.buffer, ins.size);
+        if (t == NULL) {
+            local_arena_alloc_reset(local_arena);
+            return -1;
+        }
+        ins_buffer = t;
+    }
 
     size_t new_size = str->size + ins.size;
 
@@ -450,6 +475,9 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         if (arena_top == str->buffer+str->capacity) {
             void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
             if (t == NULL) {
+                if (local_arena == NULL) {
+                    local_arena_alloc_reset(local_arena);
+                }
                 return -1;
             }
             memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
@@ -457,6 +485,9 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         else {
             char* t = (char*)arena_alloc_push(arena, new_capacity);
             if (t == NULL) {
+                if (local_arena == NULL) {
+                    local_arena_alloc_reset(local_arena);
+                }
                 return -1;
             }
             memcpy(t, str->buffer, pos);
@@ -469,7 +500,10 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
     }
 
-    memcpy(str->buffer+pos, ins.buffer, ins.size);
+    memcpy(str->buffer+pos, ins_buffer, ins.size);
+    if (local_arena == NULL) {
+        local_arena_alloc_reset(local_arena);
+    }
 
     str->size += ins.size;
     return 0;

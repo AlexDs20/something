@@ -544,6 +544,17 @@ int test_string_insert_sv(void) {
     ASSERT_EQ(s1.size,      strlen(cstr) + sv_long.size);
     ASSERT_GE(s1.capacity,  strlen(cstr) + sv_long.size);
 
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
+    sv = sv_slice_string(s1, 7, 22);
+    r = string_insert_sv(arena, &s1, 7, sv);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + sv.size);
+    ASSERT_GE(s1.capacity,  strlen(cstr) + sv.size);
+
     return 0;
 }
 
