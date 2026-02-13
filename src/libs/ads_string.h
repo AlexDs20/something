@@ -93,6 +93,10 @@ StringView sv_truncate_front(StringView sv, size_t len);
 StringView sv_truncate_back(StringView sv, size_t len);
 StringView sv_trim_front(StringView sv);         // removes ' ', '\t', '\n', '\r', '\v'. '\f'
 StringView sv_trim_back(StringView sv);
+// StringView sv_split_delim(StringView* sv, char delim)
+// StringView sv_file_extension(StringView sv);
+// StringView sv_file_name(StringView sv);
+// StringView sv_directory_name(StringView sv);
 
 bool sv_equal(StringView sv1, StringView sv2);
 int  sv_compare(const StringView* sv1, const StringView* sv2);         // For usage with e.g. qsort or binary search

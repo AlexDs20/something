@@ -10,12 +10,14 @@ static size_t get_new_capacity(size_t new_size) {
 }
 
 static int compare(const void* v1, const void* v2, size_t len) {
-    const char* s1 = (const char*)v1;
-    const char* s2 = (const char*)v2;
+    const unsigned char* s1 = (const unsigned char*)v1;
+    const unsigned char* s2 = (const unsigned char*)v2;
     while (len-- > 0) {
-        if (*s1++ != *s2++) {
-            return s1[-1] < s2[-1] ? -1 : 1;
+        if (*s1 != *s2) {
+            return *s1 < *s2 ? -1 : 1;
         }
+        s1++;
+        s2++;
     }
     return 0;
 }
@@ -682,7 +684,6 @@ static int erase_and_insert_main_logic(Arena* arena, String* str, size_t pos, si
     return 0;
 }
 
-// TODO(alex): Handle if StringView intersect the String
 int string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv) {
     if (str == NULL || str->buffer == NULL || sv.buffer == NULL || pos+len > str->size) {
         return -1;
@@ -835,10 +836,6 @@ void string_debug_print(const String* s) {
     printf("  free:       %lu bytes\n",      s->capacity - s->size - 1);
 }
 
-void string_debug_print(String s) {
-    string_debug_print(&s);
-}
-
 void string_print(const String* s) {
     printf("%s", s->buffer);
 }
@@ -981,18 +978,25 @@ bool sv_ends_with(StringView sv, StringView pre) {
 }
 
 size_t sv_find(StringView haystack, StringView needle) {
+    /*
+     * Look into Boyer-Moore-Horspool for better perf.
+     * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
+     */
     if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return 0;
+        return haystack.size;
     }
+    if (needle.size == 0) return 0;
+    if (needle.size > haystack.size) return haystack.size;
 
     const unsigned char* s1 = (const unsigned char*) haystack.buffer;
     const unsigned char* s2 = (const unsigned char*) needle.buffer;
 
     size_t len = haystack.size-needle.size;
-    size_t i = 0;
-    for (size_t i = 0; i<len; i++, s1++) {
-        if (compare(s1, s2, needle.size) == 0) {
-            return i;
+    for (size_t i = 0; i<=len; i++, s1++) {
+        if (*s1 == *s2) {
+            if (compare(s1, s2, needle.size) == 0) {
+                return i;
+            }
         }
     }
 
@@ -1001,17 +1005,21 @@ size_t sv_find(StringView haystack, StringView needle) {
 
 size_t sv_rfind(StringView haystack, StringView needle) {
     if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return 0;
+        return haystack.size;
     }
 
-    size_t len = haystack.size-needle.size;
-    const unsigned char* s1 = (const unsigned char*) haystack.buffer + len;
+    size_t idx = haystack.size-needle.size;
+    const unsigned char* s1 = (const unsigned char*) haystack.buffer + idx;
 
-    while(len >= 0) {
+    while(1) {
         if (compare(s1--, needle.buffer, needle.size) == 0) {
-            return len;
+            return idx;
         }
-        len--;
+
+        if (idx == 0) {
+            break;
+        }
+        idx--;
     }
 
     return haystack.size;
