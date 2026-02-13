@@ -666,6 +666,14 @@ int test_string_overwrite_sv(void) {
     sv = sv_from_cstr("edited with a very long StringView, so long as we need to realloc");
     string_overwrite_sv(arena, &s, 12, sv);
 
+    s = string_init_cstr(arena, cstr);
+    sv = sv_slice_string(s, 12, 6);
+    string_overwrite_sv(arena, &s, 14, sv);
+
+    s = string_init_cstr(arena, cstr);
+    sv = sv_slice_string(s, 12, s.size-12);
+    string_overwrite_sv(arena, &s, 30, sv);
+
 
     return 0;
 }
@@ -713,6 +721,11 @@ int test_string_erase_and_insert_sv(void) {
     arena_alloc_push(arena, 42);
     sv = sv_from_cstr("inserting a lot of stuff here so that we have to touch the arena");
     string_erase_and_insert_sv(arena, &s, 8, 1, sv);
+
+
+    s = string_init_cstr(arena, cstr);
+    sv = sv_slice_string(s, 10, 41);
+    string_erase_and_insert_sv(arena, &s, 19, 4, sv);
 
     return 0;
 }

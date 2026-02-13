@@ -60,7 +60,6 @@ int     string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins);
 #define string_insert_buffer(arena, str, pos, buffer, len)  string_insert_sv(arena, str, pos, sv_from_buffer(buffer, len))
 #define string_insert_char(arena, str, c)                   do { char _c=(c); string_insert_sv(arena, str, pos, sv_from_buffer(&(_c), 1)); } while (0)
 
-// Make overwrite grow again, pass Arena* arena
 int     string_overwrite_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...);
 int     string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args);
 int     string_overwrite_sv(Arena* arena, String* str, size_t pos, StringView sv);
