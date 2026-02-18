@@ -22,11 +22,21 @@ static int compare(const void* v1, const void* v2, size_t len) {
     return 0;
 }
 
+static int fmt_length(const char* fmt, va_list args) {
+    int n;
+    va_list args2;
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
+    va_copy(args2, args);
+    n = vsnprintf(NULL, 0, fmt, args2);
+    va_end(args2);
+    return n;
+}
+
 //==============================
 // STRING
 //==============================
 String string_init_empty(Arena* arena, size_t capacity) {
-    String str = {0};
+    String str;
 
     str.buffer = (char*) arena_alloc_push(arena, capacity);
 
@@ -49,25 +59,20 @@ String string_init_fmt(Arena* arena, const char* fmt, ...) {
 }
 
 String string_init_vfmt(Arena* arena, const char* fmt, va_list args) {
-    String str = {0};
-    if (fmt == NULL) {
-        return str;
-    }
-
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
     va_list args2;
-    va_copy(args2, args);
-
-    int n = vsnprintf(NULL, 0, fmt, args2);
-    va_end(args2);
-
-    if (n < 0) {
+    String str;
+    if (fmt == NULL) {
         return (String){0};
     }
 
+    int n = fmt_length(fmt, args);
+    if (n < 0) {
+        return (String){0};
+    }
     size_t len = (size_t)n;
 
     size_t capacity = get_new_capacity(len);
+
     str.buffer = (char*) arena_alloc_push(arena, capacity);
     if (str.buffer == NULL) {
         return (String){0};
@@ -82,10 +87,10 @@ String string_init_vfmt(Arena* arena, const char* fmt, va_list args) {
 }
 
 String string_init_sv(Arena* arena, StringView sv) {
-    String str = {0};
+    String str;
 
     if (sv.buffer == NULL) {
-        return str;
+        return (String){0};
     }
 
     str.capacity = get_new_capacity(sv.size);
@@ -102,37 +107,19 @@ String string_init_sv(Arena* arena, StringView sv) {
 }
 
 const char* string_as_cstr(const String* str) {
-    if (str == NULL || str->buffer == NULL) {
-        return "";
-    }
+    // TODO: Decide if I want to return "" when there is a NULL
     return str->buffer;
 }
 
-int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args){
-    va_list args2;
-    va_copy(args2, args);
+static int append_memory_logic(Arena* arena, String* str, size_t append_len) {
+    size_t new_size = str->size + append_len;
 
-    //==================================================
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
-    if (str == NULL || str->buffer == NULL || fmt == NULL) {
-        return -1;
-    }
-
-    // Sets ap to point before the first additional argument
-    int n = vsnprintf(NULL, 0, fmt, args2);        // Return the "written" size without '\0'
-    va_end(args2);
-
-    if (n < 0) {
-        return -1;
-    }
-
-    size_t len = (size_t)n;
-
-    if (str->size + len + 1 > str->capacity) {
+    if (new_size + 1 > str->capacity) {
         void* arena_top = arena_alloc_used_location(arena);
-        if (arena_top == NULL) return -1;
+        if (arena_top == NULL){
+            return -1;
+        }
 
-        size_t new_size = str->size + len;
         size_t new_capacity = get_new_capacity(new_size);
 
         if (arena_top == str->buffer+str->capacity) {
@@ -151,13 +138,34 @@ int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args)
         }
         str->capacity = new_capacity;
     }
+    str->size = new_size;
+    return 0;
+}
+
+int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args){
+    va_list args2;
+    if (str == NULL || str->buffer == NULL || fmt == NULL) {
+        return -1;
+    }
+
+    //==================================================
+    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
+    int n = fmt_length(fmt, args);
+    if (n < 0) {
+        return -1;
+    }
+    size_t len = (size_t)n;
+    size_t old_size = str->size;
+
+    size_t new_size = str->size + len;
+    int r = append_memory_logic(arena, str, len);
+    if (r != 0) {
+        return r;
+    }
 
     va_copy(args2, args);
-    vsnprintf(str->buffer+str->size, len+1, fmt, args2);
+    vsnprintf(str->buffer+old_size, len+1, fmt, args2);
     va_end(args2);
-
-    str->size += len;
-    str->buffer[str->size] = '\0';
 
     return 0;
 }
@@ -175,75 +183,67 @@ int string_append_sv(Arena* arena, String* str, StringView append) {
         return -1;
     }
 
-    if (str->size + append.size + 1 > str->capacity) {
-        void* arena_top = arena_alloc_used_location(arena);
-        if (arena_top == NULL) return -1;
-
-        size_t new_size = str->size + append.size;
-        size_t new_capacity = get_new_capacity(new_size);
-
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) {
-                return -1;
-            }
-        }
-        else {
-            char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) {
-                return -1;
-            }
-            memcpy(t, str->buffer, str->size);
-            str->buffer = t;
-        }
-        str->capacity = new_capacity;
+    size_t old_size = str->size;
+    int r = append_memory_logic(arena, str, append.size);
+    if (r != 0) {
+        return r;
     }
 
-    memcpy(str->buffer+str->size, append.buffer, append.size);
-    str->size += append.size;
+    memcpy(str->buffer+old_size, append.buffer, append.size);
     str->buffer[str->size] = '\0';
 
     return 0;
 }
 
-int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args) {
-    va_list args2;
-    va_copy(args2, args);
+static int prepend_memory_logic(Arena* arena, String* str, size_t prepend_len) {
+    size_t new_size = str->size + prepend_len;
 
-    //==============================
-    if (str == NULL || str->buffer == NULL || fmt == NULL) {
-        return -1;
-    }
-
-    int n = vsnprintf(NULL, 0, fmt, args2);
-    va_end(args2);
-
-    if (n<0) {
-        return -1;
-    }
-
-    size_t len = (size_t) n;
-
-    const char save_char = str->buffer[0];
-
-    if (str->size+1+len > str->capacity) {
-        size_t new_capacity = get_new_capacity(str->size+len);
+    if (new_size+1 > str->capacity) {
+        size_t new_capacity = get_new_capacity(new_size);
         const char* arena_top = (char*)arena_alloc_used_location(arena);
+
         if (arena_top == str->buffer+str->capacity) {
             void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) return -1;
-            memmove(str->buffer+len, str->buffer, str->size+1);
+            if (t == NULL){
+                return -1;
+            }
+            memmove(str->buffer+prepend_len, str->buffer, str->size+1);
         }
         else {
             char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) return -1;
-            memcpy(t+len, str->buffer, str->size+1);
+            if (t == NULL){
+                return -1;
+            }
+            memcpy(t+prepend_len, str->buffer, str->size+1);
             str->buffer = t;
         }
         str->capacity = new_capacity;
     }
     else {
-        memmove(str->buffer+len, str->buffer, str->size+1);
+        memmove(str->buffer+prepend_len, str->buffer, str->size+1);
+    }
+    str->size = new_size;
+    return 0;
+}
+
+int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args) {
+    va_list args2;
+
+    if (str == NULL || str->buffer == NULL || fmt == NULL) {
+        return -1;
+    }
+
+    int n = fmt_length(fmt, args);
+    if (n<0) {
+        return -1;
+    }
+    size_t len = (size_t) n;
+
+    const char save_char = str->buffer[0];
+
+    int r = prepend_memory_logic(arena, str, len);
+    if (r != 0) {
+        return r;
     }
 
     va_copy(args2, args);
@@ -251,8 +251,6 @@ int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args
     va_end(args2);
 
     str->buffer[len] = save_char;
-    str->size += len;
-    //==============================
     return 0;
 }
 
@@ -300,64 +298,61 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
         pre_buffer = t;
     }
 
-    new_size = str->size + pre.size;
-
-    // Need to realloc
-    if (new_size + 1 > str->capacity) {
-        size_t new_capacity = get_new_capacity(new_size);
-
-        arena_top = (char*)arena_alloc_used_location(arena);
-        if (arena_top == NULL) {
-            if (local_arena != NULL) {
-                local_arena_alloc_reset(local_arena);
-            }
-            return -1;
+    int r = prepend_memory_logic(arena, str, pre.size);
+    if (r != 0) {
+        if (local_arena != NULL) {
+            local_arena_alloc_reset(local_arena);
         }
-
-        if (arena_top == str->buffer + str->capacity) {
-            size_t bytes_needed = new_capacity - str->capacity;
-            tmp = (char*)arena_alloc_push_unaligned(arena, bytes_needed);
-            if (tmp == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-            memmove(str->buffer+pre.size, str->buffer, str->size+1);
-        }
-        else {
-            tmp = (char*)arena_alloc_push(arena, new_capacity);
-            if (tmp == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-            memcpy(tmp+pre.size, str->buffer, str->size+1);
-            str->buffer = tmp;
-        }
-        str->capacity = new_capacity;
-    }
-    else {
-        memmove(str->buffer+pre.size, str->buffer, str->size+1);
+        return r;
     }
 
     memcpy(str->buffer, pre_buffer, pre.size);
     if (local_arena != NULL) {
         local_arena_alloc_reset(local_arena);
     }
+    return 0;
+}
+
+static int insert_memory_logic(Arena* arena, String* str, size_t pos, size_t ins_len) {
+    size_t new_size = str->size + ins_len;
+
+    if (new_size+1 > str->capacity) {
+        size_t new_capacity = get_new_capacity(new_size);
+        char* arena_top = (char*)arena_alloc_used_location(arena);
+
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memmove(str->buffer+pos+ins_len, str->buffer+pos, str->size+1 - pos);
+        }
+        else {
+            char* t = (char*) arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memcpy(t, str->buffer, pos);
+            memcpy(t+pos+ins_len, str->buffer+pos, str->size+1 - pos);
+            str->buffer = t;
+        }
+        str->capacity = new_capacity;
+    }
+    else {
+        memmove(str->buffer+pos+ins_len, str->buffer+pos, str->size+1 - pos);
+    }
+
     str->size = new_size;
     return 0;
 }
 
 int string_insert_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
     va_list args2;
-    va_copy(args2, args);
-
     if (str == NULL || str->buffer == NULL || fmt == NULL || pos > str->size) {
         return -1;
     }
 
+    va_copy(args2, args);
     if (pos == 0) {
         int r = string_prepend_vfmt(arena, str, fmt, args2);
         va_end(args2);
@@ -370,54 +365,29 @@ int string_insert_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, v
 
     int n = vsnprintf(NULL, 0, fmt, args2);
     va_end(args2);
-
     if (n<0) {
         return -1;
     }
-
     size_t len = (size_t) n;
 
+    int r = insert_memory_logic(arena, str, pos, len);
+    if (r != 0) {
+        return r;
+    }
+
     // Save first char of what is after the insert because vsnprintf always puts a \0 ...
-    char save_char = str->buffer[pos];
-
-    if (str->size+1+len > str->capacity) {
-        size_t new_capacity = get_new_capacity(str->size+len);
-        char* arena_top = (char*)arena_alloc_used_location(arena);
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) {
-                return -1;
-            }
-            memmove(str->buffer+pos+len, str->buffer+pos, str->size+1 - pos);
-        }
-        else {
-            char* t = (char*) arena_alloc_push(arena, new_capacity);
-            if (t == NULL) {
-                return -1;
-            }
-            memcpy(t, str->buffer, pos);
-            memcpy(t+pos+len, str->buffer+pos, str->size+1 - pos);
-            str->buffer = t;
-        }
-        str->capacity = new_capacity;
-    }
-    else {
-        memmove(str->buffer+pos+len, str->buffer+pos, str->size+1 - pos);
-    }
-
-
+    char save_char = str->buffer[pos+len];
     va_copy(args2, args);
     vsnprintf(str->buffer+pos, len+1, fmt, args2);
     va_end(args2);
     str->buffer[pos+len] = save_char;
-    str->size += len;
     return 0;
 }
 
 int string_insert_fmt(Arena* arena, String* str, size_t pos, const char* fmt, ...){
     va_list ap;
     va_start(ap, fmt);
-    int r = string_prepend_vfmt(arena, str, fmt, ap);
+    int r = string_insert_vfmt(arena, str, pos, fmt, ap);
     va_end(ap);
     return r;
 }
@@ -462,46 +432,60 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
         ins_buffer = t;
     }
 
-    size_t new_size = str->size + ins.size;
-
-    if (str->size+1+ins.size > str->capacity) {
-        size_t new_capacity = get_new_capacity(new_size);
-        const char* arena_top = (char*) arena_alloc_used_location(arena);
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-            memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
+    int r = insert_memory_logic(arena, str, pos, ins.size);
+    if (r != 0) {
+        if (local_arena != NULL) {
+            local_arena_alloc_reset(local_arena);
         }
-        else {
-            char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-            memcpy(t, str->buffer, pos);
-            memcpy(t+pos+ins.size, str->buffer+pos, str->size+1 - pos);
-            str->buffer = t;
-        }
-        str->capacity = new_capacity;
-    }
-    else {
-        memmove(str->buffer+pos+ins.size, str->buffer+pos, str->size+1 - pos);
+        return r;
     }
 
     memcpy(str->buffer+pos, ins_buffer, ins.size);
     if (local_arena != NULL) {
         local_arena_alloc_reset(local_arena);
     }
-
-    str->size += ins.size;
     return 0;
+}
+
+//==============================
+// REVIEW FROM HERE
+//==============================
+
+static int overwrite_memory_logic(Arena* arena, String* str, size_t pos, size_t len) {
+    size_t new_size = pos+len > str->size ? pos+len : str->size;
+
+    // Need to realloc
+    if (pos+len+1 > str->capacity) {
+        size_t new_size = pos+len;
+        char* arena_top = (char*)arena_alloc_used_location(arena);
+        size_t new_capacity = get_new_capacity(new_size);
+
+        if (arena_top == str->buffer+str->capacity) {
+            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
+            if (t == NULL) {
+                return -1;
+            }
+        }
+        else {
+            char* t = (char*)arena_alloc_push(arena, new_capacity);
+            if (t == NULL) {
+                return -1;
+            }
+            memcpy(t, str->buffer, pos);
+            str->buffer = t;
+        }
+
+        str->capacity = new_capacity;
+        str->size = pos+len;
+        str->buffer[str->size] = '\0';
+    }
+    else {
+        // size_t end = pos+len > str->size ? pos+len : str->size;
+        if (pos+len > str->size) {
+            str->size = pos+len;
+            str->buffer[str->size] = '\0';
+        }
+    }
 }
 
 int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
@@ -511,14 +495,10 @@ int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt
         return -1;
     }
 
-    va_copy(args2, args);
-    int n = vsnprintf(NULL, 0, fmt, args2);
-    va_end(args2);
-
+    int n = fmt_length(fmt, args);
     if (n<0) {
         return -1;
     }
-
     size_t len = (size_t) n;
 
     // Need to realloc
@@ -550,7 +530,7 @@ int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt
         // size_t end = pos+len > str->size ? pos+len : str->size;
         if (pos+len > str->size) {
             str->size = pos+len;
-            str->buffer[pos+len] = '\0';
+            str->buffer[str->size] = '\0';
         }
     }
 
@@ -634,6 +614,9 @@ int string_overwrite_sv(Arena* arena, String* str, size_t pos, StringView sv) {
     }
     memcpy(str->buffer+pos, sv_buffer, sv.size);
     str->buffer[str->size] = '\0';
+    if (local_arena != NULL) {
+        local_arena_alloc_reset(local_arena);
+    }
     return 0;
 }
 
@@ -641,28 +624,29 @@ int string_erase(String* str, size_t pos, size_t len) {
     if ((str == NULL) || (str->buffer == NULL)) {
         return -1;
     }
-    if (pos < str->size) {
-        if (pos+len >= str->size) {
-            str->size = pos;
-            str->buffer[pos] = '\0';
-            return 0;
-        }
-        memmove(str->buffer+pos, str->buffer+pos+len, str->size - (pos+len));
-        str->size -= len;
-        str->buffer[str->size] = '\0';
+    if (pos >= str->size) {
+        return -1;
+    }
+
+    if (pos+len >= str->size) {
+        str->size = pos;
+        str->buffer[pos] = '\0';
         return 0;
     }
+    memmove(str->buffer+pos, str->buffer+pos+len, str->size - (pos+len));
+    str->size -= len;
+    str->buffer[str->size] = '\0';
     return 0;
 }
 
-static int erase_and_insert_main_logic(Arena* arena, String* str, size_t pos, size_t len, size_t insert_len) {
+static int erase_and_insert_memory_logic(Arena* arena, String* str, size_t pos, size_t len, size_t insert_len) {
     // Check the size difference between what is removed and what is added
     int size_difference = len - insert_len;
-    size_t new_size = str->size + size_difference;
+    size_t new_size = str->size + len - insert_len;
 
     // If we grow beyond the current capacity => need more space
-    if (str->size+1+size_difference > str->capacity) {
-        size_t new_capacity = get_new_capacity(str->size+size_difference);
+    if (new_size + 1 > str->capacity) {
+        size_t new_capacity = get_new_capacity(new_size);
         char* arena_top = (char*)arena_alloc_used_location(arena);
         if (arena_top == str->buffer+str->capacity) {
             void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
@@ -681,6 +665,7 @@ static int erase_and_insert_main_logic(Arena* arena, String* str, size_t pos, si
     else {
         memmove(str->buffer+pos+insert_len, str->buffer+pos+len, str->size+1-(pos+len));
     }
+    str->size = new_size;
     return 0;
 }
 
@@ -724,21 +709,23 @@ int string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len
     // Check the size difference between what is removed and what is added
     if (len == sv.size) {
         memcpy(str->buffer + pos, sv_buffer, sv.size);
+        if (local_arena != NULL) {
+            local_arena_alloc_reset(local_arena);
+        }
         return 0;
     }
 
-    int r = erase_and_insert_main_logic(arena, str, pos, len, sv.size);
+    int r = erase_and_insert_memory_logic(arena, str, pos, len, sv.size);
     if (r != 0) {
         if (local_arena != NULL) {
-            return -1;
+            local_arena_alloc_reset(local_arena);
         }
         return r;
     }
 
     memcpy(str->buffer+pos, sv_buffer, sv.size);
-    str->size += (sv.size-len);
     if (local_arena != NULL) {
-        return -1;
+        local_arena_alloc_reset(local_arena);
     }
     return 0;
 }
@@ -778,7 +765,7 @@ int string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t l
         return 0;
     }
 
-    int r = erase_and_insert_main_logic(arena, str, pos, len, insert_len);
+    int r = erase_and_insert_memory_logic(arena, str, pos, len, insert_len);
 
     if (r != 0) {
         return -1;
@@ -791,7 +778,6 @@ int string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t l
     va_end(args2);
 
     str->buffer[pos+insert_len] = save_char;
-    str->size += (insert_len-len);
     return 0;
 }
 
@@ -813,8 +799,10 @@ int string_clear(String* str) {
 String string_deep_copy(Arena* arena, const String* str) {
     if ((str == NULL) || (str->buffer == NULL)) return (String){0};
 
-    void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->capacity);
-
+    // void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->capacity);
+    void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->size+1);
+    if (p == NULL) return (String){0};
+    p = arena_alloc_push_unaligned(arena, str->capacity - (str->size+1));
     if (p == NULL) return (String){0};
 
     return (String){
@@ -954,6 +942,9 @@ bool sv_starts_with(StringView sv, StringView pre) {
     if (sv.buffer == NULL || pre.buffer == NULL) {
         return false;
     }
+    if (pre.size > sv.size) {
+        return false;
+    }
 
     for (size_t i = 0; i<pre.size; ++i) {
         if (sv.buffer[i] != pre.buffer[i]) {
@@ -1007,6 +998,8 @@ size_t sv_rfind(StringView haystack, StringView needle) {
     if (haystack.buffer == NULL || needle.buffer == NULL) {
         return haystack.size;
     }
+    if (needle.size == 0) return haystack.size;
+    if (needle.size > haystack.size) return haystack.size;
 
     size_t idx = haystack.size-needle.size;
     const unsigned char* s1 = (const unsigned char*) haystack.buffer + idx;
