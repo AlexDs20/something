@@ -985,6 +985,9 @@ int test_sv_find(void) {
     r = sv_find(sv, sv_from_cstr("This"));
     ASSERT_EQ(r, 0);
 
+    r = sv_find(sv, sv_from_cstr("!"));
+    ASSERT_EQ(r, sv.size-1);
+
     r = sv_find(sv, sv_from_cstr("test"));
     ASSERT_EQ(r, 10);
     ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("test")));
@@ -1002,6 +1005,12 @@ int test_sv_rfind(void) {
 
     r = sv_rfind(sv, sv_from_cstr("rfind!"));
     ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("rfind!")));
+
+    r = sv_rfind(sv, sv_from_cstr("!"));
+    ASSERT_EQ(r, sv.size-1);
+
+    r = sv_rfind(sv, sv_from_cstr("T"));
+    ASSERT_EQ(r, 0);
 
     r = sv_rfind(sv, sv_from_cstr("test"));
     ASSERT_EQ(r, 46);

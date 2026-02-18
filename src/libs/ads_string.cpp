@@ -447,16 +447,11 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
     return 0;
 }
 
-//==============================
-// REVIEW FROM HERE
-//==============================
-
 static int overwrite_memory_logic(Arena* arena, String* str, size_t pos, size_t len) {
     size_t new_size = pos+len > str->size ? pos+len : str->size;
 
     // Need to realloc
-    if (pos+len+1 > str->capacity) {
-        size_t new_size = pos+len;
+    if (new_size+1 > str->capacity) {
         char* arena_top = (char*)arena_alloc_used_location(arena);
         size_t new_capacity = get_new_capacity(new_size);
 
@@ -476,16 +471,9 @@ static int overwrite_memory_logic(Arena* arena, String* str, size_t pos, size_t 
         }
 
         str->capacity = new_capacity;
-        str->size = pos+len;
-        str->buffer[str->size] = '\0';
     }
-    else {
-        // size_t end = pos+len > str->size ? pos+len : str->size;
-        if (pos+len > str->size) {
-            str->size = pos+len;
-            str->buffer[str->size] = '\0';
-        }
-    }
+    str->size = new_size;
+    return 0;
 }
 
 int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
@@ -501,45 +489,18 @@ int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt
     }
     size_t len = (size_t) n;
 
-    // Need to realloc
-    if (pos+len+1 > str->capacity) {
-        size_t new_size = pos+len;
-        char* arena_top = (char*)arena_alloc_used_location(arena);
-        size_t new_capacity = get_new_capacity(new_size);
-
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) {
-                return -1;
-            }
-        }
-        else {
-            char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) {
-                return -1;
-            }
-            memcpy(t, str->buffer, pos);
-            str->buffer = t;
-        }
-
-        str->capacity = new_capacity;
-        str->size = pos+len;
-        str->buffer[str->size] = '\0';
-    }
-    else {
-        // size_t end = pos+len > str->size ? pos+len : str->size;
-        if (pos+len > str->size) {
-            str->size = pos+len;
-            str->buffer[str->size] = '\0';
-        }
+    int r = overwrite_memory_logic(arena, str, pos, len);
+    if (r != 0) {
+        return r;
     }
 
     char save_char = str->buffer[pos+len];
-
     va_copy(args2, args);
     vsnprintf(str->buffer+pos, len+1, fmt, args2);
     va_end(args2);
     str->buffer[pos+len] = save_char;
+
+    str->buffer[str->size] = '\0';
     return 0;
 }
 
@@ -578,40 +539,14 @@ int string_overwrite_sv(Arena* arena, String* str, size_t pos, StringView sv) {
         sv_buffer = t;
     }
 
-    if (pos+sv.size+1 > str->capacity) {
-        size_t new_size = pos+sv.size;
-        size_t new_capacity = get_new_capacity(new_size);
-        char* arena_top = (char*)arena_alloc_used_location(arena);
+    int r = overwrite_memory_logic(arena, str, pos, sv.size);
+    if (r != 0) {
+        if (local_arena != NULL) {
+            local_arena_alloc_reset(local_arena);
+        }
+        return r;
+    }
 
-        if (arena_top == str->buffer+str->capacity) {
-            void* t = arena_alloc_push_unaligned(arena, new_capacity - str->capacity);
-            if (t == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-        }
-        else {
-            char* t = (char*)arena_alloc_push(arena, new_capacity);
-            if (t == NULL) {
-                if (local_arena != NULL) {
-                    local_arena_alloc_reset(local_arena);
-                }
-                return -1;
-            }
-            memcpy(t, str->buffer, pos);
-            str->buffer = t;
-        }
-        str->capacity = new_capacity;
-        str->size = new_size;
-    }
-    else {
-        // Enough capacity
-        if (pos + sv.size > str->size) {
-            str->size = pos + sv.size;
-        }
-    }
     memcpy(str->buffer+pos, sv_buffer, sv.size);
     str->buffer[str->size] = '\0';
     if (local_arena != NULL) {
@@ -627,12 +562,12 @@ int string_erase(String* str, size_t pos, size_t len) {
     if (pos >= str->size) {
         return -1;
     }
-
-    if (pos+len >= str->size) {
-        str->size = pos;
-        str->buffer[pos] = '\0';
-        return 0;
+    if (pos+len > str->size) {
+        // str->size = pos;
+        // str->buffer[pos] = '\0';
+        return -1;
     }
+
     memmove(str->buffer+pos, str->buffer+pos+len, str->size - (pos+len));
     str->size -= len;
     str->buffer[str->size] = '\0';
@@ -799,7 +734,6 @@ int string_clear(String* str) {
 String string_deep_copy(Arena* arena, const String* str) {
     if ((str == NULL) || (str->buffer == NULL)) return (String){0};
 
-    // void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->capacity);
     void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->size+1);
     if (p == NULL) return (String){0};
     p = arena_alloc_push_unaligned(arena, str->capacity - (str->size+1));
@@ -852,12 +786,12 @@ StringView sv_from_cstr(const char* cstr) {
 }
 
 StringView sv_slice_sv(StringView sv, size_t start, size_t len) {
-    if (start > sv.size) {
+    if ( (start >= sv.size) || (start+len > sv.size) ) {
         return (StringView){0};
     }
     return (StringView) {
         .buffer = sv.buffer+start,
-        .size = start+len < sv.size ? len : sv.size-start,
+        .size = len,
     };
 }
 
@@ -887,11 +821,12 @@ StringView sv_trim_front(StringView sv) {
      *  ' ': 32
      */
     size_t i = 0;
-    for (; i<sv.size; ++i) {
-        char c = sv.buffer[i];
+    while (i < sv.size) {
+        unsigned char c = sv.buffer[i];
         if (!((c >= 9 && c <= 13) || c == 32)) {
             break;
         }
+        i++;
     }
     return (StringView){
         .buffer = sv.buffer+i,
@@ -939,10 +874,7 @@ int sv_compare(const StringView* sv1, const StringView* sv2) {
 }
 
 bool sv_starts_with(StringView sv, StringView pre) {
-    if (sv.buffer == NULL || pre.buffer == NULL) {
-        return false;
-    }
-    if (pre.size > sv.size) {
+    if (sv.buffer == NULL || pre.buffer == NULL || pre.size > sv.size) {
         return false;
     }
 
@@ -954,14 +886,14 @@ bool sv_starts_with(StringView sv, StringView pre) {
     return true;
 }
 
-bool sv_ends_with(StringView sv, StringView pre) {
-    if (sv.buffer == NULL || pre.buffer == NULL || sv.size < pre.size) {
+bool sv_ends_with(StringView sv, StringView post) {
+    if (sv.buffer == NULL || post.buffer == NULL || sv.size < post.size) {
         return false;
     }
 
-    const char* buf = sv.buffer + sv.size-pre.size;
-    for (size_t i = 0; i<pre.size; ++i) {
-        if (buf[i] != pre.buffer[i]) {
+    const char* buf = sv.buffer + sv.size-post.size;
+    for (size_t i = 0; i<post.size; ++i) {
+        if (buf[i] != post.buffer[i]) {
             return false;
         }
     }
