@@ -6,9 +6,8 @@
 typedef enum {
     STRING_SUCCESS = 0,
     // STRING_NULL,
-    // STRING_ARENA_FAIL,
     // STRING_OUT_OF_MEMORY,
-    // STRING_OUT_OF_BOUNDS,
+    // STRING_BAD_INPUT,
     STRING_FAIL,
 } StringError;
 
@@ -71,13 +70,20 @@ int     string_overwrite_sv(Arena* arena, String* str, size_t pos, StringView sv
 int     string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, ...);
 int     string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t len, const char* fmt, va_list args);
 int     string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv);
+#define string_erase_and_insert_buffer(arena, str, pos, rm_len, buffer, ins_len)    string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_buffer(buffer, ins_len))
+#define string_erase_and_insert_cstr(arena, str, pos, rm_len, cstr)                 string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_cstr(cstr))
+#define string_erase_and_insert_string(arena, str, pos, rm_len, str_p_over)         string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_string(*(str_p_over)))
+#define string_erase_and_insert_char(arena, str, pos, rm_len, c)                  do { char _c=(c); string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_buffer(&(_c), 1)); } while (0)
+
+// string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
 
 int    string_clear(String* str);
 int    string_erase(String* str, size_t pos, size_t len);
 String string_deep_copy(Arena* arena, const String* str);
+// void string_shrink_to_fit(Arena* arena, String* str);
+// void string_reserve(Arena* arena, String* str, size_t new_cap);
 
 void   string_debug_print(const String* string);
-void   string_debug_print(String string);
 void   string_print(const String* str);
 
 //==============================
@@ -93,7 +99,10 @@ StringView sv_truncate_front(StringView sv, size_t len);
 StringView sv_truncate_back(StringView sv, size_t len);
 StringView sv_trim_front(StringView sv);         // removes ' ', '\t', '\n', '\r', '\v'. '\f'
 StringView sv_trim_back(StringView sv);
-// StringView sv_split_delim(StringView* sv, char delim)
+// TODO: Implement
+// StringView sv_trim_front_by_chars(StringView sv, StringView chars);
+// StringView sv_trim_back_by_chars(StringView sv, StringView chars);
+// StringView sv_chop_by_delim(StringView* sv, char delim)
 // StringView sv_file_extension(StringView sv);
 // StringView sv_file_name(StringView sv);
 // StringView sv_directory_name(StringView sv);

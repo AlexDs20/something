@@ -12,7 +12,9 @@ int test_string_init_empty(void) {
     String s2 = string_init_empty(arena, 0);
     ASSERT_NOT_NULL(s2.buffer);
     ASSERT_EQ(s2.size, 0);
-    ASSERT_EQ(s2.capacity, 0);
+    ASSERT_EQ(s2.capacity, 1);
+
+    String s_null = {0};
     return 0;
 }
 
@@ -674,7 +676,6 @@ int test_string_overwrite_sv(void) {
     sv = sv_slice_string(s, 12, s.size-12);
     string_overwrite_sv(arena, &s, 30, sv);
 
-
     return 0;
 }
 /*
@@ -910,10 +911,10 @@ int test_sv_compare(void) {
 
     StringView sv3 = sv_from_cstr("This is another cstr");
     r = sv_compare(&sv1, &sv3);
-    ASSERT_EQ(r, 1);
+    ASSERT_GE(r, 1);
 
     r = sv_compare(&sv3, &sv1);
-    ASSERT_EQ(r, -1);
+    ASSERT_LE(r, -1);
 
     String s = string_init_cstr(arena, cstr);
     int m = string_append_cstr(arena, &s, " with some extras");
@@ -921,10 +922,10 @@ int test_sv_compare(void) {
     StringView sv4 = sv_from_string(s);
 
     r = sv_compare(&sv1, &sv4);
-    ASSERT_EQ(r, -1);
+    ASSERT_LE(r, -1);
 
     r = sv_compare(&sv4, &sv1);
-    ASSERT_EQ(r, 1);
+    ASSERT_GE(r, 1);
 
     return 0;
 }
