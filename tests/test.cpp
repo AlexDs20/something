@@ -52,6 +52,9 @@ test_entry tests[] = {
 
     // {"test_string_erase", test_string_erase},
     // {"test_string_clear", test_string_clear},
+    // {"test_string_deep_copy", test_string_deep_copy},
+    {"test_string_reserve", test_string_reserve},
+    {"test_string_shrink_to_fit", test_string_shrink_to_fit},
 
 
     {"test_sv_from_buffer", test_sv_from_buffer},
@@ -64,6 +67,7 @@ test_entry tests[] = {
     {"test_sv_truncate_back", test_sv_truncate_back},
     {"test_sv_trim_front", test_sv_trim_front},
     {"test_sv_trim_back", test_sv_trim_back},
+    {"test_sv_chop_by_delim_sv", test_sv_chop_by_delim_sv},
 
     {"test_sv_equal", test_sv_equal},
     {"test_sv_compare", test_sv_compare},

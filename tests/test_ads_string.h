@@ -332,6 +332,17 @@ int test_string_prepend_fmt(void) {
     //------------------------------
 
     s1 = string_init_cstr(arena, cstr);
+    const char* pre_super_long =  "THIS HAS TO GO THROUGH THE SHORT PATH THIS HAS TO GO THROUGH THE SHORT PATH THIS HAS TO GO THROUGH THE SHORT PATH THIS HAS TO GO THROUGH THE SHORT PATH";
+    r = string_prepend_fmt(arena, &s1, "%s", pre_super_long);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_NOT_NULL(s1.buffer);
+    ASSERT_EQ(s1.size,      strlen(cstr) + strlen(pre_super_long));
+    ASSERT_GE(s1.capacity,  strlen(cstr) + strlen(pre_super_long));
+
+    //------------------------------
+
+    s1 = string_init_cstr(arena, cstr);
     const char* pre_long =  "THIS IS A VERY LONG THING I WANT TO PREPEND TO HAVE TO INCREASE THE CAPACITY! ";
     r = string_prepend_fmt(arena, &s1, "%s", pre_long);
 
@@ -767,6 +778,59 @@ int test_string_clear(void) {
     return 0;
 }
 
+int test_string_reserve(void) {
+    const char* cstr = "This is the full string test_string_reserve!";
+
+    String s = string_init_cstr(arena, cstr);
+    size_t old_cap = s.capacity;
+    size_t new_cap = 3*old_cap;
+    int r = string_reserve(arena, &s, new_cap);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(s.capacity, new_cap);
+
+    s = string_init_cstr(arena, cstr);
+    arena_alloc_push(arena, 42);
+    old_cap = s.capacity;
+    new_cap = 3*old_cap;
+    r = string_reserve(arena, &s, new_cap);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(s.capacity, new_cap);
+
+    return 0;
+}
+
+int test_string_shrink_to_fit(void) {
+    const char* cstr = "This is the full string test_string_shrink_to_fit!";
+
+    String s = string_init_cstr(arena, cstr);
+    size_t old_cap = s.capacity;
+    size_t new_cap = 3*old_cap;
+    int r = string_reserve(arena, &s, new_cap);
+    ASSERT_EQ(r, 0);
+
+    r = string_shrink_to_fit(arena, &s);
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(s.capacity, s.size+1);
+
+
+    s = string_init_cstr(arena, cstr);
+    old_cap = s.capacity;
+    new_cap = 3*old_cap;
+    r = string_reserve(arena, &s, new_cap);
+    ASSERT_EQ(r, 0);
+    arena_alloc_push(arena, 42);
+
+    r = string_shrink_to_fit(arena, &s);
+    // TODO: Think about what would be mose natural here
+    // ASSERT_EQ(r, 0);
+    // Capacity not changed because not on top of arena
+    ASSERT_EQ(s.capacity, new_cap);
+
+    return 0;
+}
+
 int test_sv_from_buffer(void) {
     const char* buffer = "This is a test of test_sv_from_buffer";
     StringView sv = sv_from_buffer(buffer, strlen(buffer));
@@ -881,6 +945,51 @@ int test_sv_trim_back(void) {
 
     r = sv_trim_back(sv);
     ASSERT_TRUE(sv_equal(r, sv_from_cstr("   \t This is with spaces at the back test_sv_trim_back!")));
+    return 0;
+}
+
+int test_sv_chop_by_delim_sv(void) {
+    const char* cstr = "This, is, with, a, bunch, of, commas, within, test_sv_chop_by_delim_sv!";
+    StringView sv = sv_from_cstr(cstr);
+
+    StringView delim = sv_from_cstr(",");
+    while (1) {
+        StringView part = sv_chop_by_delim_sv(&sv, delim);
+        if (part.size == 0) break;
+    }
+
+    delim = sv_from_cstr("with");
+    sv = sv_from_cstr(cstr);
+    while (1) {
+        StringView part = sv_chop_by_delim_sv(&sv, delim);
+        if (part.size == 0) break;
+    }
+
+    sv = sv_from_cstr(cstr);
+    while (1) {
+        StringView part = sv_chop_by_delim_char(&sv, ',');
+        if (part.size == 0) break;
+    }
+
+    sv = sv_from_cstr(cstr);
+    String delim_str = string_init_cstr(arena, ",");
+    while (1) {
+        StringView part = sv_chop_by_delim_string(&sv, delim_str);
+        if (part.size == 0) break;
+    }
+
+    sv = sv_from_cstr(cstr);
+    const char* buf = "with";
+    printf("\n");
+    sv_print(sv);
+    while (1) {
+        StringView part = sv_chop_by_delim_buffer(&sv, buf, 4);
+        printf("\n");
+        sv_print(part);
+        printf("\n");
+        sv_print(sv);
+        if (part.size == 0) break;
+    }
     return 0;
 }
 
