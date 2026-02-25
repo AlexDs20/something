@@ -980,10 +980,16 @@ int test_sv_chop_by_delim_sv(void) {
 
     sv = sv_from_cstr(cstr);
     const char* buf = "with";
+    while (1) {
+        StringView part = sv_chop_by_delim_buffer(&sv, buf, 4);
+        if (part.size == 0) break;
+    }
+
+    sv = sv_from_cstr(cstr);
     printf("\n");
     sv_print(sv);
     while (1) {
-        StringView part = sv_chop_by_delim_buffer(&sv, buf, 4);
+        StringView part = sv_chop_by_delim_fmt(&sv, "%s", ",");
         printf("\n");
         sv_print(part);
         printf("\n");

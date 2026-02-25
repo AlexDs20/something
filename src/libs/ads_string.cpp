@@ -961,6 +961,25 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
     };
 }
 
+StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...) {
+    StringView out = {.buffer=NULL, .size=0};
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    va_list args;
+    va_start(args, fmt);
+    String delim = string_init_vfmt(local_arena->arena, fmt, args);
+    va_end(args);
+    if (delim.buffer == NULL) {
+        goto cleanup;
+    }
+
+    out = sv_chop_by_delim_string(sv, delim);
+
+cleanup:
+    local_arena_alloc_reset(local_arena);
+    return out;
+}
+
 bool sv_equal(StringView sv1, StringView sv2) {
     if (sv1.size != sv2.size) return false;
     int cmp = compare(sv1.buffer, sv2.buffer, sv1.size);

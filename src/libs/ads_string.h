@@ -6,8 +6,8 @@
 // Small String Optimization
 // UTF8
 // Immutability on errors
-// Format logic
-// faster find
+// Format logic repeated
+// Faster find
 // Allocator abstraction layer?
 // pos bounds : pos >= or pos >
 
@@ -47,11 +47,11 @@ StringView sv_trim_back(StringView sv);
 // StringView sv_trim_front_by_chars(StringView sv, StringView chars);
 // StringView sv_trim_back_by_chars(StringView sv, StringView chars);
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim);
+StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...);
 static inline StringView sv_chop_by_delim_char(StringView* sv, char c) { return sv_chop_by_delim_sv(sv, sv_from_buffer(&c, 1)); }
 #define sv_chop_by_delim_cstr(sv_ptr, cstr)           sv_chop_by_delim_sv((sv_ptr), sv_from_cstr((cstr)))
 #define sv_chop_by_delim_string(sv_ptr, str)          sv_chop_by_delim_sv((sv_ptr), sv_from_string((str)))
 #define sv_chop_by_delim_buffer(sv_ptr, buf, len)     sv_chop_by_delim_sv((sv_ptr), sv_from_buffer((buf), (len)))
-// StringView sv_chop_by_delim_fmt(sv_ptr, fmt, ...)     sv_chop_by_delim_sv((sv_ptr), sv_from_buffer((buf), (len)))
 // StringView sv_file_extension(StringView sv);
 // StringView sv_file_name(StringView sv);
 // StringView sv_directory_name(StringView sv);
