@@ -1132,5 +1132,20 @@ int test_sv_rfind(void) {
     ASSERT_EQ(r, 46);
     ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("test")));
 
+    r = sv_rfind(sv, sv_from_cstr("haystack"));
+    ASSERT_EQ(r, 37);
+    ASSERT_TRUE(sv_starts_with(sv_truncate_front(sv, r), sv_from_cstr("haystack")));
+
+    return 0;
+}
+
+int test_sv_file_extension(void) {
+    const char* cstr = "This is a test to find the extension in a haystack/test_sv_file_extension with extension.jpg!";
+    StringView sv = sv_from_cstr(cstr);
+    size_t r;
+
+    StringView ext = sv_file_extension(sv);
+    sv_print(ext);
+
     return 0;
 }

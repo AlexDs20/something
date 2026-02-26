@@ -825,28 +825,6 @@ int string_shrink_to_fit(Arena* arena, String* str) {
     return 0;
 }
 
-void string_debug_print(const String* s) {
-    printf("String Debug Info:\n");
-    printf(" String:      %p\n",             s);
-    if (s == NULL) return;
-    if (s->buffer != NULL) {
-    printf("  buffer:     %p\n",             s->buffer);
-    printf("  size:       %zu bytes   %p\n", s->size, s->buffer+s->size+1);
-    printf("  capacity:   %zu bytes   %p\n", s->capacity, s->buffer+s->capacity);
-    printf("  free:       %zu bytes\n",      s->capacity - s->size - 1);
-    } else {
-    printf("  buffer:     NULL\n");
-    }
-}
-
-void string_print(const String* s) {
-    if (s == NULL || s->buffer == NULL) {
-        printf("NULL String!\n");
-        return;
-    }
-    printf("%s", s->buffer);
-}
-
 //==============================
 // STRING VIEW
 //==============================
@@ -1014,7 +992,12 @@ bool sv_ends_with(StringView sv, StringView post) {
 }
 
 static size_t BMH_search(StringView haystack, StringView needle) {
-    // Proprocess pattern
+    /*
+     * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
+     * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
+     */
+
+    // Preprocess pattern
     size_t table[256];
     for (size_t i = 0; i<256; i++) {
         table[i] = needle.size;
@@ -1037,13 +1020,40 @@ static size_t BMH_search(StringView haystack, StringView needle) {
     return haystack.size;
 }
 
-// TODO(alex): Now wiki had an implementation of BMH, apparently, there is something even
-// better called two way search. TBC
-size_t sv_find(StringView haystack, StringView needle) {
+static size_t BMH_rsearch(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
      */
+    // Preprocess pattern
+    size_t table[256];
+    for (size_t i = 0; i<256; i++) {
+        table[i] = needle.size;
+    }
+
+    const unsigned char* h_buf = (const unsigned char*) haystack.buffer;
+    const unsigned char* n_buf = (const unsigned char*) needle.buffer;
+
+    for (size_t i = needle.size - 1; i >= 1; i--) {
+        table[n_buf[i]] = i;
+    }
+
+    size_t skip = haystack.size - needle.size;
+
+    // Abuse underflow
+    while (skip <= haystack.size - needle.size) {
+        if (memcmp(&h_buf[skip], n_buf, needle.size) == 0) {
+            return skip;
+        }
+        skip -= table[h_buf[skip]];
+    }
+
+    return haystack.size;
+}
+
+// TODO(alex): Now wiki had an implementation of BMH, apparently, there is something even
+// better called two way search. TBC
+size_t sv_find(StringView haystack, StringView needle) {
     if (haystack.buffer == NULL || needle.buffer == NULL) {
         return haystack.size;
     }
@@ -1051,12 +1061,15 @@ size_t sv_find(StringView haystack, StringView needle) {
     if (needle.size > haystack.size) return haystack.size;
 
 #if defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__)
+
     const void* p = memmem(haystack.buffer, haystack.size, needle.buffer, needle.size);
     if (p != NULL) {
         return (size_t)((const char*)p - haystack.buffer);
     }
     return haystack.size;
+
 #else
+
     const unsigned char* h = (const unsigned char*) haystack.buffer;
     const unsigned char* n = (const unsigned char*) needle.buffer;
 
@@ -1103,45 +1116,52 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         const unsigned char* match = (const unsigned char*) memrchr((void*)h, n[0], haystack.size);
         return match != NULL ? (size_t)(match-h) : haystack.size;
     }
-
-    const unsigned char* p = h;
-    size_t remaining = haystack.size - needle.size + 1;
-    while (true) {
-        const unsigned char* match = (const unsigned char*) memrchr((void*)h, n[0], remaining);
-        if (match == NULL) {
-            break;
-        }
-        if (memcmp(match, n, needle.size) == 0) {
-            return (size_t)(match - h);
-        }
-        if (match == h) {
-            break;
-        }
-        remaining = (size_t)(match - h);
+    else if (needle.size > 6) {
+        return BMH_rsearch(haystack, needle);
     }
-    return haystack.size;
+    else {
+        const unsigned char* p = h;
+        size_t remaining = haystack.size - needle.size + 1;
+        while (true) {
+            const unsigned char* match = (const unsigned char*) memrchr((void*)h, n[0], remaining);
+            if (match == NULL) {
+                break;
+            }
+            if (memcmp(match, n, needle.size) == 0) {
+                return (size_t)(match - h);
+            }
+            if (match == h) {
+                break;
+            }
+            remaining = (size_t)(match - h);
+        }
+        return haystack.size;
+    }
 #else
-    size_t i = haystack.size-needle.size;
-    while (true) {
-        if ((h[i] == n[0]) && (memcmp(h+i , n, needle.size) == 0)) {
-            return i;
-        }
-        if (i == 0) {
-            break;
-        }
-        i--;
-    }
-    return haystack.size;
+    return BMH_rsearch(haystack, needle);
+
+    // size_t i = haystack.size-needle.size;
+    // while (true) {
+    //     if ((h[i] == n[0]) && (memcmp(h+i , n, needle.size) == 0)) {
+    //         return i;
+    //     }
+    //     if (i == 0) {
+    //         break;
+    //     }
+    //     i--;
+    // }
+    // return haystack.size;
 #endif
 }
 
-// TODO: improve
 StringView sv_file_extension(StringView sv) {
-    size_t pos = sv_rfind(sv, sv_from_cstr("."));
-    return (StringView){.buffer=sv.buffer+pos, .size=sv.size-pos};
+    size_t p1 = sv_rfind(sv, sv_from_cstr("/"));
+    StringView t = sv_truncate_front(sv, p1);
+
+    size_t p2 = sv_rfind(t, sv_from_cstr("."));
+    return (StringView){.buffer=sv.buffer+p1+p2, .size=sv.size-p1-p2};
 }
 
-// TODO: improve
 StringView sv_file_name(StringView sv) {
     size_t pos = sv_rfind(sv, sv_from_cstr("/"));
     if (pos == sv.size) {
@@ -1150,10 +1170,9 @@ StringView sv_file_name(StringView sv) {
     return (StringView){.buffer=sv.buffer+pos, .size=sv.size-pos};
 }
 
-// TODO: improve
 StringView sv_directory_name(StringView sv){
     size_t pos = sv_rfind(sv, sv_from_cstr("/"));
-    return (StringView){.buffer=sv.buffer, .size=pos};
+    return (StringView){.buffer=sv.buffer, .size=pos+1};
 }
 
 void sv_print(StringView sv) {
@@ -1166,4 +1185,26 @@ void sv_debug_print(StringView sv) {
     printf("StringView Debug Info:\n");
     printf("  buffer:     %p\n",             sv.buffer);
     printf("  size:       %zu bytes   %p\n", sv.size, sv.buffer+sv.size);
+}
+
+void string_debug_print(const String* s) {
+    printf("String Debug Info:\n");
+    printf(" String:      %p\n",             s);
+    if (s == NULL) return;
+    if (s->buffer != NULL) {
+    printf("  buffer:     %p\n",             s->buffer);
+    printf("  size:       %zu bytes   %p\n", s->size, s->buffer+s->size+1);
+    printf("  capacity:   %zu bytes   %p\n", s->capacity, s->buffer+s->capacity);
+    printf("  free:       %zu bytes\n",      s->capacity - s->size - 1);
+    } else {
+    printf("  buffer:     NULL\n");
+    }
+}
+
+void string_print(const String* s) {
+    if (s == NULL || s->buffer == NULL) {
+        printf("NULL String!\n");
+        return;
+    }
+    printf("%s", s->buffer);
 }

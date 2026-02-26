@@ -76,6 +76,8 @@ test_entry tests[] = {
     {"test_sv_find", test_sv_find},
     {"test_sv_rfind", test_sv_rfind},
 
+    {"test_sv_file_extension", test_sv_file_extension},
+
 
 };
 
