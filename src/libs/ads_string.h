@@ -50,9 +50,9 @@ static inline StringView sv_chop_by_delim_char(StringView* sv, char c) { return 
 #define sv_chop_by_delim_cstr(sv_ptr, cstr)           sv_chop_by_delim_sv((sv_ptr), sv_from_cstr((cstr)))
 #define sv_chop_by_delim_string(sv_ptr, str)          sv_chop_by_delim_sv((sv_ptr), sv_from_string((str)))
 #define sv_chop_by_delim_buffer(sv_ptr, buf, len)     sv_chop_by_delim_sv((sv_ptr), sv_from_buffer((buf), (len)))
-// StringView sv_file_extension(StringView sv);
-// StringView sv_file_name(StringView sv);
-// StringView sv_directory_name(StringView sv);
+StringView sv_file_extension(StringView sv);
+StringView sv_file_name(StringView sv);
+StringView sv_directory_name(StringView sv);
 
 bool sv_equal(StringView sv1, StringView sv2);
 int  sv_compare(const StringView* sv1, const StringView* sv2);         // For usage with e.g. qsort or binary search
@@ -119,13 +119,15 @@ int     string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t
 #define string_erase_and_insert_string(arena, str, pos, rm_len, str_p_over)         string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_string(*(str_p_over)))
 static inline int string_erase_and_insert_char(Arena* arena, String* str, size_t pos, size_t rm_len, char c) { return string_erase_and_insert_sv(arena, str, pos, rm_len, sv_from_buffer(&c, 1)); }
 
-// string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
+int string_replace_first(Arena* arena, String* string, StringView target, StringView replacement);
+int string_replace_last(Arena* arena, String* string, StringView target, StringView replacement);
+// int string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
 
 int     string_clear(String* str);
 int     string_erase(String* str, size_t pos, size_t len);
 String  string_deep_copy(Arena* arena, const String* str);
 int     string_reserve(Arena* arena, String* str, size_t new_capacity);
-// #define string_increase_capacity(arena, str, amount)  string_reserve(arena, str, (str) ? (str)->size + amount : 0)
+#define string_increase_capacity(arena, str, amount)  string_reserve(arena, str, (str) ? (str)->size + amount : 0)
 int     string_shrink_to_fit(Arena* arena, String* str);
 
 void   string_debug_print(const String* string);

@@ -727,6 +727,30 @@ int string_erase_and_insert_fmt(Arena* arena, String* str, size_t pos, size_t le
     return r;
 }
 
+int string_replace_first(Arena* arena, String* str, StringView target, StringView replacement) {
+    if (str == NULL || str->buffer == NULL) {
+        return -1;
+    }
+    StringView sv = sv_from_string(*str);
+    size_t pos = sv_find(sv, target);
+    if (pos == sv.size) {
+        return -1;
+    }
+    return string_erase_and_insert_sv(arena, str, pos, target.size, replacement);
+}
+
+int string_replace_last(Arena* arena, String* str, StringView target, StringView replacement) {
+    if (str == NULL || str->buffer == NULL) {
+        return -1;
+    }
+    StringView sv = sv_from_string(*str);
+    size_t pos = sv_rfind(sv, target);
+    if (pos == sv.size) {
+        return -1;
+    }
+    return string_erase_and_insert_sv(arena, str, pos, target.size, replacement);
+}
+
 int string_clear(String* str) {
     if ((str == NULL) || (str->buffer == NULL)) return -1;
     str->size = 0;
@@ -1109,6 +1133,27 @@ size_t sv_rfind(StringView haystack, StringView needle) {
     }
     return haystack.size;
 #endif
+}
+
+// TODO: improve
+StringView sv_file_extension(StringView sv) {
+    size_t pos = sv_rfind(sv, sv_from_cstr("."));
+    return (StringView){.buffer=sv.buffer+pos, .size=sv.size-pos};
+}
+
+// TODO: improve
+StringView sv_file_name(StringView sv) {
+    size_t pos = sv_rfind(sv, sv_from_cstr("/"));
+    if (pos == sv.size) {
+        pos = 0;
+    }
+    return (StringView){.buffer=sv.buffer+pos, .size=sv.size-pos};
+}
+
+// TODO: improve
+StringView sv_directory_name(StringView sv){
+    size_t pos = sv_rfind(sv, sv_from_cstr("/"));
+    return (StringView){.buffer=sv.buffer, .size=pos};
 }
 
 void sv_print(StringView sv) {
