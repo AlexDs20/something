@@ -3,7 +3,6 @@
 #include <stdarg.h>     // for variadic number of args.
 
 // TODO:
-// Faster find
 // Small String Optimization
 // UTF8
 // Format logic repeated
@@ -42,14 +41,15 @@ StringView sv_truncate_front(StringView sv, size_t len);
 StringView sv_truncate_back(StringView sv, size_t len);
 StringView sv_trim_front(StringView sv);         // removes ' ', '\t', '\n', '\r', '\v'. '\f'
 StringView sv_trim_back(StringView sv);
+// TODO
 // StringView sv_trim_front_by_chars(StringView sv, StringView chars);
 // StringView sv_trim_back_by_chars(StringView sv, StringView chars);
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim);
-StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...);
+#define    sv_chop_by_delim_cstr(sv_ptr, cstr)           sv_chop_by_delim_sv((sv_ptr), sv_from_cstr((cstr)))
+#define    sv_chop_by_delim_string(sv_ptr, str)          sv_chop_by_delim_sv((sv_ptr), sv_from_string((str)))
+#define    sv_chop_by_delim_buffer(sv_ptr, buf, len)     sv_chop_by_delim_sv((sv_ptr), sv_from_buffer((buf), (len)))
 static inline StringView sv_chop_by_delim_char(StringView* sv, char c) { return sv_chop_by_delim_sv(sv, sv_from_buffer(&c, 1)); }
-#define sv_chop_by_delim_cstr(sv_ptr, cstr)           sv_chop_by_delim_sv((sv_ptr), sv_from_cstr((cstr)))
-#define sv_chop_by_delim_string(sv_ptr, str)          sv_chop_by_delim_sv((sv_ptr), sv_from_string((str)))
-#define sv_chop_by_delim_buffer(sv_ptr, buf, len)     sv_chop_by_delim_sv((sv_ptr), sv_from_buffer((buf), (len)))
+
 StringView sv_file_extension(StringView sv);
 StringView sv_file_name(StringView sv);
 StringView sv_directory_name(StringView sv);
@@ -60,6 +60,7 @@ bool sv_starts_with(StringView sv, StringView prefix);
 bool sv_ends_with(StringView sv, StringView suffix);
 size_t sv_find(StringView haystack, StringView needle);
 size_t sv_rfind(StringView haystack, StringView needle);
+// TODO
 // size_t sv_find_any_of(StringView sv, StringView chars);
 // size_t sv_rfind_any_of(StringView sv, StringView chars);
 
@@ -121,7 +122,8 @@ static inline int string_erase_and_insert_char(Arena* arena, String* str, size_t
 
 int string_replace_first(Arena* arena, String* string, StringView target, StringView replacement);
 int string_replace_last(Arena* arena, String* string, StringView target, StringView replacement);
-// int string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
+// TODO
+int string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
 
 int     string_clear(String* str);
 int     string_erase(String* str, size_t pos, size_t len);

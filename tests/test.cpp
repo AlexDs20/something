@@ -50,6 +50,8 @@ test_entry tests[] = {
     {"test_string_erase_and_insert_sv", test_string_erase_and_insert_sv},
     {"test_string_erase_and_insert_fmt", test_string_erase_and_insert_fmt},
 
+    {"test_string_replace_all", test_string_replace_all},
+
     // {"test_string_erase", test_string_erase},
     // {"test_string_clear", test_string_clear},
     // {"test_string_deep_copy", test_string_deep_copy},

@@ -764,6 +764,16 @@ int test_string_erase_and_insert_fmt(void) {
     return 0;
 }
 
+int test_string_replace_all(void) {
+    const char* cstr = "This is a cstr for test_string_replace_all! It will replace all a with aAa\n";
+
+    String s = string_init_cstr(arena, cstr);
+    int r = string_replace_all(arena, &s, sv_from_cstr("a"), sv_from_cstr("aAa"));
+    printf("\n result: %d\n", r);
+    string_print(&s);
+    return 0;
+}
+
 int test_string_erase(void) {
     const char* cstr = "This is the full string test_string_erase!";
     String s = string_init_cstr(arena, cstr);
@@ -984,18 +994,6 @@ int test_sv_chop_by_delim_sv(void) {
         StringView part = sv_chop_by_delim_buffer(&sv, buf, 4);
         if (part.size == 0) break;
     }
-
-    sv = sv_from_cstr(cstr);
-    printf("\n");
-    sv_print(sv);
-    while (1) {
-        StringView part = sv_chop_by_delim_fmt(&sv, "%s", ",");
-        printf("\n");
-        sv_print(part);
-        printf("\n");
-        sv_print(sv);
-        if (part.size == 0) break;
-    }
     return 0;
 }
 
@@ -1145,7 +1143,6 @@ int test_sv_file_extension(void) {
     size_t r;
 
     StringView ext = sv_file_extension(sv);
-    sv_print(ext);
 
     return 0;
 }

@@ -751,6 +751,91 @@ int string_replace_last(Arena* arena, String* str, StringView target, StringView
     return string_erase_and_insert_sv(arena, str, pos, target.size, replacement);
 }
 
+int string_replace_all(Arena* arena, String* str, StringView target, StringView replacement) {
+    if (str == NULL || str->buffer == NULL) {
+        return -1;
+    }
+    if (target.size == 0) {
+        return 0;
+    }
+
+    size_t count = 0;
+    StringView sv = sv_from_string(*str);
+    StringView search_sv = sv;
+
+    // Count how many instances of the target
+    // TODO: We could cache the positions of the targets to replace
+    while (search_sv.size >= target.size) {
+        size_t p = sv_find(search_sv, target);
+        if (p == search_sv.size) {
+            break;
+        }
+        count++;
+        search_sv = sv_truncate_front(search_sv, p+target.size);
+    }
+
+    if (count == 0) {
+        return 0;
+    }
+
+    // Get the new size of the string depending on if it grows or shrinks
+    size_t size_difference = 0;
+    unsigned char grows = replacement.size > target.size;
+
+    if (!grows) {
+        size_difference = count * (target.size - replacement.size);
+    }
+    else {
+        size_difference = count * (replacement.size - target.size);
+        if (SIZE_MAX - str->size < size_difference) return -1;
+    }
+
+    size_t new_size = grows ? str->size + size_difference : str->size - size_difference;
+
+    // Allocate a new string
+    size_t new_capacity = get_new_capacity(0, new_size);
+    char* new_buffer = (char*)arena_alloc_push(arena, new_capacity);
+    if (new_buffer == NULL)  {
+        return -1;
+    }
+
+    // Go through the string again and copy to new buffer
+    // and insert the replacements
+    search_sv = sv;
+    char* write_p = new_buffer;
+
+    while(search_sv.size >= 0) {
+        size_t p = sv_find(search_sv, target);
+
+        if (p == search_sv.size) {
+            // Nothing more found
+            // But we still need to copy stuff
+            memcpy(write_p, search_sv.buffer, search_sv.size);
+            write_p += search_sv.size;
+            break;
+        }
+
+        // Only copy what's before if there is something before...
+        if (p > 0) {
+            memcpy(write_p, search_sv.buffer, p);
+            write_p += p;
+        }
+
+        if (replacement.size > 0 && replacement.buffer != NULL) {
+            memcpy(write_p, replacement.buffer, replacement.size);
+            write_p += replacement.size;
+        }
+
+        search_sv = sv_truncate_front(search_sv, p+target.size);
+    }
+
+    str->buffer = new_buffer;
+    str->size = new_size;
+    str->capacity = new_capacity;
+
+    return 0;
+}
+
 int string_clear(String* str) {
     if ((str == NULL) || (str->buffer == NULL)) return -1;
     str->size = 0;
@@ -823,6 +908,28 @@ int string_shrink_to_fit(Arena* arena, String* str) {
     }
     str->capacity = str->size + 1;
     return 0;
+}
+
+void string_debug_print(const String* s) {
+    printf("String Debug Info:\n");
+    printf(" String:      %p\n",             s);
+    if (s == NULL) return;
+    if (s->buffer != NULL) {
+    printf("  buffer:     %p\n",             s->buffer);
+    printf("  size:       %zu bytes   %p\n", s->size, s->buffer+s->size+1);
+    printf("  capacity:   %zu bytes   %p\n", s->capacity, s->buffer+s->capacity);
+    printf("  free:       %zu bytes\n",      s->capacity - s->size - 1);
+    } else {
+    printf("  buffer:     NULL\n");
+    }
+}
+
+void string_print(const String* s) {
+    if (s == NULL || s->buffer == NULL) {
+        printf("NULL String!\n");
+        return;
+    }
+    printf("%s", s->buffer);
 }
 
 //==============================
@@ -935,24 +1042,6 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
         .buffer = sv->buffer-(pos+delim.size),
         .size = pos,
     };
-}
-
-StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...) {
-    StringView out = {0};
-    LocalArena* local_arena = local_arena_alloc_create();
-
-    va_list args;
-    va_start(args, fmt);
-    String delim = string_init_vfmt(local_arena->arena, fmt, args);
-    va_end(args);
-    if (delim.buffer == NULL) {
-        goto cleanup;
-    }
-
-    out = sv_chop_by_delim_string(sv, delim);
-cleanup:
-    local_arena_alloc_reset(local_arena);
-    return out;
 }
 
 bool sv_equal(StringView sv1, StringView sv2) {
@@ -1185,26 +1274,4 @@ void sv_debug_print(StringView sv) {
     printf("StringView Debug Info:\n");
     printf("  buffer:     %p\n",             sv.buffer);
     printf("  size:       %zu bytes   %p\n", sv.size, sv.buffer+sv.size);
-}
-
-void string_debug_print(const String* s) {
-    printf("String Debug Info:\n");
-    printf(" String:      %p\n",             s);
-    if (s == NULL) return;
-    if (s->buffer != NULL) {
-    printf("  buffer:     %p\n",             s->buffer);
-    printf("  size:       %zu bytes   %p\n", s->size, s->buffer+s->size+1);
-    printf("  capacity:   %zu bytes   %p\n", s->capacity, s->buffer+s->capacity);
-    printf("  free:       %zu bytes\n",      s->capacity - s->size - 1);
-    } else {
-    printf("  buffer:     NULL\n");
-    }
-}
-
-void string_print(const String* s) {
-    if (s == NULL || s->buffer == NULL) {
-        printf("NULL String!\n");
-        return;
-    }
-    printf("%s", s->buffer);
 }
