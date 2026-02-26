@@ -48,16 +48,6 @@ static int compare(const void* v1, const void* v2, size_t len) {
 #endif
 }
 
-static int fmt_length(const char* fmt, va_list args) {
-    int n;
-    va_list args2;
-    // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
-    va_copy(args2, args);
-    n = vsnprintf(NULL, 0, fmt, args2);
-    va_end(args2);
-    return n;
-}
-
 static int resize_and_shift_memory_logic(Arena* arena, String* str, size_t pos, size_t rm_len, size_t insert_len) {
     if (str == NULL || str->buffer == NULL) {
         return -1;
@@ -229,12 +219,10 @@ int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args)
 
     //==================================================
     // Source: https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Variable-Number-of-Arguments.html
-    // int n = fmt_length(fmt, args);
     char fmt_buffer[128];
     va_copy(args2, args);
     int n = vsnprintf(fmt_buffer, sizeof(fmt_buffer), fmt, args2);
     va_end(args2);
-    // int n = fmt_length(fmt, args);
     if (n < 0) {
         return -1;
     }
@@ -316,6 +304,7 @@ int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args
         va_copy(args2, args);
         int m = vsnprintf(str->buffer, len+1, fmt, args2);
         va_end(args2);
+        // Note: This breaks immutability on error
         if (m < 0 || (size_t) m != len) {
             return -1;
         }
@@ -421,6 +410,7 @@ int string_insert_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, v
         va_copy(args2, args);
         int m = vsnprintf(str->buffer+pos, len+1, fmt, args2);
         va_end(args2);
+        // Note: the string has been mutated and if error => string is dirty
         if (m < 0 || (size_t) m != len) {
             return -1;
         }
@@ -520,6 +510,7 @@ int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt
         va_copy(args2, args);
         int m = vsnprintf(str->buffer+pos, len+1, fmt, args2);
         va_end(args2);
+        // Note: the string has been mutated and if error => string is dirty
         if (m < 0 || (size_t) m != len) {
             return -1;
         }
@@ -591,7 +582,6 @@ int string_erase(String* str, size_t pos, size_t len) {
 
     memmove(str->buffer+pos, str->buffer+pos+len, str->size - (pos+len)+1);
     str->size -= len;
-    //str->buffer[str->size] = '\0';
     return 0;
 }
 
@@ -720,6 +710,7 @@ int string_erase_and_insert_vfmt(Arena* arena, String* str, size_t pos, size_t l
         va_copy(args2, args);
         int m = vsnprintf(str->buffer+pos, insert_len+1, fmt, args2);
         va_end(args2);
+        // Note: This breaks str immutability on error
         if (m < 0 || (size_t) m != insert_len) {
             return -1;
         }
@@ -836,13 +827,7 @@ void string_print(const String* s) {
 // STRING VIEW
 //==============================
 StringView sv_from_buffer(const char* buffer, size_t len) {
-    if (buffer == NULL) {
-        return (StringView){0};
-    }
-    return (StringView){
-        .buffer = buffer,
-        .size = len,
-    };
+    return buffer ? (StringView){ .buffer = buffer, .size = len } : (StringView){0};
 }
 
 StringView sv_from_sv(StringView sv) {
@@ -850,27 +835,15 @@ StringView sv_from_sv(StringView sv) {
 }
 
 StringView sv_from_cstr(const char* cstr) {
-    if (cstr == NULL) {
-        return (StringView){0};
-    }
-    return (StringView) {
-        .buffer = cstr,
-        .size = strlen(cstr),
-    };
+    return cstr ? (StringView){ .buffer = cstr, .size = strlen(cstr) } : (StringView){0};
 }
 
 StringView sv_from_string(String str) {
-    if (str.buffer == NULL) {
-        return (StringView){0};
-    }
-    return (StringView) {
-        .buffer = str.buffer,
-        .size = str.size,
-    };
+    return str.buffer ? (StringView){ .buffer = str.buffer, .size = str.size } : (StringView){0};
 }
 
 StringView sv_slice_sv(StringView sv, size_t start, size_t len) {
-    if ( (start >= sv.size) || (len > sv.size-start) ) {
+    if ( (start > sv.size) || (len > sv.size-start) ) {
         return (StringView){0};
     }
     return (StringView) {
@@ -947,6 +920,7 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
         return (StringView){.buffer=sv->buffer, .size=0};
     }
     size_t pos = sv_find(*sv, delim);
+    // TODO: I think this if is useless
     if (pos == sv->size) {
         StringView out = sv_from_sv(*sv);
         sv->buffer += sv->size;
@@ -962,7 +936,7 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
 }
 
 StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...) {
-    StringView out = {.buffer=NULL, .size=0};
+    StringView out = {0};
     LocalArena* local_arena = local_arena_alloc_create();
 
     va_list args;
@@ -974,7 +948,6 @@ StringView sv_chop_by_delim_fmt(StringView* sv, const char* fmt, ...) {
     }
 
     out = sv_chop_by_delim_string(sv, delim);
-
 cleanup:
     local_arena_alloc_reset(local_arena);
     return out;
@@ -982,8 +955,8 @@ cleanup:
 
 bool sv_equal(StringView sv1, StringView sv2) {
     if (sv1.size != sv2.size) return false;
-    int cmp = compare(sv1.buffer, sv2.buffer, sv1.size);
-    return cmp == 0;
+
+    return compare(sv1.buffer, sv2.buffer, sv1.size) == 0;
 }
 
 int sv_compare(const StringView* sv1, const StringView* sv2) {
@@ -1016,9 +989,35 @@ bool sv_ends_with(StringView sv, StringView post) {
     return compare(sv.buffer + sv.size-post.size, post.buffer, post.size) == 0;
 }
 
+static size_t BMH_search(StringView haystack, StringView needle) {
+    // Proprocess pattern
+    size_t table[256];
+    for (size_t i = 0; i<256; i++) {
+        table[i] = needle.size;
+    }
+    const unsigned char* h_buf = (const unsigned char*) haystack.buffer;
+    const unsigned char* n_buf = (const unsigned char*) needle.buffer;
+
+    for (size_t i = 0; i<needle.size-1; i++) {
+        table[n_buf[i]] = needle.size - 1 - i;
+    }
+
+    size_t skip = 0;
+
+    while (haystack.size - skip >= needle.size) {
+        if (memcmp(&h_buf[skip], n_buf, needle.size) == 0) {
+            return skip;
+        }
+        skip += table[h_buf[skip+needle.size-1]];
+    }
+    return haystack.size;
+}
+
+// TODO(alex): Now wiki had an implementation of BMH, apparently, there is something even
+// better called two way search. TBC
 size_t sv_find(StringView haystack, StringView needle) {
     /*
-     * Look into Boyer-Moore-Horspool for better perf.
+     * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
      */
     if (haystack.buffer == NULL || needle.buffer == NULL) {
@@ -1041,23 +1040,27 @@ size_t sv_find(StringView haystack, StringView needle) {
         const unsigned char* match = (const unsigned char*) memchr((void*)h, n[0], haystack.size);
         return match != NULL ? (size_t)(match - h) : haystack.size;
     }
-
-    size_t remaining = haystack.size - needle.size + 1;
-    const unsigned char* p = h;
-
-    while (remaining > 0) {
-        const unsigned char* match = (const unsigned char*) memchr((void*)p, n[0], remaining);
-        if (match == NULL) {
-            break;
-        }
-        if (memcmp(match, n, needle.size) == 0) {
-            return (size_t)(match - h);
-        }
-        size_t advance = (size_t)(match - p) + 1;
-        p = match+1;
-        remaining -= advance;
+    else if (needle.size > 6) {         // Just a "random" number, BMH is better for larger needles
+        return BMH_search(haystack, needle);
     }
-    return haystack.size;
+    else {
+        size_t remaining = haystack.size - needle.size + 1;
+        const unsigned char* p = h;
+
+        while (remaining > 0) {
+            const unsigned char* match = (const unsigned char*) memchr((void*)p, n[0], remaining);
+            if (match == NULL) {
+                break;
+            }
+            if (memcmp(match, n, needle.size) == 0) {
+                return (size_t)(match - h);
+            }
+            size_t advance = (size_t)(match - p) + 1;
+            p = match+1;
+            remaining -= advance;
+        }
+        return haystack.size;
+    }
 #endif
 }
 

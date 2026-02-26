@@ -3,13 +3,11 @@
 #include <stdarg.h>     // for variadic number of args.
 
 // TODO:
+// Faster find
 // Small String Optimization
 // UTF8
-// Immutability on errors
 // Format logic repeated
-// Faster find
 // Allocator abstraction layer?
-// pos bounds : pos >= or pos >
 
 // TODO?
 typedef enum {
@@ -127,6 +125,7 @@ int     string_clear(String* str);
 int     string_erase(String* str, size_t pos, size_t len);
 String  string_deep_copy(Arena* arena, const String* str);
 int     string_reserve(Arena* arena, String* str, size_t new_capacity);
+// #define string_increase_capacity(arena, str, amount)  string_reserve(arena, str, (str) ? (str)->size + amount : 0)
 int     string_shrink_to_fit(Arena* arena, String* str);
 
 void   string_debug_print(const String* string);
