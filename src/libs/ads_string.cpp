@@ -986,7 +986,7 @@ StringView sv_trim_front(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.buffer == NULL) return sv;
+    if (sv.size == 0) return sv;
     size_t i = 0;
     while (i < sv.size) {
         unsigned char c = sv.buffer[i];
@@ -1010,7 +1010,7 @@ StringView sv_trim_back(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.buffer == NULL) return sv;
+    if (sv.size == 0) return sv;
     while (sv.size > 0) {
         unsigned char c = sv.buffer[sv.size-1];
         if (!((c>=9 && c<=13) || (c == 32))) {
@@ -1129,7 +1129,6 @@ static size_t BMH_rsearch(StringView haystack, StringView needle) {
 
     size_t skip = haystack.size - needle.size;
 
-    // Abuse underflow
     while (skip <= haystack.size - needle.size) {
         if (memcmp(&h_buf[skip], n_buf, needle.size) == 0) {
             return skip;
@@ -1245,9 +1244,15 @@ size_t sv_rfind(StringView haystack, StringView needle) {
 
 StringView sv_file_extension(StringView sv) {
     size_t p1 = sv_rfind(sv, sv_from_cstr("/"));
-    StringView t = sv_truncate_front(sv, p1);
+    StringView t = sv;
+    if (p1 != sv.size) {
+        t = sv_truncate_front(sv, p1);
+    }
 
     size_t p2 = sv_rfind(t, sv_from_cstr("."));
+    if (p2 == t.size) {
+        return (StringView){0};
+    }
     return (StringView){.buffer=sv.buffer+p1+p2, .size=sv.size-p1-p2};
 }
 
@@ -1256,11 +1261,14 @@ StringView sv_file_name(StringView sv) {
     if (pos == sv.size) {
         pos = 0;
     }
-    return (StringView){.buffer=sv.buffer+pos, .size=sv.size-pos};
+    return (StringView){.buffer=sv.buffer+pos+1, .size=sv.size-(pos+1)};
 }
 
 StringView sv_directory_name(StringView sv){
     size_t pos = sv_rfind(sv, sv_from_cstr("/"));
+    if (pos == sv.size) {
+        return sv;
+    }
     return (StringView){.buffer=sv.buffer, .size=pos+1};
 }
 

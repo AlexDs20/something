@@ -122,7 +122,6 @@ static inline int string_erase_and_insert_char(Arena* arena, String* str, size_t
 
 int string_replace_first(Arena* arena, String* string, StringView target, StringView replacement);
 int string_replace_last(Arena* arena, String* string, StringView target, StringView replacement);
-// TODO
 int string_replace_all(Arena* arena, String* str, StringView target, StringView replacement);
 
 int     string_clear(String* str);
