@@ -1,14 +1,52 @@
 #include "libs/ads_jpeg.h"
+#include "platform/io.h"
 #include <stdio.h>
-/*  ============
- *  JPEG JFIF
- *  ============
- *  This implementation only convers Baseline Sequential jpg compression (JFIF implementation)
- *  If JPG progressive or gierarchical compression, see itu-1150 standard
+/*  ==================
+ *  JPEG Documentation
+ *  ==================
+ *  This implementation currently only covers Baseline Sequential (and soon progressive) DCT jpg compression
  *
- *  - This JPG implementation standard: https://www.w3.org/Graphics/JPEG/itu-t81.pdf
- *  - JFIF standard: https://www.w3.org/Graphics/JPEG/jfif3.pdf
- *  - Interesting note to not read 186 pages: https://www.opennet.ru/docs/formats/jpeg.txt
+ *  Some references:
+ *  The official jpeg compression algorithm specification can be found here:
+ *      - https://www.w3.org/Graphics/JPEG/itu-t81.pdf
+ *  The original Jpeg File Interchange Format specification:
+ *      - https://www.w3.org/Graphics/JPEG/jfif3.pdf
+ *  The newer Exchangeable Image File format:
+ *      - FILL IN
+ *  Some other article that I found interesting:
+ *      - Interesting note to not read 186 pages: https://www.opennet.ru/docs/formats/jpeg.txt
+ *
+ *  Introduction:
+ *  -------------
+ *  While jpeg is generally considered a file format, it is really an algorithm for compressing image-like data.
+ *  The jpeg specificiation itu-t81 actually does not say much about the components (i.e. color channels) in the image as it is just a compression algorithm, instead the components are specified by metadata.
+ *  One could think of using RGB but it is more common to use YCbCr as specified by JFIF.
+ *  Because the goal of this format is to compress the data, specific tricks have to be applied to the data and sometimes specific parameters must be specified and stored within the jpeg file to be to able to uncompress the image.
+ *  A jpeg file is there not only the compressed image data but it also specifies a number of parameters that specifies how to process the compressed data.
+ *  Thus markers with specific meaning (e.g 0xFFC4) are used throughout a jpeg file to speficy what type of content follows the marker.
+ *
+ *  There are several "flavours" of the jpeg compression algorithm, the simplest one is the baseline algorithm.
+ *  I will also cover the progressive version of the algorithm.
+ *  There is also the lossless version and different encoding method (specifically arithmetic coding) which I will not cover (as I haven't read the specs for these.)
+ *
+ *  In the following I will first start by explaining the baseline compression algorithm and then mention what progressive compression does differently from the baseline.
+ *
+ *  How the compression works:
+ *  --------------------------
+ *  These are the few main steps:
+ *  - Convert from RGB to YCbCr
+ *  - Convert from position space (8x8 pixels) to frequency space using discrete cosine transform (DCT). This is similar to fourier transform but only using cosines.
+ *  - "Quantize" the amplitude coefficients obtained from DCT. By quantize, it is simply meant "dividing the coefficient" and round the result.
+ *  - Reorder the coefficients in "typical order of amplitude" using the zigzag order.
+ *  - Encode the result for one component at a time
+ *      - The first amplitude coefficient (called DC) is encoded differently than the following 63 coefficients (called AC)
+ *      For the first block of 8x8:
+ *          - The value of the DC from the first 8x8 block is encoded fully (let's call it 'DC_i' to be used as a reference below)
+ *          - The 63 AC are encoded
+ *      Subsequent blocks of 8x8:
+ *          - The difference from the previous blocks' DC value is encoded that is: DC_{i+1}-DC_i (where DC_{i+1} is this blocks' DC and DC_i is the previous one)
+ *          - The next 63 AC coefficients are encoded.
+ *
  *
  *  Markers: (https://www.disktuna.com/list-of-jpeg-markers/)
  *      FFD8: start of image file
@@ -42,7 +80,9 @@
  *
  */
 
-#include "libs/IDCT_Weights.txt"
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#define LOC __FILE__ ":" XSTR(__LINE__)
 
 // itu-t81.pdf page 32
 enum Markers {
@@ -141,9 +181,6 @@ struct HuffmanNode {
 
 typedef struct HuffmanTable HuffmanTable;
 struct HuffmanTable {
-    u8 n;
-    u8 id[4];   // map index to id
-    //                index
     HuffmanNode* DCroot[4];
     HuffmanNode* ACroot[4];
 };
@@ -176,14 +213,14 @@ void print_ht(HuffmanTable& ht, bool include_tree=false) {
     printf("Huffman table spec: \n");
     printf("------------------  \n");
 
-    printf("Number tables: %d\n", ht.n);
-    for (u8 i=0; i<ht.n; i++) {
-        printf("Table %d:\n", i);
-        printf("    id: %d\n", ht.id[i]);
-
+    for (u8 i=0; i<4; i++) {
+        printf("DC ptr %p:\n", ht.DCroot[i]);
         if (include_tree) {
             printf("    DCTree: \n    ");
             draw_huffman_tree(ht.DCroot[i]);
+        }
+        printf("AC ptr %p:\n", ht.ACroot[i]);
+        if (include_tree) {
             printf("    ACTree: \n    ");
             draw_huffman_tree(ht.ACroot[i]);
         }
@@ -252,7 +289,8 @@ typedef struct ComponentInfo ComponentInfo;
 struct ComponentInfo {
     HuffmanNode* DCHuffmanTable;
     HuffmanNode* ACHuffmanTable;
-    f32* buffer;     // decoded data
+    s16* coeff;         // the "raw" decoded coefficient 1 block after each other still in zigzag order
+    f32* buffer;        // decoded data
     u8* QT;
     u32 xi;
     u32 yi;
@@ -326,8 +364,8 @@ typedef struct ScanHeader ScanHeader;
 struct ScanHeader {
     u8 n_components;
 
-    u8 start_spectral;              // Not used for baseline
-    u8 end_spectral;                // Not used
+    u8 spectral_start;              // Not used for baseline
+    u8 spectral_end;                // Not used
     u8 approx_high;                 // Not used
     u8 approx_low;                  // Not used
 
@@ -342,18 +380,17 @@ void print_sh(ScanHeader& sh) {
 
     for (u8 i=0; i<sh.n_components; i++) {
         printf("Component %d: \n", i);
-        // printf("    id selector: %d\n", sh.id_selector[i]);
-        // printf("    dc selector: %d\n", sh.dc_selector[i]);
-        // printf("    ac selector: %d\n", sh.ac_selector[i]);
+        printf("    address: %p\n", sh.components[i]);
+        // print_ci(sh.components[i]);
     }
-    printf("Start spectral: %d\n", sh.start_spectral);
-    printf("End spectral: %d\n", sh.end_spectral);
+    printf("Start spectral: %d\n", sh.spectral_start);
+    printf("End spectral: %d\n", sh.spectral_end);
     printf("Approx high: %d\n", sh.approx_high);
     printf("Approx low: %d\n", sh.approx_low);
 }
 
-typedef struct jpeg_t jpeg_t;
-struct jpeg_t {
+typedef struct Jpeg Jpeg;
+struct Jpeg {
     QuantizationTables qt;
     FrameHeader fh;
     ScanHeader sh;
@@ -397,7 +434,7 @@ bool overflow(BitStream* bs) {
 }
 
 inline
-bool skip_nbytes(BitStream* bs, u64 n) {
+bool skip_nbytes(BitStream* bs, s64 n) {
     bool error = false;
     bs->byte_pos += n;
 
@@ -414,15 +451,14 @@ u8 read_byte(BitStream* bs) {
 u16 read_2bytes(BitStream* bs){
     return bs->data[bs->byte_pos++]<<8 | bs->data[bs->byte_pos++];
 }
-// u8 read_bit(BitStream* bs);
 
-bool next_bit(BitStream* bs, u8* bit_out) {
-    bool error = false;
+ImageParsingResult next_bit(BitStream* bs, u8* bit_out) {
+    ImageParsingResult result = {IMAGE_SUCCESS, nullptr};
 
     if (overflow(bs)) {
-        printf("Next bit went beyond the bit stream data\n");
-        error = true;
-        return error;
+        const char* loc = LOC;
+        printf("%s\n", LOC);
+        return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
     }
 
     u8 byte = bs->data[bs->byte_pos];
@@ -430,16 +466,45 @@ bool next_bit(BitStream* bs, u8* bit_out) {
 
     // Update
     bs->bit_pos++;
+    if (overflow(bs)) {
+        const char* loc = LOC;
+        printf("%s\n", LOC);
+        return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+    }
+
     if (bs->bit_pos == 8) {
         bs->bit_pos = 0;
         bs->byte_pos++;
+        if (overflow(bs)) {
+            const char* loc = LOC;
+            printf("%s\n", LOC);
+            return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+        }
 
         // Skip 0xFF00
         if (byte == 0xFF && bs->data[bs->byte_pos] == 0x00) {
             bs->byte_pos++;
+            if (overflow(bs)) {
+                const char* loc = LOC;
+                printf("%s\n", LOC);
+                return (ImageParsingResult){IMAGE_FAIL, "Next bit went beyond the bit stream data\n"};
+            }
         }
     }
-    return error;
+    return result;
+}
+
+ImageParsingResult read_bits(BitStream* bs, u8 n, u16* out) {
+    ImageParsingResult result = {IMAGE_SUCCESS, nullptr};
+
+    *out = 0;
+    u8 bit;
+    for (u8 i=0; i<n; i++) {
+        result = next_bit(bs, &bit);
+        if (result.status != IMAGE_SUCCESS) { return result; }
+        *out = (*out<<1) | bit;
+    }
+    return result;
 }
 
 u8 peek_byte(BitStream* bs) {
@@ -454,7 +519,7 @@ u16 peek_2_bytes(u8* v) {
     return v[0] << 8 | v[1];
 }
 
-ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, Jpeg* jpeg) {
     FrameHeader& fh = jpeg->fh;
 
     u16 length = read_2bytes(bs);
@@ -464,14 +529,40 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
     length--;
 
     if (fh.src_precision != 8) {
-        return (ImageParsingResult){IMAGE_FAIL, "Bytes per color != 8 not supported for DCT baseline."};
+        return (ImageParsingResult){IMAGE_FAIL, "Bytes per color != 8 not supported for DCT baseline or DCT Progressive."};
     }
 
     fh.src_height = read_2bytes(bs);
     length -= 2;
     if (fh.src_height == 0) {
-        // TODO(alex): Go through file until DNL and set the src_height directly here.
-        return (ImageParsingResult){IMAGE_FAIL, "NOT IMPLEMENTED: Got src_height of 0 but no support for using DefineNumberOfLines marker yet."};
+        // Save current position
+        u64 current_byte_pos = bs->byte_pos;
+        u64 current_bit_pos = bs->bit_pos;
+
+        u8 p = read_byte(bs);
+        u8 m = read_byte(bs);
+        while (true) {
+            if (overflow(bs)) {
+                return (ImageParsingResult){IMAGE_FAIL, "Did not find the image height."};
+            }
+            else if (p==0xFF && m==DefineNumberOfLines) {
+                u16 l = read_2bytes(bs);
+                if (l != 4) {
+                    return (ImageParsingResult){IMAGE_FAIL, "Length of DefineNumberOfLines should be 4."};
+                }
+                fh.src_height = read_2bytes(bs);
+                if (fh.src_height == 0) {
+                    return (ImageParsingResult){IMAGE_FAIL, "Could not find the image height."};
+                }
+                break;
+            }
+            p = m;
+            m = read_byte(bs);
+        }
+
+        // Reset the bitstream to where we were
+        bs->byte_pos = current_byte_pos;
+        bs->bit_pos  = current_bit_pos;
     }
 
     fh.src_width = read_2bytes(bs);
@@ -485,6 +576,12 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
 
     if (fh.src_components == 0) {
         return (ImageParsingResult){IMAGE_FAIL, "Number of components = 0 not supported."};
+    }
+
+    if (jpeg->frame_type == StartOfFrame2) {     // Progressive DCT, only support for up to 4 components
+        if (fh.src_components > 4) {
+            return (ImageParsingResult){IMAGE_FAIL, "Number of components >4 not allowed by spec."};
+        }
     }
 
     u8 v;
@@ -529,13 +626,14 @@ ImageParsingResult parse_frame_header(Arena* arena, BitStream* bs, jpeg_t* jpeg)
 
         // Note: Only support of 8 bits components
         fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * sizeof (f32));
+        fh.components[i].coeff = (s16*)arena_alloc_push_zero(arena, fh.components[i].xi * fh.components[i].yi * sizeof (s16));
         // fh.components[i].buffer = (f32*)arena_alloc_push(arena, fh.components[i].xi * fh.components[i].yi * fh.src_components * sizeof (u8));
     }
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_scan_header(BitStream* bs, Jpeg* jpeg) {
     ScanHeader& sh = jpeg->sh;
 
     u16 length = read_2bytes(bs);
@@ -549,18 +647,29 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
     }
 
     u8 v;
+    u8 dc_selector[4];
+    u8 ac_selector[4];
     for (u8 i=0; i<sh.n_components; i++) {
         u8 id_selector = read_byte(bs);
         length--;
 
         v = read_byte(bs);
         length--;
-        u8 dc_selector = v >> 4;
-        u8 ac_selector = v & 0x0F;
-        if (dc_selector > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
-        } else if (ac_selector > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
+        dc_selector[i] = v >> 4;
+        ac_selector[i] = v & 0x0F;
+        if (jpeg->frame_type == StartOfFrame0) {        // Baseline DCT
+            if (dc_selector[i] > 1) {
+                return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be 0 or 1 for Sequential Baseline DCT."};
+            } else if (ac_selector[i] > 1) {
+                return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be 0 or 1 for Sequential Baseline DCT."};
+            }
+        }
+        else if (jpeg->frame_type == StartOfFrame2) {   // Progressive DCT
+            if (dc_selector[i] > 3) {
+                return (ImageParsingResult){IMAGE_FAIL, "DC coding table must be between 0 and 3 for Progressive DCT."};
+            } else if (ac_selector[i] > 3) {
+                return (ImageParsingResult){IMAGE_FAIL, "AC coding table must be between 0 and 3 for Progressive DCT."};
+            }
         }
 
         // Setup the component informations so that it's complete with QT and AC/DC tables
@@ -568,15 +677,8 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
             if (id_selector == jpeg->fh.components[j].id) {
                 sh.components[i] = &jpeg->fh.components[j];
 
-                // Set the components DC/AC tables
-                for (u8 k=0; k<jpeg->ht.n; k++) {
-                    if (dc_selector == jpeg->ht.id[k]) {
-                        sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[k];
-                    }
-                    if (ac_selector == jpeg->ht.id[k]) {
-                        sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[k];
-                    }
-                }
+                sh.components[i]->DCHuffmanTable = jpeg->ht.DCroot[dc_selector[i]];
+                sh.components[i]->ACHuffmanTable = jpeg->ht.ACroot[ac_selector[i]];
 
                 // Set the correct Quantization table
                 u8 qt_id_selector = jpeg->fh.QT_selector[j];
@@ -592,27 +694,61 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
         }
     }
 
-    sh.start_spectral = read_byte(bs);
+    sh.spectral_start = read_byte(bs);
     length--;
-    if (sh.start_spectral != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have start spectral = 0"};
+
+    sh.spectral_end = read_byte(bs);
+    length--;
+
+    if (jpeg->frame_type == StartOfFrame0) {
+        if (sh.spectral_start != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have start spectral = 0"};
+        }
+        if (sh.spectral_end != 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 63"};
+        }
+    }
+    else if (jpeg->frame_type == StartOfFrame2) {
+        if (sh.spectral_end > 63) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral <= 63"};
+        }
+        if (sh.spectral_end < sh.spectral_start) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have end spectral smaller than start."};
+        }
     }
 
-    sh.end_spectral = read_byte(bs);
-    length--;
-    if (sh.end_spectral != 63) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have end spectral = 0"};
+    // Now that we know the spectral ranges
+    // We can check that we have the needed AC/DC tables
+    for (u8 i=0; i<sh.n_components; i++) {
+        if ((sh.spectral_start == 0) && (jpeg->ht.DCroot[dc_selector[i]] == NULL)) {
+            return (ImageParsingResult){IMAGE_FAIL, "Undefined DC table."};
+        }
+
+        if ((sh.spectral_end > 0) && (jpeg->ht.ACroot[ac_selector[i]] == NULL)) {
+            return (ImageParsingResult){IMAGE_FAIL, "Undefined AC table."};
+        }
     }
+
 
     v = read_byte(bs);
     length--;
     sh.approx_high = v >> 4;
-    if (sh.approx_high != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation high = 0"};
-    }
     sh.approx_low  = v & 0x0F;
-    if (sh.approx_low != 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation low = 0"};
+    if (jpeg->frame_type == StartOfFrame0) {
+        if (sh.approx_high != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation high = 0"};
+        }
+        if (sh.approx_low != 0) {
+            return (ImageParsingResult){IMAGE_FAIL, "Baseline DCT must have approximation low = 0"};
+        }
+    }
+    else if (jpeg->frame_type == StartOfFrame2) {
+        if (sh.approx_high > 13) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have approximation high smaller than 13."};
+        }
+        if (sh.approx_low > 13) {
+            return (ImageParsingResult){IMAGE_FAIL, "Progressive DCT must have approximation low smaller than 13."};
+        }
     }
 
     if (length != 0) {
@@ -622,13 +758,13 @@ ImageParsingResult parse_scan_header(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_application_segment_n(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_application_segment_n(BitStream* bs, Jpeg* jpeg) {
     u16 length = peek_2bytes(bs);
     skip_nbytes(bs, length);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_application_segment_14(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_application_segment_14(BitStream* bs, Jpeg* jpeg) {
     // This is usually used by adobe encoders
     //
     // Adobed@
@@ -641,13 +777,13 @@ ImageParsingResult parse_application_segment_14(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_comment(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_comment(BitStream* bs, Jpeg* jpeg) {
     u16 length = peek_2bytes(bs);
     skip_nbytes(bs, length);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_define_restart_interval(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_restart_interval(BitStream* bs, Jpeg* jpeg) {
     u16 length = read_2bytes(bs);
     length -= 2;
 
@@ -662,17 +798,13 @@ ImageParsingResult parse_define_restart_interval(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_define_number_of_lines(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_number_of_lines(BitStream* bs, Jpeg* jpeg) {
     u16 length = read_2bytes(bs);
     length -= 2;
 
     // Specifies the number of MCU in the restart interval
-    jpeg->fh.src_height = read_2bytes(bs);
+    read_2bytes(bs);
     length -= 2;
-
-    if (jpeg->fh.src_height == 0) {
-        return (ImageParsingResult){IMAGE_FAIL, "NOT IMPLEMENTED: setting the number of lines from the DefineNumberOfLines marker."};
-    }
 
     if (length != 0) {
         return (ImageParsingResult){IMAGE_FAIL, "Expected length of DefineNumberOfLines and read data do not match."};
@@ -681,7 +813,7 @@ ImageParsingResult parse_define_number_of_lines(BitStream* bs, jpeg_t* jpeg) {
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg* jpeg) {
     HuffmanTable& ht = jpeg->ht;
 
     s32 length = (s32)read_2bytes(bs);
@@ -699,25 +831,9 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_
         if (table_class > 1) {
             return (ImageParsingResult){IMAGE_FAIL, "Huffman table class must be 0 for DC or 1 for AC."};
         }
-        if (table_id > 1) {
-            return (ImageParsingResult){IMAGE_FAIL, "Huffman table id must either be 0 or 1."};
+        if (table_id > 3) {
+            return (ImageParsingResult){IMAGE_FAIL, "Huffman table id must be <= 3."};
         }
-
-        // Check if we already have the id (because same id for DC and AC)
-        u8 idx = ht.n;
-        {
-            for (u8 i=0; i<ht.n; i++) {
-                if (table_id == ht.id[i]) {
-                    idx = i;
-                    break;
-                }
-            }
-            // If we don't have the id, increase number of tables
-            if (idx == ht.n) {
-                ht.n++;
-            }
-        }
-        ht.id[idx] = table_id;
 
         // Read actual huffman table code lengths and associated symbols
         // For each length of symbols save that length and count the total number of symbols
@@ -740,9 +856,9 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_
         // Convert table to tree for easier parsing of the entropy stream
         HuffmanNode* root = (HuffmanNode*)arena_alloc_push_zero(arena, sizeof(HuffmanNode));
         if (table_class == 0) {
-            ht.DCroot[idx] = root;
+            ht.DCroot[table_id] = root;
         } else {
-            ht.ACroot[idx] = root;
+            ht.ACroot[table_id] = root;
         }
 
         HuffmanNode* node = 0;
@@ -761,11 +877,13 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_
                     u8 bit = (code >> c) & 1;
                     if (bit) { // right
                         if (!node->right) {
+                            // TODO(alex): Perf: preallocate before the loop so that we don't need to push the pointer everytime?
                             node->right = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
                         }
                         node = node->right;
                     } else {    // left
                         if (!node->left) {
+                            // TODO(alex): Perf: preallocate before the loop so that we don't need to push the pointer everytime?
                             node->left = (HuffmanNode*)arena_alloc_push_zero_unaligned(arena, sizeof(HuffmanNode));
                         }
                         node = node->left;
@@ -786,7 +904,7 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, jpeg_
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_define_quantization_table(BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_define_quantization_table(BitStream* bs, Jpeg* jpeg) {
     QuantizationTables& qt = jpeg->qt;
 
     s32 length = (s32)read_2bytes(bs);
@@ -900,7 +1018,7 @@ ImageParsingResult decode_one_huffman_code(BitStream* bs, HuffmanNode* root, u8*
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-s16 read_n_bits(BitStream* bs, u8 n) {
+s16 decode_n_bits(BitStream* bs, u8 n) {
     s16 out;
     u8 bit;
     u16 tmp_value = 0;
@@ -929,23 +1047,24 @@ ImageParsingResult parse_dc_data_unit(BitStream* bs, HuffmanNode* root, s16* out
     }
 
     // Read that amount of bits
-    *out = read_n_bits(bs, category);
+    *out = decode_n_bits(bs, category);
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
 ImageParsingResult parse_ac_data_unit(BitStream* bs, HuffmanNode* root, u8* run_length, s16* out) {
     u8 symbol;
+    // TODO error?
     decode_one_huffman_code(bs, root, &symbol);
 
-    *run_length = symbol >> 4;
-    u8 category = symbol & 0x0F;
+    *run_length = symbol >> 4;      // preceeding zeros
+    u8 category = symbol & 0x0F;    // Number of bits to read to get the value
 
     if (category == 0) {
         *out = 0;
         return (ImageParsingResult){IMAGE_SUCCESS, 0};
     }
 
-    *out = read_n_bits(bs, category);
+    *out = decode_n_bits(bs, category);
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
@@ -981,6 +1100,7 @@ const f32 S6 = C2;
 const f32 S7 = C1;
 
 void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    #include "libs/IDCT_Weights.txt"
     for (u8 u=0; u<8; u++) {
         f32 sum = 0;
         for (u8 x=0; x<8; x++) {
@@ -991,6 +1111,7 @@ void dct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
 }
 
 void idct_1d_naive(f32* out, u32 out_stride, f32* in, u32 in_stride) {
+    #include "libs/IDCT_Weights.txt"
     for (u8 x=0; x<8; x++) {
         for (u8 u=0; u<8; u++) {
             out[x*out_stride] += in[u*in_stride] * IDCT_Weights[x][u];
@@ -1348,24 +1469,12 @@ void idct_2d_aan(f32 idct[64], f32 mcu[64]) {
     }
 }
 
-ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult parse_baseline_scan(Arena* persist_arena, BitStream* bs, Jpeg* jpeg) {
     u8 expected_restart_id = 0;
     u8 previous;
     u8 marker;
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
-
-    // To go from flat zigzag order to flat unzigzag order
-    const u8 unzigzag[64] = {
-        0,   1,  8, 16,  9,  2,  3, 10,
-        17, 24, 32, 25, 18, 11,  4,  5,
-        12, 19, 26, 33, 40, 48, 41, 34,
-        27, 20, 13,  6,  7, 14, 21, 28,
-        35, 42, 49, 56, 57, 50, 43, 36,
-        29, 22, 15, 23, 30, 37, 44, 51,
-        58, 59, 52, 45, 38, 31, 39, 46,
-        53, 60, 61, 54, 47, 55, 62, 63
-    };
 
     // If only 1 component in the scan => Vi and Hi should be 1
     //  => This means that the number of mcu is not that from the FrameHeader
@@ -1378,6 +1487,7 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     if (n_components == 1) {
         Vi[0] = 1;
         Hi[0] = 1;
+        // TODO(alex): Shouldn't this be jpeg->sh.components[0] ==> ScanHeader instead of frameheader
         n_mcu_width =  ceil((f32)jpeg->fh.components[0].xi / 8);
         n_mcu_height = ceil((f32)jpeg->fh.components[0].yi / 8);
     } else {
@@ -1399,116 +1509,97 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
     }
 
     u64 current_mcu = 0;
+    // TODO(alex): Shouldn't this be n_mcu_width*n_mcu_height instead?
+    u64 total_number_mcu = jpeg->fh.n_mcu_width * jpeg->fh.n_mcu_height;
     for (u64 i=0; i<n_restart_intervals; i++) {
         // ImageParsingResult result = parse_EntropySegment(persist_arena, bs, jpeg);
-        {
-            // Reset all 4 s16 values to 0
-            jpeg->dc_pred[0] = 0;
-            jpeg->dc_pred[1] = 0;
-            jpeg->dc_pred[2] = 0;
-            jpeg->dc_pred[3] = 0;
+        // Reset all 4 s16 values to 0
+        jpeg->dc_pred[0] = 0;
+        jpeg->dc_pred[1] = 0;
+        jpeg->dc_pred[2] = 0;
+        jpeg->dc_pred[3] = 0;
 
-            u64 n = 0;
-            // TODO: This does not handle properly on the last of the restart intervals if the number of mcu in the last restart_interval is not
-            while (n++ < restart_interval) {
-                // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
-                {
-                    u32 mcu_block_start_y = (u32)(current_mcu / n_mcu_width);
-                    u32 mcu_block_start_x = current_mcu - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
+        u64 n = 0;
+        while (n++ < restart_interval && current_mcu < total_number_mcu) {
+            // ImageParsingResult result = parse_mcu(persist_arena, bs, jpeg);
+            u32 mcu_block_start_y = (u32)(current_mcu / n_mcu_width);
+            u32 mcu_block_start_x = current_mcu - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
 
-                    for (u8 i=0; i<n_components; i++) {
-                        u8* Q = jpeg->sh.components[i]->QT;
-                        HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
-                        HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
+            for (u8 i=0; i<n_components; i++) {
+                // u8* Q = jpeg->sh.components[i]->QT;
+                HuffmanNode* dc_ht_root = jpeg->sh.components[i]->DCHuffmanTable;
+                HuffmanNode* ac_ht_root = jpeg->sh.components[i]->ACHuffmanTable;
 
-                        for (u8 v=0; v<Vi[i]; v++) {
-                            for (u8 h=0; h<Hi[i]; h++) {
-                                f32 zz_mcu[64] = {0};
-                                f32 mcu[64] = {0};
-                                f32 idct[64] = {0};
+                for (u8 v=0; v<Vi[i]; v++) {
+                    for (u8 h=0; h<Hi[i]; h++) {
+                        //  Identify correctly where to put the data in the component array
+                        //  Data format is: block0[64]block1[64],...,blockxi[64,]
+                        u32 idx_x = (mcu_block_start_x*Hi[i] + h) * 64;
+                        u32 idx_y = (mcu_block_start_y*Vi[i] + v);
+                        u64 offset = idx_x + idx_y * (jpeg->sh.components[i]->xi*8);
+                        s16* zz_mcu = &jpeg->sh.components[i]->coeff[offset];
 
-                                s16 value;
-                                result = parse_dc_data_unit(bs, dc_ht_root, &value);
-                                if (result.status != IMAGE_SUCCESS) { return result; }
+                        s16 value;
+                        result = parse_dc_data_unit(bs, dc_ht_root, &value);
+                        if (result.status != IMAGE_SUCCESS) { return result; }
 
-                                s16 dc = jpeg->dc_pred[i] + value;
-                                jpeg->dc_pred[i] = dc;
-                                zz_mcu[0] = dc;
+                        s16 dc = jpeg->dc_pred[i] + value;
+                        jpeg->dc_pred[i] = dc;
+                        zz_mcu[0] = dc;
 
-                                u8 j = 1;
-                                while (j<64) {        // and not a marker that would indicate something
-                                    u8 preceding_zeros = 0;
-                                    result = parse_ac_data_unit(bs, ac_ht_root, &preceding_zeros, &value);
-                                    if (result.status != IMAGE_SUCCESS) { return result; }
-                                    s16 ac = value;
+                        u8 j = 1;
+                        while (j<64) {        // and not a marker that would indicate something
+                            u8 preceding_zeros = 0;
+                            result = parse_ac_data_unit(bs, ac_ht_root, &preceding_zeros, &value);
+                            if (result.status != IMAGE_SUCCESS) { return result; }
+                            s16 ac = value;
 
-                                    if (ac == 0 && preceding_zeros == 0) {
-                                        while (j<64) {
-                                            zz_mcu[j++] = 0;
-                                        }
-                                    } else {
-                                        for (u8 k=0; k<preceding_zeros; k++) {
-                                            zz_mcu[j++] = 0;
-                                        }
-                                        zz_mcu[j++] = ac;
-                                    }
+                            if (ac == 0 && preceding_zeros == 0) {
+                                while (j<64) {
+                                    zz_mcu[j++] = 0;
                                 }
-
-                                // Dequantize and Unzigzag
-                                for (u8 l=0; l<64; l++) {
-                                    mcu[unzigzag[l]] = zz_mcu[l] * Q[l];
+                            } else {
+                                for (u8 k=0; k<preceding_zeros; k++) {
+                                    zz_mcu[j++] = 0;
                                 }
-
-                                // IDCT
-                                idct_2d_aan(idct, mcu);
-
-                                // Assign the value at the correct component buffer position
-                                u32 idx_x = ((mcu_block_start_x*Hi[i]) + h) * 8;
-                                u32 idx_y = ((mcu_block_start_y*Vi[i]) + v) * 8;
-
-                                for (u8 y=0; y<8; y++) {
-                                    for (u8 x=0; x<8; x++) {
-                                        u64 linear_index = (idx_y+y) * jpeg->sh.components[i]->xi + (idx_x+x);
-                                        u16 l = x + y*8;
-
-                                        jpeg->sh.components[i]->buffer[linear_index] = idct[l];
-                                    }
-                                }
+                                zz_mcu[j++] = ac;
                             }
                         }
                     }
-
-                    current_mcu++;
                 }
             }
 
-            // Go through all the last bits until byte aligned
-            u8 bit;
-            while (bs->bit_pos != 0) {
-                next_bit(bs, &bit);
-            }
-
-            u8 tmp;
-            previous = read_byte(bs);
-            marker = read_byte(bs);
-            if (0xFF != previous) {
-                return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
-            }
-            while (marker == 0xFF) {
-                marker = read_byte(bs);
-            }
-            if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
-                return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
-            }
-            skip_nbytes(bs, -2);
+            current_mcu++;
         }
-
         if (result.status != IMAGE_SUCCESS) {
             // TODO(alex): Here could check and move forward until next restart marker?
             return result;
         }
+
+        // Go through all the last bits until byte aligned (bit filling)
+        u8 bit;
+        while (bs->bit_pos != 0) {
+            next_bit(bs, &bit);
+        }
+
+        u8 tmp;
         previous = read_byte(bs);
         marker = read_byte(bs);
+        if (0xFF != previous) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+        }
+        // TODO(alex): check this
+        while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
+            marker = read_byte(bs);
+        }
+        // if ( !(is_restart_marker(marker, &tmp) | is_interpret_marker(marker) | (StartOfScan == marker) | (EndOfImage == marker)) ) {
+        //     return (ImageParsingResult){IMAGE_FAIL, "Invalid marker encountered."};
+        // }
+        // skip_nbytes(bs, -2);
+
+        // previous = read_byte(bs);
+        // marker = read_byte(bs);
         if (is_restart_marker(marker, &expected_restart_id)) {
             continue;
         } else {
@@ -1516,10 +1607,327 @@ ImageParsingResult parse_scan(Arena* persist_arena, BitStream* bs, jpeg_t* jpeg)
             break;
         }
     }
+
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStream* bs, jpeg_t* jpeg) {
+ImageParsingResult decode_progressive_dc(BitStream* bs, Jpeg* jpeg) {
+    // - For each restart interval
+    // - For each set of MCU in a restart interval e.g. 512 MCU
+    // - For each MCU
+    // - For each component
+    // - For each elem in Hi
+    // - For each elem in Vi
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+
+    u8 Hi[4] = {0};
+    u8 Vi[4] = {0};
+    u8 n_components = jpeg->sh.n_components;
+    u32 n_mcu_width = jpeg->fh.n_mcu_width;
+    u32 n_mcu_height = jpeg->fh.n_mcu_height;
+
+    if (n_components == 1) {    // 1 component => no Hi / Vi
+        Hi[0] = 1;
+        Vi[0] = 1;
+        n_mcu_width  = ceil((f32)jpeg->sh.components[0]->xi / 8);
+        n_mcu_height = ceil((f32)jpeg->sh.components[0]->yi / 8);
+    } else {
+        for (u8 i=0; i<n_components; i++) {
+            Hi[i] = jpeg->sh.components[i]->Hi;
+            Vi[i] = jpeg->sh.components[i]->Vi;
+        }
+    }
+    u64 total_n_mcu = n_mcu_width * n_mcu_height;
+
+    u32 restart_interval_size = jpeg->restart_interval != 0 ? jpeg->restart_interval : total_n_mcu;
+    u32 restart_interval_num  = ceil((f32)total_n_mcu / restart_interval_size);
+
+    u64 processed_mcu = 0;
+    for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
+        s16 dc_pred[4] = {0};
+
+        for (u32 mcu_idx=0; mcu_idx<restart_interval_size; mcu_idx++) {
+            if (processed_mcu + mcu_idx >= total_n_mcu) {
+                break;
+            }
+            u32 mcu_block_start_y = (u32)((processed_mcu + mcu_idx) / n_mcu_width);
+            u32 mcu_block_start_x =       (processed_mcu + mcu_idx) - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
+
+            for (u8 comp_idx=0; comp_idx<n_components; comp_idx++) {
+                HuffmanNode* dc_ht_root = jpeg->sh.components[comp_idx]->DCHuffmanTable;
+
+                for (u8 vi=0; vi<Vi[comp_idx]; vi++) {
+                    for (u8 hi=0; hi<Hi[comp_idx]; hi++) {
+                        // Lots of stuff just to write to the write spot...
+                        u32 idx_x = (mcu_block_start_x*Hi[comp_idx] + hi) * 64;
+                        u32 idx_y = (mcu_block_start_y*Vi[comp_idx] + vi);
+                        u64 offset = idx_x + idx_y * (jpeg->sh.components[comp_idx]->xi*8);
+                        s16* zz_mcu = &jpeg->sh.components[comp_idx]->coeff[offset];
+
+                        // Decode DC
+                        if (jpeg->sh.approx_high == 0) {    // First time decoding DC
+                            s16 value;
+                            result = parse_dc_data_unit(bs, dc_ht_root, &value);
+                            if (result.status != IMAGE_SUCCESS) { return result; }
+                            dc_pred[comp_idx] += value;
+
+                            zz_mcu[0] = dc_pred[comp_idx] << jpeg->sh.approx_low;
+                        } else {
+                            u8 bit;
+                            // TODO(alex): FIXME error
+                            next_bit(bs, &bit);
+                            zz_mcu[0] |= (bit << jpeg->sh.approx_low);
+                        }
+                    }
+                }
+            }
+        }
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
+        }
+
+        // Go through all the last bits until byte aligned (bit filling)
+        u8 bit;
+        while (bs->bit_pos != 0) {
+            next_bit(bs, &bit);
+        }
+
+        u8 tmp;
+        u8 previous = read_byte(bs);
+        u8 marker = read_byte(bs);
+        if (0xFF != previous) {
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+        }
+        // TODO(alex): check this
+        while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
+            marker = read_byte(bs);
+        }
+        if (is_restart_marker(marker, &tmp)) {
+            continue;
+        } else {
+            skip_nbytes(bs, -2);
+            break;
+        }
+    }
+
+    return result;
+}
+
+ImageParsingResult decode_progressive_ac(BitStream* bs, Jpeg* jpeg) {
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+
+    u32 n_mcu_width = ceil((f32)jpeg->sh.components[0]->xi / 8);
+    u32 n_mcu_height = ceil((f32)jpeg->sh.components[0]->yi / 8);
+    u64 total_n_mcu = n_mcu_width * n_mcu_height;
+
+    u32 restart_interval_size = jpeg->restart_interval != 0 ? jpeg->restart_interval : total_n_mcu;
+    u32 restart_interval_num  = ceil((f32)total_n_mcu / restart_interval_size);
+
+    HuffmanNode* ac_ht_root = jpeg->sh.components[0]->ACHuffmanTable;
+
+    u64 processed_mcu = 0;
+    u64 restart_pos;
+    for (u32 ri_idx=0; ri_idx<restart_interval_num; ri_idx++, processed_mcu+=restart_interval_size) {
+        s16 dc_pred[4] = {0};
+        u16 skips = 0;
+
+        for (u32 mcu_idx=0; mcu_idx<restart_interval_size; mcu_idx++) {
+            if (processed_mcu + mcu_idx >= total_n_mcu) {
+                break;
+            }
+
+            // All these factors could be obtained more easily by just gradually incrementing
+            // And all blocks are contiguous so we probably don't need all of these.
+            u32 mcu_block_start_y = (u32)((processed_mcu + mcu_idx) / n_mcu_width);
+            u32 mcu_block_start_x =       (processed_mcu + mcu_idx) - mcu_block_start_y*n_mcu_width;    // = current_mcu % n_mcu_width;
+
+            // Lots of stuff just to write to the write spot...
+            u32 idx_x = (mcu_block_start_x*1 + 0) * 64;
+            u32 idx_y = (mcu_block_start_y*1 + 0);
+            u64 offset = idx_x + idx_y * (jpeg->sh.components[0]->xi*8);
+            s16* zz_mcu = &jpeg->sh.components[0]->coeff[offset];
+
+
+            // Decode AC
+            if (jpeg->sh.approx_high == 0) {    // First time decoding AC
+                if (skips > 0) {
+                    skips--;
+                    continue;
+                }
+                for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end;) {
+                    u8 rrrrssss;
+
+                    result = decode_one_huffman_code(bs, ac_ht_root, &rrrrssss);
+                    if (bs->byte_pos > restart_pos){
+                        printf("ri idx: %d / %d / %d \n", 0, ri_idx, restart_interval_num);
+                        printf("mcu idx: %d / %d / %d \n", 0 , mcu_idx, restart_interval_size-1);
+                        printf("idx: %d / %d / %d \n", jpeg->sh.spectral_start, idx, jpeg->sh.spectral_end);
+                        if (result.error_message != nullptr) printf("failed with: %s\n", result.error_message);
+                        return (ImageParsingResult){IMAGE_FAIL, "\n---\nFailed :(\n---\n"};
+                    }
+                    if (result.status != IMAGE_SUCCESS) return result;
+
+                    u8  r = rrrrssss >> 4;
+                    s16 s = rrrrssss & 0x0F;        // Number of bits to read to get the value
+
+                    if (s == 0) {
+                        // Fill 16 zeros
+                        if (r==0xF) {
+                            // Write 16 zeros but it should not be needed if we default initialize to 0
+                            idx += 0x10;
+                            continue;
+                        }
+                        // Fill rest of band with 0
+                        else if (r==0) {
+                            // Assumes zero initialized
+                            break;
+                        }
+                        // Skip several blocks of bands which are 0
+                        else {
+                            // Get amount of blocks to skip
+                            skips = (1<<r) - 1;
+                            u16 extra_skips = 0;
+                            result = read_bits(bs, r, &extra_skips);
+                            if (result.status != IMAGE_SUCCESS) return result;
+                            skips += extra_skips;
+                            // mcu_idx += skips;
+                            break;
+                        }
+                    }
+                    else {
+                        // Write preceding zeros (skips because 0 initialized)
+                        idx += r;
+                        // Write the value that we read
+                        s16 ac = decode_n_bits(bs, s);
+                        zz_mcu[idx++] = ac << jpeg->sh.approx_low;
+                    }
+                }
+            } else {                            // Subsequent
+                s16 shifted_bit = (s16) (1 << jpeg->sh.approx_low);
+
+                // Handle band skips (EOBn) in subsequent AC
+                if (skips>0) {
+                    for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end; idx++) {
+                        if (zz_mcu[idx] != 0) {
+                            u8 bit;
+                            next_bit(bs, &bit);
+                            if (bit) {
+                                zz_mcu[idx] += (zz_mcu[idx]>0) ? shifted_bit : -shifted_bit;
+                            }
+                        }
+                    }
+                    skips--;
+                }
+                else {
+                    for (u8 idx=jpeg->sh.spectral_start; idx<=jpeg->sh.spectral_end;) {
+                        u8 rrrrssss;
+                        decode_one_huffman_code(bs, ac_ht_root, &rrrrssss);
+                        u8  r = rrrrssss >> 4;
+                        s16 s = rrrrssss & 0x0F;        // Number of bits to read to get the value
+
+                        // EOBn
+                        if (s == 0) {
+                            if (r<0xF) {
+                                skips = (1 << r) - 1;
+                                u16 extra_skips = 0;
+                                result = read_bits(bs, r, &extra_skips);
+                                if (result.status != IMAGE_SUCCESS) return result;
+                                skips += extra_skips;
+                                r = 64;     // Force finish the block
+                            }
+                            // ZRL
+                            else /* if (r == 0xF) */ {
+                                // r = 0xF , s = 0 => skip 16 zeroes
+                            }
+                        }
+                        // Skips zeros + write 1 value
+                        else if (s == 1) {
+                            u8 sign_bit;
+                            next_bit(bs, &sign_bit);
+                            s = sign_bit ? shifted_bit : -shifted_bit;
+                        }
+                        else {
+                            return (ImageParsingResult){IMAGE_FAIL, "Bad category. Expected 0 or 1 for subsequent AC scans."};
+                        }
+
+                        for (;idx<=jpeg->sh.spectral_end;) {
+                            s16* p = &zz_mcu[idx];
+                            if (*p != 0) {
+                                u8 bit;
+                                next_bit(bs, &bit);
+                                if (bit) {
+                                    *p += (*p>0) ? shifted_bit : -shifted_bit;
+                                }
+                            }
+                            else {
+                                // Skip the values that are 0
+                                // Except if it's the last when we write the s value we read
+                                if (r == 0) {
+                                    *p = s;
+                                    idx++;
+                                    break;
+                                }
+                                r--;
+                            }
+                            idx++;
+                        }
+
+                    }
+                }
+            }
+        }
+
+        if (result.status != IMAGE_SUCCESS) {
+            // TODO(alex): Here could check and move forward until next restart marker?
+            return result;
+        }
+
+        // Go through all the last bits until byte aligned (bit filling)
+        u8 bit;
+        while (bs->bit_pos != 0) {
+            next_bit(bs, &bit);
+        }
+
+        u8 tmp;
+        u8 previous = read_byte(bs);
+        u8 marker = read_byte(bs);
+        if (0xFF != previous) {
+            printf("Should've gotten a marker but got 0x%02X%02X\n", previous, marker);
+            return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
+        }
+        // TODO(alex): check this
+        while (marker == 0xFF) {
+            printf("TODO(alex): CHECK: DOES THIS HAPPEN!?\n");
+            marker = read_byte(bs);
+        }
+        if (is_restart_marker(marker, &tmp)) {
+            continue;
+        } else {
+            skip_nbytes(bs, -2);
+            break;
+        }
+    }
+
+    return result;
+}
+
+ImageParsingResult parse_progressive_scan(Arena* persist_arena, BitStream* bs, Jpeg* jpeg) {
+    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+
+    if (jpeg->sh.spectral_end == 0) {       // DC
+        result = decode_progressive_dc(bs, jpeg);
+    }
+    else if (jpeg->sh.spectral_start > 0) { // AC
+        result = decode_progressive_ac(bs, jpeg);
+    } else {
+        return (ImageParsingResult){IMAGE_FAIL, "Unexpected combination of parameters for a scan during progressive decoding."};
+    }
+    return result;
+}
+
+ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStream* bs, Jpeg* jpeg) {
     u8 previous = read_byte(bs);
     u8 marker   = read_byte(bs);
     ImageParsingResult result;
@@ -1528,7 +1936,12 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         if (StartOfScan == marker) {
             result = parse_scan_header(bs, jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
-            result = parse_scan(persist_arena, bs, jpeg);
+
+            if (StartOfFrame0 == jpeg->frame_type) {
+                result = parse_baseline_scan(persist_arena, bs, jpeg);
+            } else if (StartOfFrame2 == jpeg->frame_type) {
+                result = parse_progressive_scan(persist_arena, bs, jpeg);
+            }
         }
         else if (DefineQuantizationTable == marker) {
             result = parse_define_quantization_table(bs, jpeg);
@@ -1560,6 +1973,7 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
         // Read next marker
         previous = read_byte(bs);
         if (previous != 0xFF) {
+            print_mk(marker);
             return (ImageParsingResult){IMAGE_FAIL, "Expected a marker."};
         }
         marker = read_byte(bs);
@@ -1568,8 +1982,12 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-// TODO(alex): This should not use Arena and string8 but standard C types.
 ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
+    return decode_jpeg(persist_arena, data, out, false);
+}
+
+// TODO(alex): This should not use Arena and string8 but standard C types.
+ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, bool flip_vertically) {
     // Note: Current goal is to support baseline DCT 8 bits
     BitStream bs = {
         .data = data.buffer,
@@ -1594,7 +2012,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     }
 
     // Decoder_setup
-    jpeg_t jpeg = {0};
+    Jpeg jpeg = {0};
 
     //==============================
     //  Decoding
@@ -1657,24 +2075,72 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
             return (ImageParsingResult){IMAGE_FAIL, "Did not find start of frame marker! (We should never get here...)"};
         }
 
-        //  PARSE FRAME
-        {
-            // FrameHeader
-            if (marker == StartOfFrame0) {
-                jpeg.frame_type = (Markers)marker;
-                result = parse_frame_header(local_arena->arena, &bs, &jpeg);
-                if (result.status != IMAGE_SUCCESS) { return result; }
-            }
-            else {
-                return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
-            }
-
-            // TODO(alex): Allocate precisely the right amount and use u8* regardless
-            jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
-
-            // Parse all Scans
-            result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
+        // FrameHeader
+        if (marker == StartOfFrame0 || marker == StartOfFrame2) {      // Baseline DCT or Progressive
+            jpeg.frame_type = (Markers)marker;
+            result = parse_frame_header(local_arena->arena, &bs, &jpeg);
             if (result.status != IMAGE_SUCCESS) { return result; }
+        }
+        else {
+            return (ImageParsingResult){IMAGE_FAIL, "Only StartOfFrame0 marker implemented!"};
+        }
+
+        // TODO(alex): Allocate precisely the right amount and use u8* regardless
+        jpeg.buffer = (u8*)arena_alloc_push(persist_arena, jpeg.fh.src_width*jpeg.fh.src_height*4*sizeof(u8));
+
+        // Parse all Scans
+        result = parse_scans(persist_arena, local_arena->arena, &bs, &jpeg);
+        if (result.status != IMAGE_SUCCESS) { return result; }
+
+        // To go from flat zigzag order to flat unzigzag order
+        const u8 unzigzag[64] = {
+            0,   1,  8, 16,  9,  2,  3, 10,
+            17, 24, 32, 25, 18, 11,  4,  5,
+            12, 19, 26, 33, 40, 48, 41, 34,
+            27, 20, 13,  6,  7, 14, 21, 28,
+            35, 42, 49, 56, 57, 50, 43, 36,
+            29, 22, 15, 23, 30, 37, 44, 51,
+            58, 59, 52, 45, 38, 31, 39, 46,
+            53, 60, 61, 54, 47, 55, 62, 63
+        };
+
+        for (u8 i=0; i<jpeg.fh.src_components; i++) {
+            s16* comp = jpeg.fh.components[i].coeff;
+            u8* Q = jpeg.fh.components[i].QT;
+
+            u32 n_du_width =  ceil((f32)jpeg.fh.components[i].xi / 8);
+            u32 n_du_height = ceil((f32)jpeg.fh.components[i].yi / 8);
+
+            // If I put them contiguous in memory
+            for (u32 block_id_y=0; block_id_y<n_du_height; block_id_y++) {
+                for (u32 block_id_x=0; block_id_x<n_du_width; block_id_x++) {
+                    u64 block_id = block_id_y * n_du_width + block_id_x;
+
+                    s16* coeff = &comp[block_id * 64];
+                    f32 mcu[64] = {0};
+                    f32 idct[64] = {0};
+
+                    // Dequantize and Unzigzag
+                    for (u8 l=0; l<64; l++) {
+                        mcu[unzigzag[l]] = coeff[l] * Q[l];
+                    }
+
+                    // IDCT
+                    idct_2d_aan(idct, mcu);
+
+                    // Write data at correct place
+                    u32 idx_x = block_id_x * 8;
+                    u32 idx_y = block_id_y * 8;
+                    u32 base_offset = idx_y * jpeg.fh.components[i].xi + idx_x;
+                    for (u8 y=0; y<8; y++) {
+                        for (u8 x=0; x<8; x++) {
+                            u64 linear_index = base_offset + y * jpeg.fh.components[i].xi + x;
+                            u16 l = x + y*8;
+                            jpeg.fh.components[i].buffer[linear_index] = idct[l];
+                        }
+                    }
+                }
+            }
         }
 
         // Assume YCbCr
@@ -1682,9 +2148,9 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
         int tmp = 0x000000FF;
         bool is_little_endian = (*(u8*)(&tmp) == 0xFF);
         if (3 == jpeg.fh.src_components) {
-            f32* comp0 = jpeg.sh.components[0]->buffer;
-            f32* comp1 = jpeg.sh.components[1]->buffer;
-            f32* comp2 = jpeg.sh.components[2]->buffer;
+            f32* comp0 = jpeg.fh.components[0].buffer;
+            f32* comp1 = jpeg.fh.components[1].buffer;
+            f32* comp2 = jpeg.fh.components[2].buffer;
 
             u64 l0, l0_x, l0_y;
             u64 l1, l1_x, l1_y;
@@ -1713,7 +2179,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                     l1_x = x / l1_x_ratio;
                     l2_x = x / l2_x_ratio;
 
-                    u64 l = y * jpeg.fh.src_width + x;
+                    u64 l = !flip_vertically ? (y * jpeg.fh.src_width + x) : ((jpeg.fh.src_height-1 - y) * jpeg.fh.src_width + x);
                     l0 = (l0_y*jpeg.fh.components[0].xi) + l0_x;
                     l1 = (l1_y*jpeg.fh.components[1].xi) + l1_x;
                     l2 = (l2_y*jpeg.fh.components[2].xi) + l2_x;
@@ -1734,7 +2200,7 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
                 }
             }
         } else if (1 == jpeg.fh.src_components) {
-            f32* comp0 = jpeg.sh.components[0]->buffer;
+            f32* comp0 = jpeg.fh.components[0].buffer;
             for (u32 y=0; y<jpeg.fh.src_height; y++) {
                 for (u32 x=0; x<jpeg.fh.src_width; x++) {
                     u64 l = y * jpeg.fh.src_width + x;
@@ -1761,4 +2227,71 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
     out->buffer      = (u32*)jpeg.buffer;
 
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
+}
+
+int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8* precision) {
+    int success = 1;
+    // Note: Current goal is to support baseline DCT 8 bits
+    LocalArena* local_arena = local_arena_alloc_create();
+    string8 data = read_file(local_arena->arena, filename);
+    BitStream bs = {
+        .data = data.buffer,
+        .size = data.size,
+        .byte_pos = 0,
+        .bit_pos = 0
+    };
+    u8 previous = read_byte(&bs);
+    u8 marker = read_byte(&bs);
+
+    if (previous != 0xFF)                   { success = 0; goto cleanup; }
+    if (marker != StartOfImage)             { success = 0; goto cleanup; }
+    if (bs.data[bs.size-2] != 0xFF)         { success = 0; goto cleanup; }
+    if (bs.data[bs.size-1] != EndOfImage)   { success = 0; goto cleanup; }
+
+    previous = read_byte(&bs);
+    marker = read_byte(&bs);
+
+    while (true) {
+        if (previous != 0xFF) { success = 0; goto cleanup; }
+        if (overflow(&bs))    { success = 0; goto cleanup; }
+
+        if (is_start_of_frame(marker)) {
+            u16 l = read_2bytes(&bs);
+            *precision = read_byte(&bs);
+            *height = read_2bytes(&bs);
+            *width = read_2bytes(&bs);
+            *components = read_byte(&bs);
+
+            if (*height == 0) {
+                u8 p = read_byte(&bs);
+                u8 m = read_byte(&bs);
+                while (true) {
+                    if (overflow(&bs)) { success = 0; goto cleanup; }
+                    if (p==0xFF && m==DefineNumberOfLines) {
+                        u16 l = read_2bytes(&bs);
+                        if (l != 4) { success = 0; goto cleanup; }
+
+                        *height = read_2bytes(&bs);
+                        if (*height == 0) { success = 0; goto cleanup; }
+
+                        break;
+                    }
+                    p = m;
+                    m = read_byte(&bs);
+                }
+            }
+            break;
+        }
+        else {
+            u16 length = read_2bytes(&bs);
+            if (length < 2) { success = 0; goto cleanup; }
+            skip_nbytes(&bs, length-2);
+            previous = read_byte(&bs);
+            marker = read_byte(&bs);
+        }
+    }
+
+cleanup:
+    local_arena_alloc_reset(local_arena);
+    return success;
 }

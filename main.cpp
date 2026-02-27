@@ -14,7 +14,10 @@
 #include "utils/io.h"
 #include "platform/memory.h"
 
+#include "libs/ads_string.h"
+
 #include "gf_profiling.c"
+
 
 int main() {
     //
@@ -33,38 +36,55 @@ int main() {
         model = read_obj_model_file(scene_arena, file_path);
     }
 
-    u32 img_w = 1920;
-    u32 img_h = 1080;
-    const u32 bg_color = 0x777777;
+    // u32* win_buffer = model->material->map_Kd.buffer;
+    // u32 canvas_w = model->material->map_Kd.width;
+    // u32 canvas_h = model->material->map_Kd.height;
+
+    u32 canvas_w = 1920;
+    u32 canvas_h = 1080;
+    const u32 bg_color = 0x18181B;
     // TODO: Add support for RGB and GREY currently only RGBA
-    Win win = platform_init_win(1920, 1080, msg, ADSV_NEAREST);
+    Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
 
     const f32Bits zdefault = {.u = 0xFF7FFFFF};       // -Inf for IEEE 754 standard
 
     u32 running = 1;
+
+    // ColorContext frag_context = {
+    //     0xFF777777,
+    // };
+
+    TextureContext frag_context = {
+        .texture = &model->material->map_Kd,
+    };
+
     while (running) {
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
-        // Allocate the area we want to draw onto
+        // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
-        // img_w = win.w;
-        // img_h = win.h;
-        f32* zbuffer = (f32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
-        u32* win_buffer = (u32*)arena_alloc_push(frame_arena, img_w*img_h*sizeof(f32));
+        canvas_w = win.w;
+        canvas_h = win.h;
+
+        f32* zbuffer = (f32*)arena_alloc_push(frame_arena, canvas_w*canvas_h*sizeof(f32));
+        u32* win_buffer = (u32*)arena_alloc_push(frame_arena, canvas_w*canvas_h*sizeof(f32));
+
         // DATA format: [RR] [GG] [BB] [AA]
         // on little-endian: 0xAABBGGRR
         // on big-endian: 0xRRGGBBAA
 
-        for (int i=0; i<img_h*img_w; i++) {
+        for (int i=0; i<canvas_h*canvas_w; i++) {
             win_buffer[i] = bg_color;
             zbuffer[i] = zdefault.f;
         }
 
-        // draw_model_wireframe(model, img_w, img_h, win_buffer);
-        draw_model(model, img_w, img_h, win_buffer, zbuffer);
-        // draw_model_wireframe(model, img_w, img_h, win_buffer);
-        platform_render_to_window((u8*)win_buffer, img_w, img_h, &win);
+        // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
+        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
+        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
+
+        platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
     }
 
     char done_msg[] = "Done doing something!\n";

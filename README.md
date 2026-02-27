@@ -1,14 +1,33 @@
 # TODO
 - JPEG:
-    - [ ] Check / make restart marker work even if not a multiple of the total number of pixels
+    - [x] Check / make restart marker work even if not a multiple of the total number of pixels
+    - [ ] Progressive decoding
+    - [ ] Check the output data format => u8*
+    - [ ] Check memory alloc strategy
+    - [ ] Value off by 1 maybe? Check
     - [ ] Allow returning 1, 3 or 4 components as requested by a user
     - [ ] Get the info about the jpeg image without decoding
     - [ ] Allow flipping along y.
-    - [ ] Progressive decoding
     - [ ] Test code on thousands of images
 - Renderer:
     - [ ] Add another implementation for rasterizing using bounding box
     - [ ] Add rendering texture on mesh
+- Libs:
+    - [ ] String
+    - [ ] Image
+        - [X] JPEG
+        - [ ] PNG
+    - [ ] DataStructures
+        - [ ] Vector
+        - [ ] HashMap
+    - [ ] LIBC
+    - [ ] IMGUI
+    - [ ] Network
+    - [ ] Audio
+    - [ ] Math
+    - [ ] Window
+    - [ ] Threads
+    - [ ] Text format: true type?
 
 # Implemented
 - Window using Xlib with scaling nearest / bilinear or no scaling
