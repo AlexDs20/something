@@ -5,6 +5,12 @@
 #include "errno.h"
 #include "libs/libstring.h"
 
+#include <sys/stat.h>       // stat
+#include <stdio.h>          // perror
+#include <fcntl.h>          // open, O_RDONLY
+#include <stdlib.h>         // exit, ...
+#include <unistd.h>         // close, write
+
 string8 read_file(Arena* arena, string8 file_path) {
     LocalArena* local_arena = local_arena_alloc_create();
 
@@ -52,4 +58,36 @@ string8 read_file(Arena* arena, string8 file_path) {
 
     local_arena_alloc_reset(local_arena);
     return file_content;
+}
+
+void read_n_bytes(char* filepath, unsigned int n, char* buffer) {
+    int fd = open(filepath, O_RDONLY);
+    if (fd == -1) {
+      perror("open");
+      exit(1);
+    }
+
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) {
+      perror("fstat");
+      exit(2);
+    }
+
+    if (sb.st_size < n) {
+        fprintf(stderr, "File size smaller than requested.");
+        exit(3);
+    }
+
+
+    int r = read(fd, buffer, n);
+    if (r < 0) {
+        perror("read");
+        exit(4);
+    }
+    if ((unsigned int)r != n) {
+        fprintf(stderr, "Short read.\n");
+        exit(5);
+    }
+
+    close(fd);
 }

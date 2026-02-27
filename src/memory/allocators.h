@@ -3,25 +3,19 @@
 
 #include "utils/types.h"
 
-typedef enum ARENA_RESIZE_METHOD{
-    ARENA_RESIZE_NONE = 0,
-    ARENA_RESIZE_COPY = 1,
-    ARENA_RESIZE_CHAIN = 2,
-} ARENA_RESIZE_METHOD;
-
 typedef struct {
     u8* buffer;
     u64 capacity;
     u64 top;
     u64 committed;
-    ARENA_RESIZE_METHOD resize_method;
 } Arena;
 
 Arena* arena_alloc_create(u64 capacity);
 Arena* arena_alloc_create_zero(u64 capacity);
-u64 arena_alloc_used(Arena* arena);
-u64 arena_alloc_remaining(Arena* arena);
-void* arena_alloc_get(Arena* arena, u64 pos);
+u64    arena_alloc_used(Arena* arena);
+void*  arena_alloc_used_location(Arena* arena);
+u64    arena_alloc_remaining(Arena* arena);
+void*  arena_alloc_get(Arena* arena, u64 pos);
 
 void* arena_alloc_push(Arena* arena, u64 size);
 void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment);
@@ -33,8 +27,8 @@ void* arena_alloc_push_struct(Arena* arena, void* data, u64 size);
 void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment);
 void* arena_alloc_push_struct_unaligned(Arena* arena, void* data, u64 size);
 
-void arena_alloc_pop_by(Arena* arena, u64 bytes_to_pop);
-void arena_alloc_pop_by_zero(Arena* arena, u64 bytes_to_pop);
+void  arena_alloc_pop_by(Arena* arena, u64 bytes_to_pop);
+void  arena_alloc_pop_by_zero(Arena* arena, u64 bytes_to_pop);
 void* arena_alloc_pop_to(Arena* arena, void* addr);
 void* arena_alloc_pop_to_zero(Arena* arena, void* addr);
 
@@ -43,9 +37,9 @@ void arena_alloc_reset(Arena* arena);
 void arena_alloc_reset_zero(Arena* arena);
 
 void* arena_alloc_copy(Arena* dest, Arena* src);
-u64 arena_alloc_checkpoint(Arena* arena);
-void arena_alloc_restore(Arena* arena, u64 checkpoint);
-void arena_alloc_restore_zero(Arena* arena, u64 checkpoint);
+u64   arena_alloc_checkpoint(Arena* arena);
+void  arena_alloc_restore(Arena* arena, u64 checkpoint);
+void  arena_alloc_restore_zero(Arena* arena, u64 checkpoint);
 
 void* arena_alloc_align(Arena* arena);
 void arena_debug_map(Arena* arena, u64 width);
@@ -56,7 +50,8 @@ typedef struct {
     bool used;
 } LocalArena;
 
-LocalArena* local_arena_alloc_create();
+void local_arena_pool_init(void);
+LocalArena* local_arena_alloc_create(void);
 void local_arena_alloc_reset(LocalArena* local_arena);
 
 //==============================

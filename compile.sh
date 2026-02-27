@@ -1,17 +1,24 @@
 #!/bin/bash
 
-BIN="./build/main"
+if [ "$#" -eq 1 ] && [ "$1" == "test" ]; then
+    BIN="./build/test"
+    ENTRYPOINT="tests/test.cpp"
+else
+    BIN="./build/main"
+    ENTRYPOINT="main.cpp"
+fi
+
 
 FLAGS="-g -ggdb -pg -O0 -Wall"
 # FLAGS="-O3"
 FLAGS+=" -march=native -masm=intel -ffast-math"
 # FLAGS+=" -finstrument-functions -fsanitize=address"
+# SRC+=" gf_profiling.c"
 DEFINES="-D_DEBUG"
 LINKS="-lc"
 LINKSDIR=
-INCLUDES="-I."
-ENTRYPOINT="main.cpp"
-SRC="./*/*.cpp"
+INCLUDES="-I. -I./src/"
+SRC="./src/*/*.cpp"
 CXX=clang++
 
 function echo () {

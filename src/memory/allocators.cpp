@@ -48,6 +48,13 @@ u64 arena_alloc_used(Arena* arena) {
     return arena->top;
 }
 
+void* arena_alloc_used_location(Arena* arena) {
+    if (!arena || !arena->buffer) {
+        return NULL;
+    }
+    return (void*) (arena->buffer + arena->top);
+}
+
 u64 arena_alloc_remaining(Arena* arena) {
     if (!arena || !arena->buffer) {
         return 0;
@@ -90,13 +97,9 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size) {
     }
     u64 needed = arena->top + size;
     if (needed > arena->capacity) {
-        // TODO
-        if (arena->resize_method == ARENA_RESIZE_COPY) {
-        } else if (arena->resize_method == ARENA_RESIZE_CHAIN) {
-        } else {
-            printf("Arena overflow. Not enough space left.\n");
-            return 0;
-        }
+        printf("Arena overflow. Not enough space left.\n");
+        *(char*)0 = 0;
+        return 0;
     }
     if (needed > arena->committed) {
         u64 commit_amount = needed - arena->committed;
@@ -273,9 +276,9 @@ void arena_debug_print(Arena* arena) {
     if (!arena) return;
     printf("Arena Debug Info:\n");
     printf("  buffer:     %p\n", arena->buffer);
-    printf("  capacity:   %lu bytes\n", arena->capacity);
-    printf("  committed:  %lu bytes\n", arena->committed);
-    printf("  used:       %lu bytes\n", arena->top);
+    printf("  capacity:   %lu bytes   %p\n", arena->capacity, arena->buffer+arena->capacity);
+    printf("  committed:  %lu bytes   %p\n", arena->committed, arena->buffer+arena->committed);
+    printf("  used:       %lu bytes   %p\n", arena->top, arena->buffer+arena->top);
     printf("  free:       %lu bytes\n", arena->capacity - arena->top);
 }
 
@@ -305,7 +308,17 @@ void arena_debug_map(Arena* arena, u64 width) {
 #define LOCAL_ARENA_CAPACITY (1*GiB)
 global LocalArena local_arena_pool[LOCAL_ARENA_POOL_COUNT] = {0};
 
-LocalArena* local_arena_alloc_create() {
+void local_arena_pool_init(void) {
+    for (u64 i=0; i<LOCAL_ARENA_POOL_COUNT; ++i) {
+        if (local_arena_pool[i].arena == 0) {
+            local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
+            local_arena_pool[i].used = 0;
+        }
+    }
+    return;
+}
+
+LocalArena* local_arena_alloc_create(void) {
     LocalArena* out = 0;
     for (u64 i=0; i<LOCAL_ARENA_POOL_COUNT; i++) {
         // Initialize the local arena if it hasn't been done yet
@@ -383,7 +396,14 @@ void vector_alloc_clear(Vector* vector) {
     if (!vector) {
         return;
     }
-    arena_alloc_reset(vector->arena);
+    /*void* t = */ arena_alloc_pop_by(vector->arena, vector->count * vector->element_size);
+    /*
+    if (t != vector->buffer) {
+        // TODO: should return fail
+        return;
+    }
+    */
+    // vector->buffer = t;
     vector->count = 0;
 }
 

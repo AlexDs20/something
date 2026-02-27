@@ -14,6 +14,10 @@ void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
 }
 
+void print(VertexAttrs* va) {
+    printf("VertexAttrs: uvw=(%f,%f,%f) n=(%f,%f,%f)\n", va->u, va->v, va->w, va->nx, va->ny, va->nz);
+}
+
 void print(Normal* n) {
     printf("Normal: (%f,%f,%f)\n", n->x, n->y, n->z);
 }
@@ -22,13 +26,13 @@ void print(TexCoord* t) {
     printf("TexCoord: (%f,%f,%f)\n", t->u, t->v, t->w);
 }
 
-void print(Face* f) {
-    printf("Face: vertex: (%d,%d,%d)  texture: (%d,%d,%d)  normal: (%d,%d,%d)\n",
-            f->v[0], f->v[1], f->v[2],
-            f->vt[0], f->vt[1], f->vt[2],
-            f->vn[0], f->vn[1], f->vn[2]
-            );
-}
+// void print(Face* f) {
+//     printf("Face: vertex: (%d,%d,%d)  texture: (%d,%d,%d)  normal: (%d,%d,%d)\n",
+//             f->v[0], f->v[1], f->v[2],
+//             f->vt[0], f->vt[1], f->vt[2],
+//             f->vn[0], f->vn[1], f->vn[2]
+//             );
+// }
 
 
 f32x3 string_to_f32x3(Arena* arena, string8 data) {
@@ -153,18 +157,19 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
     u64 size_line  = 0;
 
     Arena* vertices_arena   = arena_alloc_create(1*GiB);
+    Arena* vertex_attrs_arena   = arena_alloc_create(1*GiB);
+    Arena* faces_arena      = arena_alloc_create(1*GiB);
     Arena* tex_coords_arena = arena_alloc_create(1*GiB);
     Arena* normals_arena    = arena_alloc_create(1*GiB);
-    Arena* faces_arena      = arena_alloc_create(1*GiB);
 
     Vector* vertices   = vector_alloc_create(vertices_arena, sizeof(Vertex));
+    Vector* vertex_attrs = vector_alloc_create(vertex_attrs_arena, sizeof(VertexAttrs));
+    Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
     Vector* tex_coords = vector_alloc_create(tex_coords_arena, sizeof(TexCoord));
     Vector* normals    = vector_alloc_create(normals_arena, sizeof(Normal));
-    Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
 
     u32 line_buffer_length = 128;
     char* line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
-    // string8 mat_file = {0};
     Material* material = 0;
 
     for (u64 i=0; i<file.size; i++) {
@@ -194,8 +199,10 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
                     if (second == ' ') {
                         // process vertex
                         Vertex v = {};
+                        VertexAttrs va = {};
                         sscanf(line_buffer, "v %f %f %f", &v.x, &v.y, &v.z);
                         vector_alloc_push(vertices, (void*)&v);
+                        vector_alloc_push(vertex_attrs, (void*)&va);
                     } else if (second == 'n') {
                         // process normal
                         Normal n = {};
@@ -212,11 +219,27 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
                     }
                 } else if (first == 'f') {
                     Face f = {};
+                    int texture[3] = {};
+                    int normal[3] = {};
                     sscanf(line_buffer, "f %d/%d/%d %d/%d/%d %d/%d/%d",
-                            &f.v[0], &f.vt[0], &f.vn[0],
-                            &f.v[1], &f.vt[1], &f.vn[1],
-                            &f.v[2], &f.vt[2], &f.vn[2]);
+                            &f.v[0], &texture[0], &normal[0],
+                            &f.v[1], &texture[1], &normal[1],
+                            &f.v[2], &texture[2], &normal[2]);
                     vector_alloc_push(faces, (void*)&f);
+
+                    // Create the Vertex Attributes
+                    for (u8 k=0; k<3; k++) {
+                        TexCoord* tc = (TexCoord*)vector_alloc_get(tex_coords, texture[k]-1);
+                        Normal* n = (Normal*)vector_alloc_get(normals, normal[k]-1);
+                        VertexAttrs* va = (VertexAttrs*)vector_alloc_get(vertex_attrs, f.v[k]-1);
+                        va->u = tc->u;
+                        va->v = tc->v;
+                        va->w = tc->w;
+                        va->nx = n->x;
+                        va->ny = n->y;
+                        va->nz = n->z;
+
+                    }
                 } else if (first == 'o') {                                          // Object
                     // process object
                     // if (++tmp_o_count>1) break;
@@ -249,12 +272,14 @@ Model* read_obj_model_file(Arena* arena, string8 file_path) {
 
     Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
     model->material = material;
-    model->vertices = vector_alloc_copy_to_arena(arena, vertices);
     model->faces = vector_alloc_copy_to_arena(arena, faces);
-    model->normals = vector_alloc_copy_to_arena(arena, normals);
-    model->tex_coords = vector_alloc_copy_to_arena(arena, tex_coords);
+    model->vertices = vector_alloc_copy_to_arena(arena, vertices);
+    model->vertex_attrs = vector_alloc_copy_to_arena(arena, vertex_attrs);
+    // model->normals = vector_alloc_copy_to_arena(arena, normals);
+    // model->tex_coords = vector_alloc_copy_to_arena(arena, tex_coords);
 
     arena_alloc_free(vertices_arena);
+    arena_alloc_free(vertex_attrs_arena);
     arena_alloc_free(tex_coords_arena);
     arena_alloc_free(normals_arena);
     arena_alloc_free(faces_arena);
@@ -292,8 +317,7 @@ void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
             continue;
         }
 
-        // h - y so that top left is 0, 0
-        u32 linear = (u32)(h-tmp.y)*w + (u32)tmp.x;
+        u32 linear = (u32)(tmp.y)*w + (u32)tmp.x;
         u32* pixel = framebuffer + linear;
         *pixel = c;
     }
@@ -488,9 +512,55 @@ static f32 ceilf32(f32 d) {
     }
 }
 
-void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+void shader_frag_color(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
+    framebuffer[y*w+x] = ((ColorContext*)shader_ctx)->color;
+}
+
+void shader_frag_depth(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
+    f32 depth = w0*a->z + w1*b->z + w2*c->z;
+    framebuffer[y*w+x] = (u32)(depth*128);
+}
+
+void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 width, u32 height, f32* zbuffer, u32* framebuffer) {
+    // TextureContext* texture_context = ((TextureContex*)shader_ctx);
+    // Check if ARGB ...
+    // u32 color = texture_context[texture_x*texture_w + texture_y];
+    // u32 color = 0xFF773377;
+    f32 u = w0*va->u + w1*vb->u + w2*vc->u;
+    f32 v = w0*va->v + w1*vb->v + w2*vc->v;
+    f32 w = w0*va->w + w1*vb->w + w2*vc->w;
+    // u32 color = (0xFF << 24) | ((u8)(255*u) << 16) | ((u8)(255*v) << 8) | ((u8)(255*w) << 0);
+
+    Image* texture = ((TextureContext*)(shader_ctx))->texture;
+    // TODO: NEAREST or BILINEAR INTERP
+    //  LoD?
+    u32 texture_x = (u32)(u * texture->width);
+    u32 texture_y = (u32)(v * texture->height);
+
+    framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
+    // framebuffer[y*width+x] = color;
+}
+
+inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
+    return 0.5f * ( (by-ay) * (bx+ax) + (cy-by) * (cx+bx) + (ay-cy) * (ax+cx) );
+}
+
+
+void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    /*
+     * assert b->x <= c->x;
+     */
     f32 ay = a->y;
     f32 by = b->y;
+    f32 cy = c->y;
     f32 ax = a->x;
     f32 bx = b->x;
     f32 cx = c->x;
@@ -504,19 +574,11 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     f32 z_left_slope;
     f32 z_right_slope;
 
-    if (bx <= cx) {
-        ad_inv_slope = (bx - ax) * y_delta_inv;
-        ae_inv_slope = (cx - ax) * y_delta_inv;
+    ad_inv_slope = (bx - ax) * y_delta_inv;
+    ae_inv_slope = (cx - ax) * y_delta_inv;
 
-        z_left_slope  = (bz - az) * y_delta_inv;
-        z_right_slope = (cz - az) * y_delta_inv;
-    } else {
-        ad_inv_slope = (cx - ax) * y_delta_inv;
-        ae_inv_slope = (bx - ax) * y_delta_inv;
-
-        z_left_slope  = (cz - az) * y_delta_inv;
-        z_right_slope = (bz - az) * y_delta_inv;
-    }
+    z_left_slope  = (bz - az) * y_delta_inv;
+    z_right_slope = (cz - az) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
     u32 ye = by>h ? h : (u32)ceilf32(by);
@@ -527,6 +589,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     // z = A_z + (y-A_y) * (B_z-A_z)/(B_y-A_y)
     f32 zs = az + (ys - ay) * z_left_slope;
     f32 ze = az + (ys - ay) * z_right_slope;
+
+    f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
@@ -548,8 +612,12 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
             if (*zpix < z) {
                 *zpix = z;
                 u32* pixel = framebuffer + off;
-                *pixel = color;
-                // *pixel = (u32)(255 * z*z);
+                // Barycentric:
+                f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
+                f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
+                f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
+                // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
+                frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -560,7 +628,12 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* 
     }
 }
 
-void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u32* framebuffer, f32* zbuffer, u32 color) {
+void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
+        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
+        u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    /*
+     * assert a->x <= b->x
+     */
     f32 ay = a->y;
     f32 by = b->y;
     f32 cy = c->y;
@@ -582,27 +655,15 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
 
     f32 y_delta_inv = 1.0f / (cy - ay);
 
-    if (ax <= bx) {
-        dc_inv_slope = (cx - ax) * y_delta_inv;
-        ec_inv_slope = (cx - bx) * y_delta_inv;
-        dx = ax;
-        ex = bx;
-        dz = az;
-        ez = bz;
+    dc_inv_slope = (cx - ax) * y_delta_inv;
+    ec_inv_slope = (cx - bx) * y_delta_inv;
+    dx = ax;
+    ex = bx;
+    dz = az;
+    ez = bz;
 
-        z_left_slope  = (cz - az) * y_delta_inv;
-        z_right_slope = (cz - bz) * y_delta_inv;
-    } else {
-        dc_inv_slope = (cx - bx) * y_delta_inv;
-        ec_inv_slope = (cx - ax) * y_delta_inv;
-        dx = bx;
-        ex = ax;
-        dz = bz;
-        ez = az;
-
-        z_left_slope  = (cz - bz) * y_delta_inv;
-        z_right_slope = (cz - az) * y_delta_inv;
-    }
+    z_left_slope  = (cz - az) * y_delta_inv;
+    z_right_slope = (cz - bz) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
     u32 ye = cy>h ? h : (u32)ceilf32(cy);
@@ -613,6 +674,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
     // z = A_z + (y-A_y) * (B_z-A_z)/(B_y-A_y)
     f32 zs = dz + (ys - ay) * z_left_slope;
     f32 ze = ez + (ys - ay) * z_right_slope;
+
+    f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
@@ -632,8 +695,12 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
             if (*zpix < z) {
                 *zpix = z;
                 u32* pixel = framebuffer + off;
-                *pixel = color;
-                // *pixel = (u32)(255 * z*z);
+
+                // Barycentric
+                f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
+                f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
+                f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
+                frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
             }
             z += z_scanline_slope;
         }
@@ -644,7 +711,10 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c, u32 w, u32 h, u3
     }
 }
 
-void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v1, Vertex* v2, Vertex* v3, u32 color) {
+void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
+        Vertex* v1, Vertex* v2, Vertex* v3,
+        VertexAttrs* va1, VertexAttrs* va2, VertexAttrs* va3,
+        void* shader_context, FragmentShader frag_shader) {
     /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -686,15 +756,21 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
      *
      */
 
+    // TODO: Change so that A, B and C are counter clock-wise instead
+
     Vertex* a = v1;
     Vertex* b = v2;
     Vertex* c = v3;
+    VertexAttrs* va = va1;
+    VertexAttrs* vb = va2;
+    VertexAttrs* vc = va3;
 
     // Sort in order of ascending y: a.y<b.y<c.y
     Vertex* t;
-    if (b->y < a->y) { t = a; a = b; b = t; }
-    if (c->y < a->y) { t = a; a = c; c = t; }
-    if (c->y < b->y) { t = b; b = c; c = t; }
+    VertexAttrs* ta;
+    if (b->y < a->y) { t = a; a = b; b = t; ta = va; va = vb; vb = ta;}
+    if (c->y < a->y) { t = a; a = c; c = t; ta = va; va = vc; vc = ta;}
+    if (c->y < b->y) { t = b; b = c; c = t; ta = vb; vb = vc; vc = ta;}
 
     // Fast terminate
     if (c->y < 0) return;
@@ -711,14 +787,25 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
     if (xmax < 0) return;
     if (xmin >= w) return;
 
+    // Lower half triangle
     if (b->y == c->y) {
-        fill_flat_top_triangle(a, b, c, w, h, framebuffer, zbuffer, color);
-    } else if (a->y == b->y) {
-        fill_flat_bottom_triangle(a, b, c, w, h, framebuffer, zbuffer, color);
-    } else {
+        if (b->x <= c->x) {
+            fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        } else {
+            fill_flat_top_triangle(a, c, b, va, vc, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        }
+    }
+    // Upper half triangle
+    else if (a->y == b->y) {
+        if (a->x <= b->x) {
+            fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        } else {
+            fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        }
+    }
+    else {
         f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
         f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
-
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
         f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
@@ -728,19 +815,48 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex
             .z = extra_z,
         };
 
+        f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
+        f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
+        f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
+        f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
+        f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
+        f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
+
+        f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
+        f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
+        f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
+        f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
+        f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
+        f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
+
+        VertexAttrs ve = {
+            .u = extra_u,
+            .v = extra_v,
+            .w = extra_w,
+            .nx = extra_nx,
+            .ny = extra_ny,
+            .nz = extra_nz,
+        };
+
         if (b->y > 0) {
-            fill_flat_top_triangle(a, b, &extra, w, h, framebuffer, zbuffer, color);
+            if (b->x <= extra.x) {
+                fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
         }
         if (b->y < h) {
-            fill_flat_bottom_triangle(&extra, b, c, w, h, framebuffer, zbuffer, color);
+            if (extra.x <= b->x) {
+                fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
         }
     }
 }
 
-
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
-    static bool swapper = false;
-
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+#if 1
     f32 minx =  10000;
     f32 maxx = -10000;
     f32 miny =  10000;
@@ -777,6 +893,7 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         maxz = maxz > b.z ? maxz : b.z;
         maxz = maxz > c.z ? maxz : c.z;
     }
+#endif
 
     for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
         Face* f = (Face*)vector_alloc_get(model->faces, i);
@@ -787,7 +904,12 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
         Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
 
+        VertexAttrs va = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[0]-1);
+        VertexAttrs vb = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[1]-1);
+        VertexAttrs vc = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[2]-1);
+
         // Scale to center of the screen
+#if 1
         a.x = (a.x - minx) * h / (maxy-miny);
         b.x = (b.x - minx) * h / (maxy-miny);
         c.x = (c.x - minx) * h / (maxy-miny);
@@ -799,15 +921,8 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer) {
         a.z = (a.z - minz) / (maxz-minz);
         b.z = (b.z - minz) / (maxz-minz);
         c.z = (c.z - minz) / (maxz-minz);
+#endif
 
-        // 0xAABBGGRR
-        u32 col = (0xFF & (u32)(220*(a.z + b.z + c.z)/3));
-
-        // fill_triangle_bbox_triangle_check(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // if (swapper)
-        // fill_triangle_line_sweep_reference(framebuffer, zbuffer, w, h, &a, &b, &c, col);
-        // else
-        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, col);
+        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }
-    swapper = !swapper;
 }
