@@ -8,6 +8,7 @@ Arena* arena = arena_alloc_create_zero(1*GiB);
 
 #include "tests/test_decode_jpeg.h"
 #include "tests/test_ads_string.h"
+#include "tests/test_ads_model_loader.h"
 
 typedef struct {
     const char* name;
@@ -79,6 +80,15 @@ test_entry tests[] = {
     {"test_sv_rfind", test_sv_rfind},
 
     {"test_sv_file_extension", test_sv_file_extension},
+
+    {"test_sv_parse_u32", test_sv_parse_u32},
+    {"test_sv_parse_s32", test_sv_parse_s32},
+    // {"test_parser_f32", test_parser_f32},
+
+
+
+    // ADS_MODEL_LOADER
+    // {"test_model_read", test_model_read},
 
 
 };
