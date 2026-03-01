@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <float.h>
 
 #include "memory/allocators.h"
 #include "libs/ads_string.h"
@@ -1321,16 +1322,16 @@ static uint8_t LUT[256] = {
 
     ['-']  = SV_CHAR_NEG,
 
+    ['.']  = SV_CHAR_DOT,
+
     // TODO continue when needed
 };
 
 static void _sv_trim_front(StringView* sv) {
-    size_t i = 0;
-    while ((i < sv->size) && (LUT[sv->buffer[0]] & SV_CHAR_SPACE)) {
+    while ((sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_SPACE)) {
         sv->buffer++;
-        i++;
+        sv->size--;
     }
-    sv->size -= i;
 }
 
 int sv_parse_u32(StringView* sv, uint32_t* out) {
@@ -1340,22 +1341,24 @@ int sv_parse_u32(StringView* sv, uint32_t* out) {
 
     _sv_trim_front(sv);
 
+    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        return -1;
+    }
+
     uint32_t v = 0;
-    unsigned char i = 0;
+
     // UINT32_MAX = 4_294_967_295
-    while ( (i<sv->size) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
-        if ((i==9) &&
-            (   ( v >  (uint32_t)(UINT32_MAX / 10)) ||
-                ((v == (uint32_t)(UINT32_MAX / 10)) && ((sv->buffer[0]-'0') > 5))
-            )
-           ) {
+    const uint32_t limit     = UINT32_MAX / 10;
+    const uint32_t remainder = UINT32_MAX % 10;
+    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        uint32_t digit = sv->buffer[0]-'0';
+        if ( (v>limit) || ((v==limit) && (digit > remainder)) ) {
             return -1;
         }
-        v = v*10 + (sv->buffer[0]-'0');
+        v = v*10 + digit;
         sv->buffer++;
-        i++;
+        sv->size--;
     }
-    sv->size -= i;
     *out = v;
 
     return 0;
@@ -1377,31 +1380,116 @@ int sv_parse_s32(StringView* sv, int32_t* out) {
         sv->buffer++;
         sv->size--;
     }
+    else if (sv->buffer[0] == '+') {
+        sv->buffer++;
+        sv->size--;
+    }
+    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        return -1;
+    }
 
     uint32_t v = 0;
-    unsigned char i = 0;
     // INT32_MAX =  2_147_483_647
     // INT32_MIN = -2_147_483_648
-    while ( (i<sv->size) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
-        if (i==9) {
-            if ( (sign == 1) && ( (v>INT32_MAX/10) || ((v==INT32_MAX/10) && (sv->buffer[0]-'0'>7)) ) ) {
-                return -1;
-            }
-            else if ((sign == -1) && ( (-1*v<INT32_MIN/10) || ((-1*v==INT32_MIN/10) && (sv->buffer[0]-'0'>8)) )){
-                return -1;
-            }
-        }
-        v = v*10 + (sv->buffer[0]-'0');
-        sv->buffer++;
-        i++;
-    }
-    sv->size -= i;
+    const uint32_t limit = INT32_MAX / 10;
+    const uint32_t remainder = sign==1 ? 7 : 8;
 
-    *out = sign * v;
+    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        uint32_t digit = sv->buffer[0]-'0';
+
+        if (v > limit || (v==limit && digit > remainder)) {
+                return -1;
+        }
+        v = v*10 + digit;
+        sv->buffer++;
+        sv->size--;
+    }
+
+    // Two's complement abuse-ish
+    *out = (int32_t)(sign==1 ? v : -v);
     return 0;
 }
 
-// int sv_parse_f32(StringView* sv, float* out);
+static double power_table[18] = {
+    1.0,
+    0.1,
+    0.01,
+    0.001,
+    0.0001,
+    0.00001,
+    0.000001,
+    0.0000001,
+    0.00000001,
+    0.000000001,
+    0.0000000001,
+    0.00000000001,
+    0.000000000001,
+    0.0000000000001,
+    0.00000000000001,
+    0.000000000000001,
+    0.0000000000000001,
+    0.00000000000000001,
+};
+
+int sv_parse_f32(StringView* sv, float* out) {
+    if (sv == NULL || sv->buffer == NULL) {
+        return -1;
+    }
+    _sv_trim_front(sv);
+    if (sv->size == 0) {
+        return -1;
+    }
+
+    int sign = 1;
+    if (LUT[sv->buffer[0]] & SV_CHAR_NEG) {
+        sign = -1;
+        sv->buffer++;
+        sv->size--;
+    }
+    else if (sv->buffer[0] == '+') {
+        sv->buffer++;
+        sv->size--;
+    }
+
+    // Decimal
+    uint64_t value = 0.0;
+    while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        value = value*10 + sv->buffer[0]-'0';
+        sv->buffer++;
+        sv->size--;
+    }
+
+    // Fractional
+    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_DOT)) {
+        sv->buffer++;
+        sv->size--;
+
+        uint64_t frac = 0;
+        uint8_t power = 0;
+        while(sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+            if (power < 18) {
+                frac = frac * 10 + sv->buffer[0]-'0';
+                power++;
+            }
+
+            sv->buffer++;
+            sv->size--;
+        }
+
+        float t = (float)(value + (double)frac * power_table[power<18 ? power : 17]);
+        if (t > FLT_MAX) {
+            return -1;
+        }
+        *out = sign * t;
+        return 0;
+    }
+
+    if (value > FLT_MAX) {
+        return -1;
+    }
+    *out = (float)(sign * value);
+    return 0;
+}
 
 void sv_print(StringView sv) {
     if (sv.buffer) {

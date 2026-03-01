@@ -1212,6 +1212,28 @@ int test_sv_parse_s32(void) {
     ASSERT_EQ(r, 0);
     ASSERT_EQ(v, expected);
 
+    //
+
+    expected = INT32_MIN + 1;
+    str = string_init_fmt(arena, "%d", expected);
+    sv = sv_from_string(str);
+
+    v = 0;
+    r = sv_parse_s32(&sv, &v);
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(v, expected);
+
+    //
+
+    expected = INT32_MAX - 1;
+    str = string_init_fmt(arena, "%d", expected);
+    sv = sv_from_string(str);
+
+    v = 0;
+    r = sv_parse_s32(&sv, &v);
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(v, expected);
+
 
     // Larger than INT32_MAX
     str = string_init_cstr(arena, "2147483648");    // INT32_MAX + 1
@@ -1227,18 +1249,17 @@ int test_sv_parse_s32(void) {
 
     return 0;
 }
-//
-// int test_parser_f32(void) {
-//     float expected = -123.456;
-//     String str = string_init_fmt(arena, "%.3f", expected);
-//     StringView sv = sv_from_string(str);
-//
-//     float v = 0;
-//     Parser p = parser_init(sv);
-//     int r = parser_f32(&p, &v);
-//
-//     ASSERT_EQ(r, 0);
-//     ASSERT_FLOAT_EQ(v, expected, 0.00001);
-//
-//     return 0;
-// }
+
+int test_parser_f32(void) {
+    float expected = -123.456f;
+    String str = string_init_fmt(arena, "%.9f.", expected);
+    StringView sv = sv_from_string(str);
+
+    float v = 0;
+    int r = sv_parse_f32(&sv, &v);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_FLOAT_EQ(v, expected, 0.00001);
+
+    return 0;
+}

@@ -83,7 +83,7 @@ test_entry tests[] = {
 
     {"test_sv_parse_u32", test_sv_parse_u32},
     {"test_sv_parse_s32", test_sv_parse_s32},
-    // {"test_parser_f32", test_parser_f32},
+    {"test_parser_f32", test_parser_f32},
 
 
 
