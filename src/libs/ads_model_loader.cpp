@@ -219,8 +219,8 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
         else if (sv_starts_with_char(line, 'f')) {      // face
             line = sv_truncate_front(line, 2);
             uint32_t v1=0,  v2=0,  v3=0;
-            uint32_t vt1=0, vt2=0, vt2=0;
-            uint32_t vn1=0, vn2=0, vn2=0;
+            uint32_t vt1=0, vt2=0, vt3=0;
+            uint32_t vn1=0, vn2=0, vn3=0;
             int r;
 
             r = sv_parse_u32(&line, &v1);
@@ -230,10 +230,36 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
             r = sv_parse_u32(&line, &v3);
             line = sv_truncate_front(line, 1);
 
-            printf("\n(%u,%u,%u)", v1, v2, v3);
+            // printf("\nv=(%u,%u,%u)", v1, v2, v3);
 
+            r = sv_parse_u32(&line, &vt1);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &vt2);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &vt3);
+            line = sv_truncate_front(line, 1);
+
+            // printf("\nvt=(%u,%u,%u)", vt1, vt2, vt3);
+
+            r = sv_parse_u32(&line, &vn1);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &vn2);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &vn3);
+            line = sv_truncate_front(line, 1);
+
+            // printf("\nvn=(%u,%u,%u)", vn1, vn2, vn3);
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
+            uint32_t s = 0;
+            line = sv_truncate_front(line, 2);
+            if (sv_starts_with_cstr(line, "0") || sv_starts_with_cstr(line, "off")) {
+                // TODO: Set off
+            }
+            else {
+                // TODO Set shading
+                int r = sv_parse_u32(&line, &s);
+            }
         }
         else if (sv_starts_with_char(line, 'l')) {      // line element
         }
