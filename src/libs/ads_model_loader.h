@@ -14,17 +14,35 @@ typedef struct {
 } Vec2f;
 
 typedef struct {
+    String name;        // newmtl
+
+    Vec3f Ka;           // ambiant color
+    Vec3f Kd;           // diffuse color
+    Vec3f Ks;           // specular color
+    Vec3f Ke;           // emissive color
+
+    float Ns;           // specular exponent
+    float Ni;           // index of refraction
+    float d;            // dissolve: Transparency = 1-d
+    int illum;          // illumination
+
+    // Textures
+    String map_Kd;      // diffuse texture
+    String map_Ks;      // specular texture
+    String map_Bump;    // normal map
+} ObjMaterial;
+
+typedef struct {
     float x, y, z;
+    float u, v, w;
+    float nx, ny, nz;
 } ObjVertex;
 
 typedef struct {
-    float u, v, w;
-    float nx, ny, nz;
-} ObjVertexAttrs;
+    int v_indices[3];
+    int vt_indices[3];
+    int vn_indices[3];
 
-typedef struct {
-    int vertices[3];
-    // int vertex_count;        Assume it's always triangle
     int material_index;
     int shading_group;
 } ObjFace;
@@ -33,9 +51,31 @@ typedef struct {
     String name;
     int first_face_index;
     int face_count;
+
+    // Easier to mark material for each group than for each face
+    int material_index;
 } ObjGroup;
 
 typedef struct {
+    Vec3f* vertices;
+    int vertex_count;
+
+    Vec3f* texcoords;
+    int texcoords_count;
+
+    Vec3f* normals;
+    int normal_count;
+
+    ObjFace* faces;
+    int face_count;
+
+    ObjGroup* groups;
+    int group_count;
+
+    ObjMaterial* materials;
+    int material_count;
+
+    String mtllib_name;
 } ObjModel;
 
 typedef struct {
