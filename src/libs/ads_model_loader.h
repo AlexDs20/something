@@ -3,6 +3,7 @@
 
 #include "memory/allocators.h"
 #include "libs/ads_string.h"
+#include "platform/io.h"
 
 typedef struct {
     float x, y, z;
@@ -36,7 +37,6 @@ typedef struct {
 
 typedef struct {
 } ObjModel;
-
 
 typedef struct {
 } Model;

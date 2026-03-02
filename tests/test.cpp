@@ -6,6 +6,7 @@
 #include "memory/allocators.h"
 Arena* arena = arena_alloc_create_zero(1*GiB);
 
+#include "tests/test_platform_io.h"
 #include "tests/test_decode_jpeg.h"
 #include "tests/test_ads_string.h"
 #include "tests/test_ads_model_loader.h"
@@ -90,12 +91,14 @@ test_entry tests[] = {
     {"test_parser_f32", test_parser_f32},
 
 
-
     //==============================
     // ADS_MODEL_LOADER
     {"test_model_read", test_model_read},
 
 
+    //==============================
+    // PLATFORM_IO
+    {"test_read_complete_file", test_read_complete_file},
 };
 
 int main() {

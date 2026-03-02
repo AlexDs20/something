@@ -1,65 +1,6 @@
 #include "libs/ads_model_loader.h"
 #include <stdio.h>
 
-// TODO(alex): Move this out!
-#include <string.h>     // strerror()
-#include "utils/defines.h"
-#include <errno.h>
-
-#include <sys/stat.h>       // stat
-#include <stdio.h>          // perror
-#include <fcntl.h>          // open, O_RDONLY
-#include <stdlib.h>         // exit, ...
-#include <unistd.h>         // close, write
-String file_read(Arena* arena, StringView file_path) {
-    LocalArena* local_arena = local_arena_alloc_create();
-
-    String fp = string_init_sv(local_arena->arena, file_path);
-    const char* cstr = string_as_cstr(&fp);
-    FILE* file = fopen(cstr, "r");
-
-    String file_content = {0};
-
-    if (!file) {
-        printf("fopen %s failed: %s\n", cstr, strerror(errno));
-        local_arena_alloc_reset(local_arena);
-        return file_content;
-    }
-
-    size_t checkpoint = arena_alloc_checkpoint(arena);
-
-    size_t chunk_size = 4*KiB;
-    size_t bytes_read = 0;
-    const unsigned char* first_loc = (const unsigned char*)arena_alloc_align(arena);
-
-    do {
-        void* loc = arena_alloc_push_unaligned(arena, chunk_size);
-        bytes_read = fread(loc, 1, chunk_size, file);
-        if (bytes_read < chunk_size) {
-            if (ferror(file)) {
-                printf("Failed while reading the file: %s!\n", cstr);
-                arena_alloc_restore(arena, checkpoint);
-                return file_content;
-            }
-            arena_alloc_pop_by(arena, chunk_size - bytes_read);
-        }
-
-    } while (bytes_read == chunk_size);
-
-    int error = fclose(file);
-    if (error) {
-        printf("fclose failed: %s\n", strerror(errno));
-        arena_alloc_restore(arena, checkpoint);
-        local_arena_alloc_reset(local_arena);
-        return file_content;
-    }
-
-    file_content.buffer = (char*)first_loc;
-    file_content.size = (size_t)((arena->buffer+arena->top) - first_loc);
-
-    local_arena_alloc_reset(local_arena);
-    return file_content;
-}
 
 static void read_mtl_file(StringView filepath) {
     /*
@@ -69,7 +10,7 @@ static void read_mtl_file(StringView filepath) {
      * https://paulbourke.net/dataformats/mtl/
      */
     LocalArena* local_arena = local_arena_alloc_create();
-    String content = file_read(local_arena->arena, filepath);
+    String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
 
     StringView space = sv_from_cstr(" ");
@@ -231,7 +172,6 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
                 r = sv_parse_f32(&line, &x);
                 r = sv_parse_f32(&line, &y);
                 r = sv_parse_f32(&line, &z);
-                // printf("\n(%.4f,%.4f,%.4f)", x, y, z);
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
                 line = sv_truncate_front(line, 3);
@@ -240,7 +180,6 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
                 r = sv_parse_f32(&line, &u);
                 r = sv_parse_f32(&line, &v);
                 r = sv_parse_f32(&line, &w);
-                // printf("\n(%.4f,%.4f,%.4f)", u, v, w);
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
                 line = sv_truncate_front(line, 3);
@@ -249,7 +188,6 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
                 r = sv_parse_f32(&line, &nx);
                 r = sv_parse_f32(&line, &ny);
                 r = sv_parse_f32(&line, &nz);
-                // printf("\n(%.4f,%.4f,%.4f)", nx, ny, nz);
             }
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
             // }
@@ -264,32 +202,44 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
             uint32_t vn1=0, vn2=0, vn3=0;
             int r;
 
-            r = sv_parse_u32(&line, &v1);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &v2);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &v3);
-            line = sv_truncate_front(line, 1);
+            StringView delim = sv_from_cstr("/");
+            StringView sep;
 
-            // printf("\nv=(%u,%u,%u)", v1, v2, v3);
+            r = sv_parse_u32(&line, &v1);
+            sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
+            if (sv_equal(sep, delim)) {
+                r = sv_parse_u32(&line, &v2);
+
+                sep = sv_chop_by(&line, 1);
+                if (sv_equal(sep, delim)) {
+                    r = sv_parse_u32(&line, &v3);
+                }
+            }
 
             r = sv_parse_u32(&line, &vt1);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &vt2);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &vt3);
-            line = sv_truncate_front(line, 1);
+            sep = sv_chop_by(&line, 1);
+            if (sv_equal(sep, delim)) {
+                r = sv_parse_u32(&line, &vt2);
 
-            // printf("\nvt=(%u,%u,%u)", vt1, vt2, vt3);
+                sep = sv_chop_by(&line, 1);
+                if (sv_equal(sep, delim)) {
+                    r = sv_parse_u32(&line, &vt3);
+                }
+            }
 
             r = sv_parse_u32(&line, &vn1);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &vn2);
-            line = sv_truncate_front(line, 1);
-            r = sv_parse_u32(&line, &vn3);
-            line = sv_truncate_front(line, 1);
+            sep = sv_chop_by(&line, 1);
+            if (sv_equal(sep, delim)) {
+                r = sv_parse_u32(&line, &vn2);
 
-            // printf("\nvn=(%u,%u,%u)", vn1, vn2, vn3);
+                sep = sv_chop_by(&line, 1);
+                if (sv_equal(sep, delim)) {
+                    r = sv_parse_u32(&line, &vn3);
+                }
+            }
+
+            // printf("\nv=(%u,%u,%u) vt=(%u,%u,%u) vn=(%u,%u,%u)", v1, v2, v3, vt1, vt2, vt3, vn1, vn2, vn3);
+
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
             uint32_t s = 0;
@@ -359,7 +309,7 @@ Model* model_read(Arena* arena, StringView filepath) {
     StringView ext = sv_file_extension(filepath);
 
     if (sv_equal(ext, sv_from_cstr(".obj"))) {
-        String file = file_read(arena, filepath);
+        String file = read_complete_file(arena, filepath);
         StringView file_content = sv_from_string(file);
         StringView base_dir = sv_directory_name(filepath);
         ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
