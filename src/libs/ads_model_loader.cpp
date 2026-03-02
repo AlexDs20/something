@@ -78,26 +78,62 @@ static void read_mtl_file(StringView filepath) {
     StringView line = sv_chop_by_delim_sv(&file, new_line);
     while (file.size != 0) {
         if (sv_starts_with(line, newmtl)) {
-            sv_chop_by_delim_sv(&line, space);
+            line = sv_truncate_front(line, newmtl.size+1);
             // sv_print(line);
         }
         else if (sv_starts_with_cstr(line, "Ka ")) {        // ambient color
+            line = sv_truncate_front(line, 3);
+            float r=0.0f, g=0.0f, b=0.0f;
+            sv_parse_f32(&line, &r);
+            sv_parse_f32(&line, &g);
+            sv_parse_f32(&line, &b);
+            printf("\nc=(%f,%f,%f)", r, g, b);
         }
         else if (sv_starts_with_cstr(line, "Kd ")) {        // diffuse color
+            line = sv_truncate_front(line, 3);
+            float r=0.0f, g=0.0f, b=0.0f;
+            sv_parse_f32(&line, &r);
+            sv_parse_f32(&line, &g);
+            sv_parse_f32(&line, &b);
+            printf("\nc=(%f,%f,%f)", r, g, b);
         }
         else if (sv_starts_with_cstr(line, "Ks ")) {        // specular color
+            line = sv_truncate_front(line, 3);
+            float r=0.0f, g=0.0f, b=0.0f;
+            sv_parse_f32(&line, &r);
+            sv_parse_f32(&line, &g);
+            sv_parse_f32(&line, &b);
+            printf("\nc=(%f,%f,%f)", r, g, b);
         }
         else if (sv_starts_with_cstr(line, "Ke ")) {        // emissive color
+            line = sv_truncate_front(line, 3);
+            float r=0.0f, g=0.0f, b=0.0f;
+            sv_parse_f32(&line, &r);
+            sv_parse_f32(&line, &g);
+            sv_parse_f32(&line, &b);
+            printf("\nc=(%f,%f,%f)", r, g, b);
         }
         else if (sv_starts_with_cstr(line, "Ns ")) {        // specular exponent
+            line = sv_truncate_front(line, 3);
+            float Ns=0.0f;
+            sv_parse_f32(&line, &Ns);
         }
         else if (sv_starts_with_cstr(line, "Ni ")) {        // Index of refraction
+            line = sv_truncate_front(line, 3);
+            float Ni=0.0f;
+            sv_parse_f32(&line, &Ni);
         }
         // else if (sv_starts_with_cstr(line, "Tr ")) {        // Transparency
         // }
         else if (sv_starts_with_cstr(line, "d ")) {         // dissolve: Tr = 1-d
+            line = sv_truncate_front(line, 3);
+            float d=0.0f;
+            sv_parse_f32(&line, &d);
         }
         else if (sv_starts_with_cstr(line, "illum ")) {     // Illumination
+            line = sv_truncate_front(line, 3);
+            uint32_t illum=0.0f;
+            sv_parse_u32(&line, &illum);
         }
         else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
         }
@@ -261,26 +297,28 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
                 int r = sv_parse_u32(&line, &s);
             }
         }
-        else if (sv_starts_with_char(line, 'l')) {      // line element
-        }
-        else if (sv_starts_with_char(line, 'p')) {      // point element
-        }
+        // else if (sv_starts_with_char(line, 'l')) {      // line element
+        // }
+        // else if (sv_starts_with_char(line, 'p')) {      // point element
+        // }
         else if (sv_starts_with(line, usemtl)) {
+            line = sv_truncate_front(line, usemtl.size+1);
+            StringView material_name = sv_trim_back(line);
         }
         else if (sv_starts_with(line, mtllib)) {
-            sv_chop_by(&line, mtllib.size+1);
-            String fp = string_init_sv(local_arena->arena, line);
-            string_prepend_sv(local_arena->arena, &fp, base_dir);
+            line = sv_trim_back(sv_truncate_front(line, mtllib.size+1));
+
+            String fp = string_init_sv(local_arena->arena, base_dir);
+            string_append_sv(local_arena->arena, &fp, line);
+
             StringView mtl_file = sv_from_string(fp);
             read_mtl_file(mtl_file);
         }
         else if (sv_starts_with_char(line, 'o')) {      // Object name
-            sv_print(line);
-            printf("\n");
+            StringView object_name = sv_truncate_front(line, 2);
         }
         else if (sv_starts_with_char(line, 'g')) {      // Group name (there can be many, in that case => data after belong to each group)
-            sv_print(line);
-            printf("\n");
+            StringView group_name = sv_truncate_front(line, 2);
         }
         else if (sv_starts_with_char(line, '#')) {
         }
