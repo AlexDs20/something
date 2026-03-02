@@ -184,19 +184,54 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
         if (sv_starts_with_char(line, 'v')) {
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
-
+                line = sv_truncate_front(line, 2);
+                float x=0, y=0, z=0;
+                int r;
+                r = sv_parse_f32(&line, &x);
+                r = sv_parse_f32(&line, &y);
+                r = sv_parse_f32(&line, &z);
+                // printf("\n(%.4f,%.4f,%.4f)", x, y, z);
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
+                line = sv_truncate_front(line, 3);
+                float u=0, v=0, w=0;
+                int r;
+                r = sv_parse_f32(&line, &u);
+                r = sv_parse_f32(&line, &v);
+                r = sv_parse_f32(&line, &w);
+                // printf("\n(%.4f,%.4f,%.4f)", u, v, w);
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
+                line = sv_truncate_front(line, 3);
+                float nx=0, ny=0, nz=0;
+                int r;
+                r = sv_parse_f32(&line, &nx);
+                r = sv_parse_f32(&line, &ny);
+                r = sv_parse_f32(&line, &nz);
+                // printf("\n(%.4f,%.4f,%.4f)", nx, ny, nz);
             }
-            else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
-            }
+            // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
+            // }
             else {
                 *((char*)0) = 0;
             }
         }
         else if (sv_starts_with_char(line, 'f')) {      // face
+            line = sv_truncate_front(line, 2);
+            uint32_t v1=0,  v2=0,  v3=0;
+            uint32_t vt1=0, vt2=0, vt2=0;
+            uint32_t vn1=0, vn2=0, vn2=0;
+            int r;
+
+            r = sv_parse_u32(&line, &v1);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &v2);
+            line = sv_truncate_front(line, 1);
+            r = sv_parse_u32(&line, &v3);
+            line = sv_truncate_front(line, 1);
+
+            printf("\n(%u,%u,%u)", v1, v2, v3);
+
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
         }

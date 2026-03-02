@@ -16,10 +16,14 @@ typedef struct {
 } test_entry;
 
 test_entry tests[] = {
+    //==============================
+    // ADS_IMAGE
     // {"JPEG_baseline_rgb", test_read_baseline_rgb},
     // {"JPEG_baseline_gray", test_read_baseline_gray},
     // {"JPEG_baseline_gray_2", test_read_baseline_gray_2},
 
+    //==============================
+    // ADS_STRING
     {"test_string_init_empty", test_string_init_empty},
     {"test_string_init_fmt", test_string_init_fmt},
     {"test_string_init_sv", test_string_init_sv},
@@ -87,8 +91,9 @@ test_entry tests[] = {
 
 
 
+    //==============================
     // ADS_MODEL_LOADER
-    // {"test_model_read", test_model_read},
+    {"test_model_read", test_model_read},
 
 
 };
