@@ -135,25 +135,30 @@ static void read_mtl_file(StringView filepath) {
             uint32_t illum=0.0f;
             sv_parse_u32(&line, &illum);
         }
-        else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
-        }
+        // else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
+        // }
         // else if (sv_starts_with_cstr(line, "sharpness ")) {
         // }
         // else if (sv_starts_with_cstr(line, "map_Ka ")) {    // texture map ambient color
         // }
         else if (sv_starts_with_cstr(line, "map_Kd ")) {    // texture map diffuse color
+            line = sv_truncate_front(line, 7);
         }
         else if (sv_starts_with_cstr(line, "map_Ks ")) {    // texture map specular color
+            line = sv_truncate_front(line, 7);
         }
         // else if (sv_starts_with_cstr(line, "map_Ns ")) {    // specular highlight component
         // }
         // else if (sv_starts_with_cstr(line, "map_d ")) {     // alpha texture map
         // }
         else if (sv_starts_with_cstr(line, "map_bump ")) {  // map_bump and bump: same
+            line = sv_truncate_front(line, 9);
         }
         else if (sv_starts_with_cstr(line, "map_Bump ")) {
+            line = sv_truncate_front(line, 9);
         }
         else if (sv_starts_with_cstr(line, "bump ")) {
+            line = sv_truncate_front(line, 9);
         }
         // else if (sv_starts_with_cstr(line, "disp ")) {      // displacement map
         // }
