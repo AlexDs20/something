@@ -76,9 +76,16 @@ size_t sv_rfind(StringView haystack, StringView needle);
 
 const char* sv_as_cstr(Arena* arena, StringView sv);
 
+//int sv_parse_u8(StringView* sv, uint8_t* out);
+//int sv_parse_s8(StringView* sv, int8_t* out);
+//int sv_parse_u16(StringView* sv, uint16_t* out);
+//int sv_parse_s16(StringView* sv, int16_t* out);
 int sv_parse_u32(StringView* sv, uint32_t* out);
 int sv_parse_s32(StringView* sv, int32_t* out);
+//int sv_parse_u64(StringView* sv, uint64_t* out);
+//int sv_parse_s64(StringView* sv, int64_t* out);
 int sv_parse_f32(StringView* sv, float* out);
+//int sv_parse_f64(StringView* sv, double* out);
 
 void sv_print(StringView sv);
 void sv_debug_print(StringView sv);
