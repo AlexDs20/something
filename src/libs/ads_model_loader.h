@@ -24,7 +24,7 @@ typedef struct {
     float Ns;           // specular exponent
     float Ni;           // index of refraction
     float d;            // dissolve: Transparency = 1-d
-    int illum;          // illumination
+    uint32_t illum;     // illumination
 
     // Textures
     String map_Kd;      // diffuse texture
@@ -39,9 +39,9 @@ typedef struct {
 } ObjVertex;
 
 typedef struct {
-    int v_indices[3];
-    int vt_indices[3];
-    int vn_indices[3];
+    uint32_t v_indices[3];
+    uint32_t vt_indices[3];
+    uint32_t vn_indices[3];
 
     int material_index;
     int shading_group;

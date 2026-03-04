@@ -23,6 +23,8 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size);
 void* arena_alloc_push_zero(Arena* arena, u64 size);
 void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment);
 void* arena_alloc_push_zero_unaligned(Arena* arena, u64 size);
+// TODO: rename push_struct to push_data
+// TODO: Implement push struct zero
 void* arena_alloc_push_struct(Arena* arena, void* data, u64 size);
 void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment);
 void* arena_alloc_push_struct_unaligned(Arena* arena, void* data, u64 size);
@@ -65,6 +67,7 @@ typedef struct {
 } Vector;
 
 Vector* vector_alloc_create(Arena* arena, u64 size);
+// TODO: Add support to push but no data and get the pointer back
 void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);
 void vector_alloc_pop_zero(Vector* vector);

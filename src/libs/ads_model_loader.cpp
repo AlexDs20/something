@@ -1,8 +1,10 @@
 #include "libs/ads_model_loader.h"
 #include <stdio.h>
 
+// TODO remove from here
+#define GiB (1024*1024*1024)     // GiB
 
-static void read_mtl_file(StringView filepath) {
+static ObjMaterial* read_mtl_file(Arena* arena, StringView filepath, uint32_t* material_count) {
     /*
      * Sources:
      * https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -13,6 +15,12 @@ static void read_mtl_file(StringView filepath) {
     String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
 
+    // TODO: There are String in this struct which should first be allocated in another arena and the copied to this one in the end
+    ObjMaterial dummy_mats = {0};
+
+    ObjMaterial* first_mats = (ObjMaterial*)arena_alloc_push_struct(arena, &dummy_mats, sizeof(ObjMaterial));
+    ObjMaterial* current_mats = first_mats;
+
     StringView space = sv_from_cstr(" ");
     StringView new_line = sv_from_cstr("\n");
     StringView newmtl = sv_from_cstr("newmtl");
@@ -21,60 +29,51 @@ static void read_mtl_file(StringView filepath) {
         if (sv_starts_with(line, newmtl)) {
             line = sv_truncate_front(line, newmtl.size+1);
             // sv_print(line);
+            // TODO: Implement push struct zero
+            current_mats = (ObjMaterial*)arena_alloc_push_struct(arena, &dummy_mats, sizeof(ObjMaterial));
+            *material_count += 1;
         }
         else if (sv_starts_with_cstr(line, "Ka ")) {        // ambient color
             line = sv_truncate_front(line, 3);
-            float r=0.0f, g=0.0f, b=0.0f;
-            sv_parse_f32(&line, &r);
-            sv_parse_f32(&line, &g);
-            sv_parse_f32(&line, &b);
-            printf("\nc=(%f,%f,%f)", r, g, b);
+            sv_parse_f32(&line, &current_mats->Ka.x);
+            sv_parse_f32(&line, &current_mats->Ka.y);
+            sv_parse_f32(&line, &current_mats->Ka.z);
         }
         else if (sv_starts_with_cstr(line, "Kd ")) {        // diffuse color
             line = sv_truncate_front(line, 3);
-            float r=0.0f, g=0.0f, b=0.0f;
-            sv_parse_f32(&line, &r);
-            sv_parse_f32(&line, &g);
-            sv_parse_f32(&line, &b);
-            printf("\nc=(%f,%f,%f)", r, g, b);
+            sv_parse_f32(&line, &current_mats->Kd.x);
+            sv_parse_f32(&line, &current_mats->Kd.y);
+            sv_parse_f32(&line, &current_mats->Kd.z);
         }
         else if (sv_starts_with_cstr(line, "Ks ")) {        // specular color
             line = sv_truncate_front(line, 3);
-            float r=0.0f, g=0.0f, b=0.0f;
-            sv_parse_f32(&line, &r);
-            sv_parse_f32(&line, &g);
-            sv_parse_f32(&line, &b);
-            printf("\nc=(%f,%f,%f)", r, g, b);
+            sv_parse_f32(&line, &current_mats->Ks.x);
+            sv_parse_f32(&line, &current_mats->Ks.y);
+            sv_parse_f32(&line, &current_mats->Ks.z);
         }
         else if (sv_starts_with_cstr(line, "Ke ")) {        // emissive color
             line = sv_truncate_front(line, 3);
-            float r=0.0f, g=0.0f, b=0.0f;
-            sv_parse_f32(&line, &r);
-            sv_parse_f32(&line, &g);
-            sv_parse_f32(&line, &b);
-            printf("\nc=(%f,%f,%f)", r, g, b);
+            sv_parse_f32(&line, &current_mats->Ke.x);
+            sv_parse_f32(&line, &current_mats->Ke.y);
+            sv_parse_f32(&line, &current_mats->Ke.z);
         }
         else if (sv_starts_with_cstr(line, "Ns ")) {        // specular exponent
             line = sv_truncate_front(line, 3);
-            float Ns=0.0f;
-            sv_parse_f32(&line, &Ns);
+            sv_parse_f32(&line, &current_mats->Ns);
         }
         else if (sv_starts_with_cstr(line, "Ni ")) {        // Index of refraction
             line = sv_truncate_front(line, 3);
-            float Ni=0.0f;
-            sv_parse_f32(&line, &Ni);
+            sv_parse_f32(&line, &current_mats->Ni);
         }
         // else if (sv_starts_with_cstr(line, "Tr ")) {        // Transparency
         // }
         else if (sv_starts_with_cstr(line, "d ")) {         // dissolve: Tr = 1-d
             line = sv_truncate_front(line, 3);
-            float d=0.0f;
-            sv_parse_f32(&line, &d);
+            sv_parse_f32(&line, &current_mats->d);
         }
         else if (sv_starts_with_cstr(line, "illum ")) {     // Illumination
             line = sv_truncate_front(line, 3);
-            uint32_t illum=0.0f;
-            sv_parse_u32(&line, &illum);
+            sv_parse_u32(&line, &current_mats->illum);
         }
         // else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
         // }
@@ -84,9 +83,11 @@ static void read_mtl_file(StringView filepath) {
         // }
         else if (sv_starts_with_cstr(line, "map_Kd ")) {    // texture map diffuse color
             line = sv_truncate_front(line, 7);
+            // TODO: handle string
         }
         else if (sv_starts_with_cstr(line, "map_Ks ")) {    // texture map specular color
             line = sv_truncate_front(line, 7);
+            // TODO: handle string
         }
         // else if (sv_starts_with_cstr(line, "map_Ns ")) {    // specular highlight component
         // }
@@ -94,12 +95,15 @@ static void read_mtl_file(StringView filepath) {
         // }
         else if (sv_starts_with_cstr(line, "map_bump ")) {  // map_bump and bump: same
             line = sv_truncate_front(line, 9);
+            // TODO: handle string
         }
         else if (sv_starts_with_cstr(line, "map_Bump ")) {
             line = sv_truncate_front(line, 9);
+            // TODO: handle string
         }
         else if (sv_starts_with_cstr(line, "bump ")) {
             line = sv_truncate_front(line, 9);
+            // TODO: handle string
         }
         // else if (sv_starts_with_cstr(line, "disp ")) {      // displacement map
         // }
@@ -149,12 +153,41 @@ static void read_mtl_file(StringView filepath) {
 
         line = sv_chop_by_delim_sv(&file, new_line);
     }
+
     local_arena_alloc_reset(local_arena);
-    return;
+    return first_mats;
 }
 
-ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
+ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base_dir) {
     LocalArena* local_arena = local_arena_alloc_create();
+
+    Arena* vertex_arena = arena_alloc_create(1*GiB);
+    Vector* vec_vertex = vector_alloc_create(vertex_arena, sizeof(Vec3f));
+
+    Arena* texcoords_arena = arena_alloc_create(1*GiB);
+    Vector* vec_texcoords = vector_alloc_create(texcoords_arena, sizeof(Vec3f));
+
+    Arena* normals_arena = arena_alloc_create(1*GiB);
+    Vector* vec_normals = vector_alloc_create(normals_arena, sizeof(Vec3f));
+
+    Arena* faces_arena = arena_alloc_create(1*GiB);
+    Vector* vec_faces = vector_alloc_create(faces_arena, sizeof(ObjFace));
+
+    Arena* materials_arena = arena_alloc_create(1*GiB);
+
+    // TODO
+    // arena_alloc_free(vertex_arena);
+    // arena_alloc_free(texcoords_arena);
+    // arena_alloc_free(normals_arena);
+    // arena_alloc_free(faces_arena);
+    // arena_alloc_free(materials_arena);
+
+    Vec3f dummy_Vec3f = {0};
+    ObjFace dummy_face = {0};
+    // TODO: -1 as defaults? Or 0 and get default material in the array?
+    int current_material_index = -1;
+    StringView current_material_name;
+    int current_shading_group = -1;
 
     // Setup the different types
     StringView new_line = sv_from_cstr("\n");
@@ -164,92 +197,80 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
     StringView line = sv_chop_by_delim_sv(&file, new_line);
     while (file.size != 0) {
         if (sv_starts_with_char(line, 'v')) {
+            Vec3f* v = NULL;
+            int r;
+
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
                 line = sv_truncate_front(line, 2);
-                float x=0, y=0, z=0;
-                int r;
-                r = sv_parse_f32(&line, &x);
-                r = sv_parse_f32(&line, &y);
-                r = sv_parse_f32(&line, &z);
+                v = (Vec3f*)vector_alloc_push(vec_vertex, &dummy_Vec3f);
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
                 line = sv_truncate_front(line, 3);
-                float u=0, v=0, w=0;
-                int r;
-                r = sv_parse_f32(&line, &u);
-                r = sv_parse_f32(&line, &v);
-                r = sv_parse_f32(&line, &w);
+                v = (Vec3f*)vector_alloc_push(vec_texcoords, &dummy_Vec3f);
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
                 line = sv_truncate_front(line, 3);
-                float nx=0, ny=0, nz=0;
-                int r;
-                r = sv_parse_f32(&line, &nx);
-                r = sv_parse_f32(&line, &ny);
-                r = sv_parse_f32(&line, &nz);
+                v = (Vec3f*)vector_alloc_push(vec_normals, &dummy_Vec3f);
             }
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
             // }
             else {
                 *((char*)0) = 0;
             }
+
+            r = sv_parse_f32(&line, &v->x);
+            r = sv_parse_f32(&line, &v->y);
+            r = sv_parse_f32(&line, &v->z);
         }
         else if (sv_starts_with_char(line, 'f')) {      // face
             line = sv_truncate_front(line, 2);
-            uint32_t v1=0,  v2=0,  v3=0;
-            uint32_t vt1=0, vt2=0, vt3=0;
-            uint32_t vn1=0, vn2=0, vn3=0;
+            ObjFace* v = (ObjFace*)vector_alloc_push(vec_faces, &dummy_face);
             int r;
 
             StringView delim = sv_from_cstr("/");
             StringView sep;
 
-            r = sv_parse_u32(&line, &v1);
+            r = sv_parse_u32(&line, &v->v_indices[0]);
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &v2);
+                r = sv_parse_u32(&line, &v->v_indices[1]);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &v3);
+                    r = sv_parse_u32(&line, &v->v_indices[2]);
                 }
             }
 
-            r = sv_parse_u32(&line, &vt1);
+            r = sv_parse_u32(&line, &v->vt_indices[0]);
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &vt2);
+                r = sv_parse_u32(&line, &v->vt_indices[1]);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &vt3);
+                    r = sv_parse_u32(&line, &v->vt_indices[2]);
                 }
             }
 
-            r = sv_parse_u32(&line, &vn1);
+            r = sv_parse_u32(&line, &v->vn_indices[0]);
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &vn2);
+                r = sv_parse_u32(&line, &v->vn_indices[1]);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &vn3);
+                    r = sv_parse_u32(&line, &v->vn_indices[2]);
                 }
             }
-
-            // printf("\nv=(%u,%u,%u) vt=(%u,%u,%u) vn=(%u,%u,%u)", v1, v2, v3, vt1, vt2, vt3, vn1, vn2, vn3);
-
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
-            uint32_t s = 0;
             line = sv_truncate_front(line, 2);
             if (sv_starts_with_cstr(line, "0") || sv_starts_with_cstr(line, "off")) {
-                // TODO: Set off
+                current_shading_group = 0;
             }
             else {
-                // TODO Set shading
-                int r = sv_parse_u32(&line, &s);
+                int r = sv_parse_s32(&line, &current_shading_group);
             }
         }
         // else if (sv_starts_with_char(line, 'l')) {      // line element
@@ -258,7 +279,8 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
         // }
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
-            StringView material_name = sv_trim_back(line);
+            current_material_name = sv_trim_back(line);
+            // TODO: Somehow get material id
         }
         else if (sv_starts_with(line, mtllib)) {
             line = sv_trim_back(sv_truncate_front(line, mtllib.size+1));
@@ -266,8 +288,9 @@ ObjModel* model_parse_obj(Arena* arena, StringView file, StringView base_dir) {
             String fp = string_init_sv(local_arena->arena, base_dir);
             string_append_sv(local_arena->arena, &fp, line);
 
+            uint32_t material_count;
             StringView mtl_file = sv_from_string(fp);
-            read_mtl_file(mtl_file);
+            ObjMaterial* mats = read_mtl_file(materials_arena, mtl_file, &material_count);
         }
         else if (sv_starts_with_char(line, 'o')) {      // Object name
             StringView object_name = sv_truncate_front(line, 2);
