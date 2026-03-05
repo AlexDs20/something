@@ -394,13 +394,12 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     // Arena* materials_arena = arena_alloc_create(1*GiB);
     // Arena* groups_arena = arena_alloc_create(1*GiB);
 
-    // TODO
-    // arena_alloc_free(vertex_arena);
-    // arena_alloc_free(texcoords_arena);
-    // arena_alloc_free(normals_arena);
-    // arena_alloc_free(faces_arena);
-    // arena_alloc_free(materials_arena);
-    // arena_alloc_free(groups_arena);
+    arena_alloc_free(vertex_arena);
+    arena_alloc_free(texcoords_arena);
+    arena_alloc_free(normals_arena);
+    arena_alloc_free(faces_arena);
+    arena_alloc_free(materials_arena);
+    arena_alloc_free(groups_arena);
 
     local_arena_alloc_reset(local_arena);
     return obj_model;

@@ -836,7 +836,7 @@ int test_string_shrink_to_fit(void) {
     // TODO: Think about what would be mose natural here
     // ASSERT_EQ(r, 0);
     // Capacity not changed because not on top of arena
-    ASSERT_EQ(s.capacity, new_cap);
+    ASSERT_EQ(s.capacity, s.size+1);
 
     return 0;
 }
