@@ -78,4 +78,8 @@ u64 vector_alloc_count(Vector* vector);
 void* vector_alloc_get(Vector* vector, u64 index);
 Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 
+// TODO:
+//  - Get pointer
+//  - Copy only data
+
 #endif  // _ALLOCATORS_H

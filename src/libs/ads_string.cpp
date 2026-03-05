@@ -829,15 +829,16 @@ int string_clear(String* str) {
     return 0;
 }
 
-String string_deep_copy(Arena* arena, const String* str) {
-    if ((str == NULL) || (str->buffer == NULL)) return (String){0};
+// TODO
+String string_deep_copy(Arena* arena, String str) {
+    if (str.buffer == NULL) return (String){0};
 
     size_t checkpoint = arena_alloc_checkpoint(arena);
-    void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->size+1);
+    void* p = arena_alloc_push_struct(arena, (void*)str.buffer, str.size+1);
     if (p == NULL) return (String){0};
 
-    if (str->capacity > str->size+1) {
-        void* tmp = arena_alloc_push_unaligned(arena, str->capacity - (str->size+1));
+    if (str.capacity > str.size+1) {
+        void* tmp = arena_alloc_push_unaligned(arena, str.capacity - (str.size+1));
         if (tmp == NULL) {
             arena_alloc_restore(arena, checkpoint);
             return (String){0};
@@ -846,8 +847,8 @@ String string_deep_copy(Arena* arena, const String* str) {
 
     return (String){
         .buffer = (char*)p,
-        .size = str->size,
-        .capacity = str->capacity,
+        .size = str.size,
+        .capacity = str.capacity,
     };
 }
 
@@ -879,18 +880,20 @@ int string_shrink_to_fit(Arena* arena, String* str) {
     if (str == NULL || str->buffer == NULL) {
         return -1;
     }
-    void* arena_top = arena_alloc_used_location(arena);
-    if (arena_top == NULL) {
-        return -1;
-    }
-    // Capacity not changed because not on top of arena
-    if ((uintptr_t)arena_top != (uintptr_t)str->buffer + str->capacity) {
-        // NOTE: Not sure what to return here...
-        return -1;
-    }
-    void* t = arena_alloc_pop_to(arena, str->buffer + str->size+1);
-    if (t == NULL) {
-        return -1;
+    // Try to move the top of the arena
+    if (arena != NULL) {
+        void* arena_top = arena_alloc_used_location(arena);
+        if (arena_top == NULL) {
+            return -1;
+        }
+
+        // Pop when on top of arena
+        if ((uintptr_t)arena_top == (uintptr_t)str->buffer + str->capacity) {
+            void* t = arena_alloc_pop_to(arena, str->buffer + str->size+1);
+            if (t == NULL) {
+                return -1;
+            }
+        }
     }
     str->capacity = str->size + 1;
     return 0;

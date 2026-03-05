@@ -32,11 +32,11 @@ typedef struct {
     String map_Bump;    // normal map
 } ObjMaterial;
 
-typedef struct {
-    float x, y, z;
-    float u, v, w;
-    float nx, ny, nz;
-} ObjVertex;
+// typedef struct {
+//     float x, y, z;
+//     float u, v, w;
+//     float nx, ny, nz;
+// } ObjVertex;
 
 typedef struct {
     uint32_t v_indices[3];
@@ -57,17 +57,21 @@ typedef struct {
 } ObjGroup;
 
 typedef struct {
-    Vec3f* vertices;
-    int vertex_count;
+    // Vec3f* vertices;
+    // int vertex_count;
+    Vector* vertices;
 
-    Vec3f* texcoords;
-    int texcoords_count;
+    // Vec3f* texcoords;
+    // int texcoords_count;
+    Vector* texcoords;
 
-    Vec3f* normals;
-    int normal_count;
+    // Vec3f* normals;
+    // int normal_count;
+    Vector* normals;
 
-    ObjFace* faces;
-    int face_count;
+    // ObjFace* faces;
+    // int face_count;
+    Vector* faces;
 
     ObjGroup* groups;
     int group_count;
