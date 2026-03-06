@@ -54,7 +54,7 @@ bool os_memory_decommit(void* addr, u64 size) {
         return false;
     }
     // Could also suggest os we don't need
-    madvise(addr, size, MADV_DONTNEED);
+    madvise(addr, size, MADV_DONTNEED);         // Or use MADF_FREE instead?
     return true;
 }
 

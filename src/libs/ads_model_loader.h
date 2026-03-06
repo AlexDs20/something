@@ -23,13 +23,17 @@ typedef struct {
 
     float Ns;           // specular exponent
     float Ni;           // index of refraction
-    float d;            // dissolve: Transparency = 1-d
+    // float d;            // dissolve: Transparency = 1-d
+    float Tr;           // Transparency
+    float Tf;           // Transmission filter
     uint32_t illum;     // illumination
 
     // Textures
+    String map_Ka;      // ambient color
     String map_Kd;      // diffuse texture
     String map_Ks;      // specular texture
     String map_Bump;    // normal map
+    String map_d;       // alpha texture map
 } ObjMaterial;
 
 // typedef struct {
@@ -57,27 +61,17 @@ typedef struct {
 } ObjGroup;
 
 typedef struct {
-    // Vec3f* vertices;
-    // int vertex_count;
     Vector* vertices;
 
-    // Vec3f* texcoords;
-    // int texcoords_count;
     Vector* texcoords;
 
-    // Vec3f* normals;
-    // int normal_count;
     Vector* normals;
 
-    // ObjFace* faces;
-    // int face_count;
     Vector* faces;
 
-    ObjGroup* groups;
-    int group_count;
+    Vector* groups;
 
-    ObjMaterial* materials;
-    int material_count;
+    Vector* materials;
 
     String mtllib_name;
 } ObjModel;
