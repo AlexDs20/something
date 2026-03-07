@@ -937,7 +937,7 @@ StringView sv_from_cstr(const char* cstr) {
 }
 
 StringView sv_from_string(String str) {
-    return str.buffer ? (StringView){ .buffer = str.buffer, .size = str.size } : (StringView){0};
+    return (StringView){ .buffer = str.buffer, .size = str.size };
 }
 
 StringView sv_slice_sv(StringView sv, size_t start, size_t len) {
@@ -975,18 +975,15 @@ StringView sv_trim_front(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.size == 0) return sv;
-    size_t i = 0;
-    while (i < sv.size) {
-        unsigned char c = sv.buffer[i];
-        if (!((c >= 9 && c <= 13) || c == 32)) {
-            break;
-        }
-        i++;
-    }
-    return (StringView){
-        .buffer = sv.buffer+i,
-        .size = sv.size-i,
+
+    const char* p = sv.buffer;
+    const char* end = sv.buffer + sv.size;
+
+    for (;p<end && (*p == 32 || (*p >= 9 && *p <=13) ); p++) {}
+
+    return (StringView) {
+        .buffer = p,
+        .size = (size_t)(end-p),
     };
 }
 
@@ -999,26 +996,26 @@ StringView sv_trim_back(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.size == 0) return sv;
-    while (sv.size > 0) {
-        unsigned char c = sv.buffer[sv.size-1];
-        if (!((c>=9 && c<=13) || (c == 32))) {
-            break;
-        }
-        sv.size--;
-    }
-    return sv;
+
+    const char* p = sv.buffer;
+    const char* end = sv.buffer + sv.size - 1;
+
+    for (;p<end && (*end == 32 || (*end >= 9 && *end <=13) ); end--) {}
+
+    return (StringView) {
+        .buffer = p,
+        .size = (size_t)(end-p+1),
+    };
 }
 
+#if defined(__DEBUG__)
+#define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
+#else
+#define ASSERT(x)       do { } while (0)
+#endif
+
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
-    if (sv == NULL || sv->buffer == NULL || delim.buffer == NULL) {
-        return (StringView){0};
-    }
-    if (delim.size == 0) {
-        return (StringView){.buffer=sv->buffer, .size=0};
-    }
     size_t pos = sv_find(*sv, delim);
-    // TODO: I think this if is useless
     if (pos == sv->size) {
         StringView out = sv_from_sv(*sv);
         sv->buffer += sv->size;
@@ -1034,16 +1031,13 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
 }
 
 StringView sv_chop_by(StringView* sv, size_t pos) {
-    if (sv == NULL) {
-        return (StringView){0};
-    }
     if (pos > sv->size) {
         return (StringView){0};
     }
     sv->buffer += pos;
     sv->size -= pos;
     return (StringView){
-        .buffer = sv->buffer - pos,
+        .buffer = sv->buffer,
         .size = pos,
     };
 }
@@ -1058,6 +1052,8 @@ int sv_compare(const StringView* sv1, const StringView* sv2) {
     // <0 if sv1 < sv2
     // =0 if sv1 == sv2
     // >0 if sv1 > sv2
+    ASSERT(sv1 != NULL);
+    ASSERT(sv2 != NULL);
     size_t len = sv1->size<sv2->size ? sv1->size : sv2->size;
 
     int cmp = _compare(sv1->buffer, sv2->buffer, len);
@@ -1069,7 +1065,15 @@ int sv_compare(const StringView* sv1, const StringView* sv2) {
 }
 
 bool sv_starts_with(StringView sv, StringView pre) {
-    if (sv.buffer == NULL || pre.buffer == NULL || pre.size > sv.size) {
+    // if (sv.buffer == NULL || pre.buffer == NULL || pre.size > sv.size) {
+    //     return false;
+    // }
+    // ASSERT(sv.buffer != NULL);
+    // ASSERT(pre.buffer != NULL);
+    if (pre.size == 0) {
+        return true;
+    }
+    if (pre.size > sv.size) {
         return false;
     }
 
@@ -1084,14 +1088,22 @@ bool sv_starts_with_char(StringView sv, char c) {
 }
 
 bool sv_ends_with(StringView sv, StringView post) {
-    if (sv.buffer == NULL || post.buffer == NULL || sv.size < post.size) {
+    // if (sv.buffer == NULL || post.buffer == NULL || sv.size < post.size) {
+    //     return false;
+    // }
+    // ASSERT(sv.buffer != NULL);
+    // ASSERT(post.buffer != NULL);
+    if (post.size == 0) {
+        return true;
+    }
+    if (post.size > sv.size)  {
         return false;
     }
 
     return _compare(sv.buffer + sv.size-post.size, post.buffer, post.size) == 0;
 }
 
-static size_t BMH_search(StringView haystack, StringView needle) {
+static size_t _BMH_search(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
@@ -1120,7 +1132,7 @@ static size_t BMH_search(StringView haystack, StringView needle) {
     return haystack.size;
 }
 
-static size_t BMH_rsearch(StringView haystack, StringView needle) {
+static size_t _BMH_rsearch(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
@@ -1153,9 +1165,11 @@ static size_t BMH_rsearch(StringView haystack, StringView needle) {
 // TODO(alex): Now wiki had an implementation of BMH, apparently, there is something even
 // better called two way search. TBC
 size_t sv_find(StringView haystack, StringView needle) {
-    if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return haystack.size;
-    }
+    // if (haystack.buffer == NULL || needle.buffer == NULL) {
+    //     return haystack.size;
+    // }
+    // ASSERT( haystack.buffer != NULL );
+    // ASSERT( needle.buffer != NULL );
     if (needle.size == 0) return 0;
     if (needle.size > haystack.size) return haystack.size;
 
@@ -1177,7 +1191,7 @@ size_t sv_find(StringView haystack, StringView needle) {
         return match != NULL ? (size_t)(match - h) : haystack.size;
     }
     else if (needle.size > 6) {         // Just a "random" number, BMH is better for larger needles
-        return BMH_search(haystack, needle);
+        return _BMH_search(haystack, needle);
     }
     else {
         size_t remaining = haystack.size - needle.size + 1;
@@ -1201,9 +1215,9 @@ size_t sv_find(StringView haystack, StringView needle) {
 }
 
 size_t sv_rfind(StringView haystack, StringView needle) {
-    if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return haystack.size;
-    }
+    // if (haystack.buffer == NULL || needle.buffer == NULL) {
+    //     return haystack.size;
+    // }
     if (needle.size == 0) return haystack.size;
     if (needle.size > haystack.size) return haystack.size;
 
@@ -1216,7 +1230,7 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         return match != NULL ? (size_t)(match-h) : haystack.size;
     }
     else if (needle.size > 6) {
-        return BMH_rsearch(haystack, needle);
+        return _BMH_rsearch(haystack, needle);
     }
     else {
         const unsigned char* p = h;
@@ -1237,19 +1251,7 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         return haystack.size;
     }
 #else
-    return BMH_rsearch(haystack, needle);
-
-    // size_t i = haystack.size-needle.size;
-    // while (true) {
-    //     if ((h[i] == n[0]) && (memcmp(h+i , n, needle.size) == 0)) {
-    //         return i;
-    //     }
-    //     if (i == 0) {
-    //         break;
-    //     }
-    //     i--;
-    // }
-    // return haystack.size;
+    return _BMH_rsearch(haystack, needle);
 #endif
 }
 
@@ -1295,6 +1297,8 @@ const char* sv_as_cstr(Arena* arena, StringView sv) {
     t[sv.size] = '\0';
     return t;
 }
+
+// PARSING
 
 enum CharType {
     SV_CHAR_SPACE = 0x1,

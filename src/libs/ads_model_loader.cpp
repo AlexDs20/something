@@ -225,8 +225,10 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     ObjGroup* current_group = NULL;
     int current_shading_group = 0;
-
     int current_face_index = -1;
+    int n_v  = 0;
+    int n_vt = 0;
+    int n_vn = 0;
 
     // default group in case nothing is given in the obj file
     current_group = (ObjGroup*)vector_alloc_push(vec_groups, &nil_group);
@@ -249,14 +251,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             if (sv_starts_with_char(line, ' ')) {       // vertex
                 line = sv_truncate_front(line, 2);
                 v = (Vec3f*)vector_alloc_push(vec_vertex, &nil_Vec3f);
+                n_v++;
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
                 line = sv_truncate_front(line, 3);
                 v = (Vec3f*)vector_alloc_push(vec_texcoords, &nil_Vec3f);
+                n_vt++;
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
                 line = sv_truncate_front(line, 3);
                 v = (Vec3f*)vector_alloc_push(vec_normals, &nil_Vec3f);
+                n_vn++;
             }
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
             // }
@@ -291,43 +296,46 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             // NOTE: No plan on supporting negative indices
             r = sv_parse_u32(&line, &f->v_indices[0]);
-            f->v_indices[0]--;
+            f->v_indices[0] = f->v_indices[0] >= 0 ? f->v_indices[0]-- : f->v_indices[0] + n_v + 1;
+
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
                 r = sv_parse_u32(&line, &f->vt_indices[0]);
-                f->vt_indices[0]--;
+                f->vt_indices[0] = f->vt_indices[0] >= 0 ? f->vt_indices[0]-- : f->vt_indices[0] + n_vt + 1;
+
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
                     r = sv_parse_u32(&line, &f->vn_indices[0]);
-                    f->vn_indices[0]--;
+                    f->vn_indices[0] = f->vn_indices[0] >= 0 ? f->vn_indices[0]-- : f->vn_indices[0] + n_vn + 1;
                 }
             }
 
             r = sv_parse_u32(&line, &f->v_indices[1]);
-            f->v_indices[1]--;
+            f->v_indices[1] = f->v_indices[1] >= 0 ? f->v_indices[1]-- : f->v_indices[1] + n_v + 1;
+
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
                 r = sv_parse_u32(&line, &f->vt_indices[1]);
-                f->vt_indices[1]--;
+                f->vt_indices[1] = f->vt_indices[1] >= 0 ? f->vt_indices[1]-- : f->vt_indices[1] + n_vt + 1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
                     r = sv_parse_u32(&line, &f->vn_indices[1]);
-                    f->vn_indices[1]--;
+                    f->vn_indices[1] = f->vn_indices[1] >= 0 ? f->vn_indices[1]-- : f->vn_indices[1] + n_vn + 1;
                 }
             }
 
             r = sv_parse_u32(&line, &f->v_indices[2]);
-            f->v_indices[2]--;
+            f->v_indices[2] = f->v_indices[2] >= 0 ? f->v_indices[2]-- : f->v_indices[2] + n_v + 1;
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
                 r = sv_parse_u32(&line, &f->vt_indices[2]);
-                f->vt_indices[2]--;
+                f->vt_indices[2] = f->vt_indices[2] >= 0 ? f->vt_indices[2]-- : f->vt_indices[2] + n_vt + 1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
                     r = sv_parse_u32(&line, &f->vn_indices[2]);
-                    f->vn_indices[2]--;
+                    f->vn_indices[2] = f->vn_indices[2] >= 0 ? f->vn_indices[2]-- : f->vn_indices[2] + n_vn + 1;
                 }
             }
         }

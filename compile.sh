@@ -14,7 +14,7 @@ FLAGS="-g -ggdb -pg -O0 -Wall"
 FLAGS+=" -march=native -masm=intel -ffast-math"
 # FLAGS+=" -finstrument-functions -fsanitize=address"
 # SRC+=" gf_profiling.c"
-DEFINES="-D_DEBUG"
+DEFINES="-D__DEBUG__"
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I. -I./src/"

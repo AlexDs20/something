@@ -1056,13 +1056,13 @@ int test_sv_starts_with(void) {
     ASSERT_EQ(r, false);
 
     r = sv_starts_with(sv1, (StringView){0});
-    ASSERT_EQ(r, false);
+    ASSERT_EQ(r, true);
 
     r = sv_starts_with((StringView){0}, sv_from_cstr("This"));
     ASSERT_EQ(r, false);
 
     r = sv_starts_with((StringView){0}, (StringView){0});
-    ASSERT_EQ(r, false);
+    ASSERT_EQ(r, true);
 
     return 0;
 }
@@ -1080,13 +1080,13 @@ int test_sv_ends_with(void) {
     ASSERT_EQ(r, false);
 
     r = sv_ends_with(sv1, (StringView){0});
-    ASSERT_EQ(r, false);
+    ASSERT_EQ(r, true);
 
     r = sv_ends_with((StringView){0}, sv_from_cstr("with!"));
     ASSERT_EQ(r, false);
 
     r = sv_ends_with((StringView){0}, (StringView){0});
-    ASSERT_EQ(r, false);
+    ASSERT_EQ(r, true);
 
     return 0;
 }

@@ -36,12 +36,6 @@ typedef struct {
     String map_d;       // alpha texture map
 } ObjMaterial;
 
-// typedef struct {
-//     float x, y, z;
-//     float u, v, w;
-//     float nx, ny, nz;
-// } ObjVertex;
-
 typedef struct {
     uint32_t v_indices[3];
     uint32_t vt_indices[3];
