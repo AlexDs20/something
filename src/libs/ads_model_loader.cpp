@@ -266,28 +266,28 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     // Second pass => the actual parsing
     ObjModel* obj_model = (ObjModel*)arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
 
-    Vec3f* vec_vertex    = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_v);
-    Vec3f* vec_texcoords = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_vt);
-    Vec3f* vec_normals   = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_vn);
-    ObjFace* vec_faces   = (ObjFace*) arena_alloc_push_zero(persist_arena, sizeof(ObjFace) * n_f);
-    ObjGroup* vec_groups = (ObjGroup*)arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)* n_g);
-    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0, i_mats = 0;
+    Vec3f* vec_vertex          = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_v);
+    Vec3f* vec_texcoords       = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_vt);
+    Vec3f* vec_normals         = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_vn);
+    ObjFace* vec_faces         = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
+    ObjGroup* vec_groups       = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    ObjMaterial* vec_materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0;
 
-    Vec3f* current_vertex   = vec_vertex;
-    Vec3f* current_texcoord = vec_texcoords;
-    Vec3f* current_normal   = vec_normals;
-    ObjFace* current_face   = vec_faces;
-    ObjGroup* current_group = vec_groups;
+    Vec3f* current_vertex     = vec_vertex;
+    Vec3f* current_texcoord   = vec_texcoords;
+    Vec3f* current_normal     = vec_normals;
+    ObjFace* current_face     = vec_faces;
+    ObjGroup* current_group   = vec_groups;
+    ObjMaterial* current_mats = vec_materials;
 
     // Default group in case nothing is given in the obj file
     *current_group = {0};
     current_group->name = string_init_cstr(string_arena, "default");
     int current_shading_group = 0;
+    int current_material_index = -1;
 
     // TODO: Handle the materials properly by also creating a default material
-    Arena* materials_arena = arena_alloc_create(1*GiB);
-    Vector* vec_materials = vector_alloc_create(materials_arena, sizeof(ObjMaterial));
-    int current_material_index = 0;
 
     StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     while (file.size != 0) {
@@ -401,10 +401,10 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
             int found = 0;
-            for (int i=0; i<vec_materials->count; i++) {
-                ObjMaterial* m = (ObjMaterial*)vector_alloc_get(vec_materials, i);
+            for (int i=0; i<n_mats; i++) {
+                ObjMaterial* m = vec_materials + i;
                 if (sv_equal(line, m->name)) {
-                    found = 1;
+                    // found = 1;
                     current_material_index = i;
                     break;
                 }
@@ -422,11 +422,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             string_append_sv(string_arena, &fp, line);
             StringView mtl_file = sv_from_string(fp);
 
-            vec_materials = read_mtl_file(materials_arena, string_arena, mtl_file);
+            ObjMaterial* mat = current_mats++;
+            // TODO: Fix this
+            // vec_materials = read_mtl_file(materials_arena, string_arena, mtl_file);
+            // read_mtl_file(string_arena, mat, mtl_file);
+            // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
         }
         else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
             StringView group_name = sv_truncate_front(line, 2);
+            // printf("\n");
+            // sv_print(group_name);
 
             ObjGroup* g = current_group++;
             i_g++;
@@ -453,19 +459,14 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
-    // Copy data to persistent arena and to the obj_model variable.
-    obj_model->materials = vector_alloc_copy_to_arena(persist_arena, vec_materials);
-
-    // Note we also need copy the strings for the materials to the persistent arena
-    for (int i=0; i<vec_materials->count; i++) {
-        int r;
-        ObjMaterial* tmp_m = (ObjMaterial*)vector_alloc_get(vec_materials, i);
-        ObjMaterial* new_m = (ObjMaterial*)vector_alloc_get(obj_model->materials, i);
-    }
+    // // Note we also need copy the strings for the materials to the persistent arena
+    // for (int i=0; i<vec_materials->count; i++) {
+    //     int r;
+    //     ObjMaterial* tmp_m = (ObjMaterial*)vector_alloc_get(vec_materials, i);
+    //     ObjMaterial* new_m = (ObjMaterial*)vector_alloc_get(obj_model->materials, i);
+    // }
 
     arena_alloc_free(string_arena);
-    arena_alloc_free(materials_arena);
-
     local_arena_alloc_reset(local_arena);
     return obj_model;
 #else

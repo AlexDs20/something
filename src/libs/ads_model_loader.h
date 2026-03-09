@@ -60,8 +60,10 @@ typedef struct {
     Vec3f* normals;
     ObjFace* faces;
     ObjGroup* groups;
-    // ObjMaterial* materials;
-    Vector* materials;
+    ObjMaterial* materials;
+    // Vector* materials;
+
+    // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;
 } ObjModel;
 
