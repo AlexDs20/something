@@ -10,9 +10,9 @@ fi
 
 
 FLAGS="-g -ggdb -pg -O0 -Wall"
-# FLAGS="-O3"
-FLAGS+=" -march=native -masm=intel -ffast-math"
-# FLAGS+=" -finstrument-functions -fsanitize=address"
+# FLAGS="-O3 -ffast-math"
+FLAGS+=" -march=native -masm=intel"
+FLAGS+=" -finstrument-functions" # -fsanitize=address"
 # SRC+=" gf_profiling.c"
 DEFINES="-D__DEBUG__"
 LINKS="-lc"

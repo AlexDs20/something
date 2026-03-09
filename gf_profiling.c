@@ -110,7 +110,7 @@ void GfProfilingStop() {
 	gfProfilingEnabledOnThisThread = false;
 }
 
-__attribute__((constructor)) 
+__attribute__((constructor))
 __attribute__((no_instrument_function))
 void GfProfilingInitialise() {
 	gfProfilingBufferSize = GF_PROFILING_BUFFER_BYTES / sizeof(GfProfilingEntry);

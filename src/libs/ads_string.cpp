@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+#include "utils/defines.h"
 
 #include "memory/allocators.h"
 #include "libs/ads_string.h"
@@ -958,12 +959,23 @@ StringView sv_truncate_front(StringView sv, size_t len) {
     };
 }
 
+void sv_truncate_front_inplace(StringView* sv, size_t len) {
+    if (len > sv->size) return;
+    sv->buffer += len;
+    sv->size -= len;
+}
+
 StringView sv_truncate_back(StringView sv, size_t len) {
     if (len > sv.size) return (StringView){0};
     return (StringView){
         .buffer = sv.buffer,
         .size = sv.size-len,
     };
+}
+
+void sv_truncate_back_inplace(StringView* sv, size_t len) {
+    if (len > sv->size) return;
+    sv->size -= len;
 }
 
 StringView sv_trim_front(StringView sv) {
@@ -1007,12 +1019,6 @@ StringView sv_trim_back(StringView sv) {
         .size = (size_t)(end-p+1),
     };
 }
-
-#if defined(__DEBUG__)
-#define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
-#else
-#define ASSERT(x)       do { } while (0)
-#endif
 
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
     size_t pos = sv_find(*sv, delim);

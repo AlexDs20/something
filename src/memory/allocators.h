@@ -66,7 +66,8 @@ typedef struct {
     u64 element_size;
 } Vector;
 
-Vector* vector_alloc_create(Arena* arena, u64 size);
+Vector* vector_alloc_create(Arena* arena, u64 struct_size);
+Vector* vector_alloc_create_size(Arena* arena, u64 struct_size, u64 n_elem);
 // TODO: Add support to push but no data and get the pointer back
 void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);

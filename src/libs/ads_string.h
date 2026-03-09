@@ -41,7 +41,9 @@ StringView  sv_from_string(String str);
 StringView  sv_slice_sv(StringView sv, size_t start, size_t len);
 #define     sv_slice_string(str, start, len)        sv_slice_sv(sv_from_string((str)), (start), (len))
 StringView  sv_truncate_front(StringView sv, size_t len);
+void        sv_truncate_front_inplace(StringView* sv, size_t len);
 StringView  sv_truncate_back(StringView sv, size_t len);
+void        sv_truncate_back_inplace(StringView* sv, size_t len);
 StringView  sv_trim_front(StringView sv);         // removes ' ', '\t', '\n', '\r', '\v'. '\f'
 StringView  sv_trim_back(StringView sv);
 // TODO

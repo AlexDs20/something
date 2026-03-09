@@ -14,26 +14,26 @@ typedef struct {
 } Vec2f;
 
 typedef struct {
-    String name;        // newmtl
+    StringView name;        // newmtl
 
-    Vec3f Ka;           // ambiant color
-    Vec3f Kd;           // diffuse color
-    Vec3f Ks;           // specular color
-    Vec3f Ke;           // emissive color
+    Vec3f Ka;               // ambiant color
+    Vec3f Kd;               // diffuse color
+    Vec3f Ks;               // specular color
+    Vec3f Ke;               // emissive color
 
-    float Ns;           // specular exponent
-    float Ni;           // index of refraction
-    // float d;            // dissolve: Transparency = 1-d
-    float Tr;           // Transparency
-    float Tf;           // Transmission filter
-    uint32_t illum;     // illumination
+    float Ns;               // specular exponent
+    float Ni;               // index of refraction
+    // float d;                // dissolve: Transparency = 1-d
+    float Tr;               // Transparency
+    float Tf;               // Transmission filter
+    uint32_t illum;         // illumination
 
     // Textures
-    String map_Ka;      // ambient color
-    String map_Kd;      // diffuse texture
-    String map_Ks;      // specular texture
-    String map_Bump;    // normal map
-    String map_d;       // alpha texture map
+    StringView map_Ka;      // ambient color
+    StringView map_Kd;      // diffuse texture
+    StringView map_Ks;      // specular texture
+    StringView map_Bump;    // normal map
+    StringView map_d;       // alpha texture map
 } ObjMaterial;
 
 typedef struct {
@@ -56,18 +56,13 @@ typedef struct {
 
 typedef struct {
     Vector* vertices;
-
     Vector* texcoords;
-
     Vector* normals;
-
     Vector* faces;
-
     Vector* groups;
-
     Vector* materials;
 
-    String mtllib_name;
+    StringView mtllib_name;
 } ObjModel;
 
 typedef struct {

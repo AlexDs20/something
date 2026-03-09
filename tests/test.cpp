@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include "gf_profiling.c"
 #include "tests/macros.h"
 
 #include "src/utils/defines.h"

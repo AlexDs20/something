@@ -30,7 +30,8 @@ int main() {
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-    string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
+    // string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
+    string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/006 - Charizard/BR_Charizard.obj");
     Model* model = {0};
     if (string_get_file_extension(file_path) == ".obj") {
         model = read_obj_model_file(scene_arena, file_path);

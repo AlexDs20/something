@@ -19,4 +19,10 @@
 
 #define EPS (1e-6)
 
+#if defined(__DEBUG__)
+#define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
+#else
+#define ASSERT(x)       do { } while (0)
+#endif
+
 #endif // _DEFINES_H
