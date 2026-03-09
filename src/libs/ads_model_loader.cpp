@@ -185,6 +185,9 @@ static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filep
 }
 
 ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base_dir) {
+// #define SINGLEPASS
+// #define RAWBUFFER
+#if !defined(SINGLEPASS)
     Arena* string_arena = arena_alloc_create(1*MiB);
     LocalArena* local_arena = local_arena_alloc_create();
 
@@ -221,42 +224,35 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
         sv_chop_by_delim_sv(&file, new_line);
     }
+    // If no group => create a default one
+    if (n_g == 0) n_g++;
     file = file_copy;
 
-    // Do the actual parsing
-    Vector* vec_vertex;
-    Vector* vec_texcoords;
-    Vector* vec_normals;
-    Vector* vec_faces;
-    Vector* vec_groups;
+    // Second pass => the actual parsing
+    ObjModel* obj_model = (ObjModel*)arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
 
-    vec_vertex    = vector_alloc_create_size(persist_arena, sizeof(Vec3f), n_v);
-    vec_texcoords = vector_alloc_create_size(persist_arena, sizeof(Vec3f), n_vt);
-    vec_normals   = vector_alloc_create_size(persist_arena, sizeof(Vec3f), n_vn);
-    vec_faces     = vector_alloc_create_size(persist_arena, sizeof(ObjFace), n_f);
-    vec_groups    = vector_alloc_create_size(persist_arena, sizeof(ObjGroup), n_g);
-
-    Arena* materials_arena = arena_alloc_create(1*GiB);
-    Vector* vec_materials = vector_alloc_create(materials_arena, sizeof(ObjMaterial));
-
-    ObjModel* obj_model = (ObjModel*)arena_alloc_push(persist_arena, sizeof(ObjModel));
-
-    // Dummy fields / vars useful while parsing
-    Vec3f nil_Vec3f = {0};
-    ObjFace nil_face = {0};
-    ObjGroup nil_group = {0};
-
-    int current_material_index = -1;
-
-    ObjGroup* current_group = NULL;
-    int current_shading_group = 0;
+    Vec3f* vec_vertex    = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_v);
+    Vec3f* vec_texcoords = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_vt);
+    Vec3f* vec_normals   = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_vn);
+    ObjFace* vec_faces   = (ObjFace*) arena_alloc_push_zero(persist_arena, sizeof(ObjFace) * n_f);
+    ObjGroup* vec_groups = (ObjGroup*)arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)* n_g);
     uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0;
 
-    // default group in case nothing is given in the obj file
-    current_group = (ObjGroup*)vector_alloc_push(vec_groups, &nil_group);
+    Vec3f* current_vertex   = vec_vertex;
+    Vec3f* current_texcoord = vec_texcoords;
+    Vec3f* current_normal   = vec_normals;
+    ObjFace* current_face   = vec_faces;
+    ObjGroup* current_group = vec_groups;
+
+    // Default group in case nothing is given in the obj file
+    *current_group = {0};
     current_group->name = string_init_cstr(string_arena, "default");
-    current_group->material_index = -1;
-    current_group->face_count = 0;
+    int current_shading_group = 0;
+
+    // TODO: Handle the materials properly by also creating a default material
+    Arena* materials_arena = arena_alloc_create(1*GiB);
+    Vector* vec_materials = vector_alloc_create(materials_arena, sizeof(ObjMaterial));
+    int current_material_index = 0;
 
     StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     while (file.size != 0) {
@@ -267,15 +263,18 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
                 line = sv_truncate_front(line, 2);
-                v = (Vec3f*)vector_alloc_get(vec_vertex, i_v++);
+                v = current_vertex++;
+                i_v++;
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
                 line = sv_truncate_front(line, 3);
-                v = (Vec3f*)vector_alloc_get(vec_texcoords, i_vt++);
+                v = current_texcoord++;
+                i_vt++;
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
                 line = sv_truncate_front(line, 3);
-                v = (Vec3f*)vector_alloc_get(vec_normals, i_vn++);
+                v = current_normal++;
+                i_vn++;
             }
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
             // }
@@ -289,17 +288,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
         else if (sv_starts_with_char(line, 'f')) {      // face
             // TODO:
-            //  - Add support for n-gons
+            //  - Add support for n-gons?
             line = sv_truncate_front(line, 2);
             int r;
 
-            if (current_group->face_count == 0) {
-                current_group->first_face_index = i_f;
+            if (vec_groups->face_count++ == 0) {
+                vec_groups->first_face_index = i_f;
             }
-            current_group->face_count++;
 
             // Actually parse the face
-            ObjFace* f = (ObjFace*)vector_alloc_get(vec_faces, i_f++);
+            ObjFace* f = current_face++;
+            i_f++;
             f->material_index = current_material_index;
             f->shading_group = current_shading_group;
 
@@ -394,10 +393,12 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
             StringView group_name = sv_truncate_front(line, 2);
 
-            current_group = (ObjGroup*)vector_alloc_get(vec_groups, i_g++);
-            current_group->name = string_init_sv(string_arena, group_name);
-            current_group->material_index = current_material_index;
-            current_group->face_count = 0;
+            ObjGroup* g = current_group++;
+            i_g++;
+            g->name = string_init_sv(string_arena, group_name);
+            g->material_index = current_material_index;
+            g->face_count = 0;
+            g->first_face_index = 0;
         }
         else if (sv_starts_with_char(line, '#')) {
         }
@@ -432,6 +433,8 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     local_arena_alloc_reset(local_arena);
     return obj_model;
+#else
+#endif
 }
 
 Model* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {

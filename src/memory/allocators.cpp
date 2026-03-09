@@ -371,18 +371,13 @@ Vector* vector_alloc_create_size(Arena* arena, u64 struct_size, u64 n) {
     if (!vector) {
         return 0;
     }
-    vector->buffer = (u8*)arena_alloc_align(arena);
+    vector->buffer = (u8*)arena_alloc_push(arena, n * struct_size);
     if (!vector->buffer) {
-        arena_alloc_restore(arena, checkpoint);
-        return 0;
-    }
-    void* t = arena_alloc_push(arena, n * struct_size);
-    if (t!=vector->buffer) {
         *(volatile char*) 0 = 0 ;
         arena_alloc_restore(arena, checkpoint);
         return 0;
     }
-    vector->count = n;
+    vector->count = 0;
     vector->element_size = struct_size;
     vector->arena = arena;
     return vector;

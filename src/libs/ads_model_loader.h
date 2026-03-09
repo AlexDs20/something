@@ -55,13 +55,13 @@ typedef struct {
 } ObjGroup;
 
 typedef struct {
-    Vector* vertices;
-    Vector* texcoords;
-    Vector* normals;
-    Vector* faces;
-    Vector* groups;
+    Vec3f* vertices;
+    Vec3f* texcoords;
+    Vec3f* normals;
+    ObjFace* faces;
+    ObjGroup* groups;
+    // ObjMaterial* materials;
     Vector* materials;
-
     StringView mtllib_name;
 } ObjModel;
 
