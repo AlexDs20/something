@@ -61,7 +61,6 @@ typedef struct {
     ObjFace* faces;
     ObjGroup* groups;
     ObjMaterial* materials;
-    // Vector* materials;
 
     // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;

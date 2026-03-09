@@ -28,7 +28,7 @@ static uint32_t count_mtl_mats(StringView filepath) {
     return n;
 }
 
-static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filepath) {
+static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView filepath) {
     /*
      * Sources:
      * https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -39,9 +39,6 @@ static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filep
 
     String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
-
-    ObjMaterial dummy_mats = {0};
-    Vector* materials = (Vector*)vector_alloc_create(arena, sizeof(ObjMaterial));
 
     ObjMaterial* current_mats = NULL;
 
@@ -54,7 +51,13 @@ static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filep
         if (sv_starts_with(line, newmtl)) {
             line = sv_truncate_front(line, newmtl.size);
 
-            current_mats = (ObjMaterial*)vector_alloc_push(materials, &dummy_mats);
+            if (current_mats == NULL) {
+                current_mats = mats;
+            }
+            else {
+                current_mats++;
+            }
+
             current_mats->name = sv_from_string(
                     string_init_sv(string_arena, sv_trim_front(line))
                     );
@@ -204,7 +207,7 @@ static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filep
     }
 
     local_arena_alloc_reset(local_arena);
-    return materials;
+    return;
 }
 
 ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base_dir) {
@@ -285,7 +288,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     *current_group = {0};
     current_group->name = string_init_cstr(string_arena, "default");
     int current_shading_group = 0;
-    int current_material_index = -1;
+    int current_material_index = 0;
 
     // TODO: Handle the materials properly by also creating a default material
 
@@ -327,9 +330,10 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             line = sv_truncate_front(line, 2);
             int r;
 
-            if (vec_groups->face_count++ == 0) {
-                vec_groups->first_face_index = i_f;
+            if (current_group->face_count == 0) {
+                current_group->first_face_index = i_f;
             }
+            current_group->face_count++;
 
             // Actually parse the face
             ObjFace* f = current_face++;
@@ -400,7 +404,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         // }
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
-            int found = 0;
+            // int found = 0;
             for (int i=0; i<n_mats; i++) {
                 ObjMaterial* m = vec_materials + i;
                 if (sv_equal(line, m->name)) {
@@ -423,9 +427,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             StringView mtl_file = sv_from_string(fp);
 
             ObjMaterial* mat = current_mats++;
-            // TODO: Fix this
-            // vec_materials = read_mtl_file(materials_arena, string_arena, mtl_file);
-            // read_mtl_file(string_arena, mat, mtl_file);
+            read_mtl_file(string_arena, mat, mtl_file);
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
         }
@@ -434,7 +436,8 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             // printf("\n");
             // sv_print(group_name);
 
-            ObjGroup* g = current_group++;
+            current_group++;
+            ObjGroup* g = current_group;
             i_g++;
             g->name = string_init_sv(string_arena, group_name);
             g->material_index = current_material_index;
@@ -459,12 +462,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
-    // // Note we also need copy the strings for the materials to the persistent arena
-    // for (int i=0; i<vec_materials->count; i++) {
-    //     int r;
-    //     ObjMaterial* tmp_m = (ObjMaterial*)vector_alloc_get(vec_materials, i);
-    //     ObjMaterial* new_m = (ObjMaterial*)vector_alloc_get(obj_model->materials, i);
-    // }
+    *(char*)0=0;
 
     arena_alloc_free(string_arena);
     local_arena_alloc_reset(local_arena);
