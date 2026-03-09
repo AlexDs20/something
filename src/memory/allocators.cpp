@@ -98,7 +98,7 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size) {
     u64 needed = arena->top + size;
     if (needed > arena->capacity) {
         printf("Arena overflow. Not enough space left.\n");
-        *(char*)0 = 0;
+        *(volatile char*) 0 = 0;
         return 0;
     }
     if (needed > arena->committed) {

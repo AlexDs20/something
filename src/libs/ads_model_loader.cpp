@@ -5,6 +5,29 @@
 #define GiB (1024*1024*1024)    // GiB
 #define MiB (1024*1024)         // MiB
 
+static uint32_t count_mtl_mats(StringView filepath) {
+    LocalArena* local_arena = local_arena_alloc_create();
+    uint32_t n = 0;
+
+    String content = read_complete_file(local_arena->arena, filepath);
+    StringView file = sv_from_string(content);
+
+    StringView new_line = sv_from_cstr("\n");
+    StringView newmtl   = sv_from_cstr("newmtl ");
+
+    StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
+    while (file.size != 0) {
+        if (sv_starts_with(line, newmtl)) {
+            n++;
+        }
+
+        line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return n;
+}
+
 static Vector* read_mtl_file(Arena* arena, Arena* string_arena, StringView filepath) {
     /*
      * Sources:
@@ -199,7 +222,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     StringView file_copy = file;
 
     // First pass counting the amount of vertex etc
-    uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0;
+    uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0, n_mats = 0;
     while (file.size != 0) {
         file = sv_trim_front(file);
         // Hacking it
@@ -222,6 +245,18 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
                     n_g++;
         }
+        else if (sv_starts_with(file, mtllib)) {
+            file = sv_truncate_front(file, mtllib.size+1);
+
+            StringView name = sv_trim_front(sv_trim_back(sv_chop_by_delim_char(&file, '\n')));
+
+            String fp = string_init_sv(string_arena, base_dir);
+            string_append_sv(string_arena, &fp, name);
+            StringView mtl_file = sv_from_string(fp);
+
+            n_mats += count_mtl_mats(mtl_file);
+        }
+
         sv_chop_by_delim_sv(&file, new_line);
     }
     // If no group => create a default one
@@ -236,7 +271,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     Vec3f* vec_normals   = (Vec3f*)   arena_alloc_push_zero(persist_arena, sizeof(Vec3f)   * n_vn);
     ObjFace* vec_faces   = (ObjFace*) arena_alloc_push_zero(persist_arena, sizeof(ObjFace) * n_f);
     ObjGroup* vec_groups = (ObjGroup*)arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)* n_g);
-    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0;
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0, i_mats = 0;
 
     Vec3f* current_vertex   = vec_vertex;
     Vec3f* current_texcoord = vec_texcoords;
