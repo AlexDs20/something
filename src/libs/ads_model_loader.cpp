@@ -462,7 +462,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
-    *(char*)0=0;
+    // *(char*)0=0;
 
     arena_alloc_free(string_arena);
     local_arena_alloc_reset(local_arena);

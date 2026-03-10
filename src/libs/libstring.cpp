@@ -120,10 +120,11 @@ string8 string_join_strings(Arena* arena, string8 a, string8 b) {
 
 string8 string_get_file_extension(string8 s) {
     string8 out = {0};
-    for (u64 i=0; i<s.size; i++) {
-        if (s.buffer[s.size-1 - i] == '.') {
-            out.buffer = &s.buffer[s.size-1 - i];
-            out.size = i+1;
+    for (s64 i=s.size-1; i>0; i--) {
+        if (s.buffer[i] == '.') {
+            out.buffer = &s.buffer[i];
+            out.size = s.size - i;
+            break;
         }
     }
     return out;

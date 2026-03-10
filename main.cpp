@@ -31,7 +31,9 @@ int main() {
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
     // string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
-    string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/006 - Charizard/BR_Charizard.obj");
+    // string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/006 - Charizard/BR_Charizard.obj");
+    string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/dragon/dragon.obj");
+    // string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/sponza/sponza.obj");
     Model* model = {0};
     if (string_get_file_extension(file_path) == ".obj") {
         model = read_obj_model_file(scene_arena, file_path);
@@ -51,13 +53,13 @@ int main() {
 
     u32 running = 1;
 
-    // ColorContext frag_context = {
-    //     0xFF777777,
-    // };
-
-    TextureContext frag_context = {
-        .texture = &model->material->map_Kd,
+    ColorContext frag_context = {
+        0xFF777777,
     };
+
+    // TextureContext frag_context = {
+    //     .texture = &model->material->map_Kd,
+    // };
 
     while (running) {
         arena_alloc_reset_zero(frame_arena);
@@ -81,9 +83,9 @@ int main() {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
-        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
+        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
     }
