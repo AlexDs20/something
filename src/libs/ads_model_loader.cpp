@@ -4,6 +4,7 @@
 // TODO remove from here
 #define GiB (1024*1024*1024)    // GiB
 #define MiB (1024*1024)         // MiB
+#define KiB (1024)              // KiB
 
 static uint32_t count_mtl_mats(StringView filepath) {
     LocalArena* local_arena = local_arena_alloc_create();
@@ -211,10 +212,6 @@ static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView fil
 }
 
 ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base_dir) {
-// #define SINGLEPASS
-// #define RAWBUFFER
-#if !defined(SINGLEPASS)
-    Arena* string_arena = arena_alloc_create(1*MiB);
     LocalArena* local_arena = local_arena_alloc_create();
 
     // First pass
@@ -226,8 +223,8 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     // First pass counting the amount of vertex etc
     uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0, n_mats = 0;
+    file = sv_trim_front(file);
     while (file.size != 0) {
-        file = sv_trim_front(file);
         // Hacking it
         if (file.buffer[0] == 'v') {
             switch (file.buffer[1]) {
@@ -251,19 +248,23 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with(file, mtllib)) {
             file = sv_truncate_front(file, mtllib.size+1);
 
+            StringView backup = file;
             StringView name = sv_trim_front(sv_trim_back(sv_chop_by_delim_char(&file, '\n')));
+            file = backup;
 
-            String fp = string_init_sv(string_arena, base_dir);
-            string_append_sv(string_arena, &fp, name);
+            String fp = string_init_sv(local_arena->arena, base_dir);
+            string_append_sv(local_arena->arena, &fp, name);
             StringView mtl_file = sv_from_string(fp);
 
             n_mats += count_mtl_mats(mtl_file);
         }
 
         sv_chop_by_delim_sv(&file, new_line);
+        file = sv_trim_front(file);
     }
-    // If no group => create a default one
-    if (n_g == 0) n_g++;
+    // Create a default one
+    n_g++;
+    // if (n_mats == 0) n_mats++;
     file = file_copy;
 
     // Second pass => the actual parsing
@@ -277,6 +278,20 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     ObjMaterial* vec_materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
     uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0;
 
+    obj_model->vertices = vec_vertex;
+    obj_model->texcoords = vec_texcoords;
+    obj_model->normals = vec_normals;
+    obj_model->faces = vec_faces;
+    obj_model->groups = vec_groups;
+    obj_model->materials = vec_materials;
+
+    obj_model->n_vertices = n_v;
+    obj_model->n_texcoords = n_vt;
+    obj_model->n_normals = n_vn;
+    obj_model->n_faces = n_f;
+    obj_model->n_groups = n_g;
+    obj_model->n_materials = n_mats;
+
     Vec3f* current_vertex     = vec_vertex;
     Vec3f* current_texcoord   = vec_texcoords;
     Vec3f* current_normal     = vec_normals;
@@ -286,7 +301,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     // Default group in case nothing is given in the obj file
     *current_group = {0};
-    current_group->name = string_init_cstr(string_arena, "default");
+    current_group->name = string_init_cstr(persist_arena, "default");
     int current_shading_group = 0;
     int current_material_index = 0;
 
@@ -300,17 +315,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
-                line = sv_truncate_front(line, 2);
+                line = sv_truncate_front(line, 1);
                 v = current_vertex++;
                 i_v++;
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
-                line = sv_truncate_front(line, 3);
+                line = sv_truncate_front(line, 2);
                 v = current_texcoord++;
                 i_vt++;
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
-                line = sv_truncate_front(line, 3);
+                line = sv_truncate_front(line, 2);
                 v = current_normal++;
                 i_vn++;
             }
@@ -345,47 +360,48 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             StringView sep;
 
             // Parse indices and convert to point to correct elements
-            r = sv_parse_u32(&line, &f->v_indices[0]);
-            f->v_indices[0] = f->v_indices[0] >= 0 ? f->v_indices[0]-- : f->v_indices[0] + i_v + 1;
+            s32 temp;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[0] = temp > 0 ? temp-1 : temp + i_v + 1;
 
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &f->vt_indices[0]);
-                f->vt_indices[0] = f->vt_indices[0] >= 0 ? f->vt_indices[0]-- : f->vt_indices[0] + i_vt + 1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[0] = temp > 0 ? temp-1 : temp + i_vt + 1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &f->vn_indices[0]);
-                    f->vn_indices[0] = f->vn_indices[0] >= 0 ? f->vn_indices[0]-- : f->vn_indices[0] + i_vn + 1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[0] = temp > 0 ? temp-1 : temp + i_vn + 1;
                 }
             }
 
-            r = sv_parse_u32(&line, &f->v_indices[1]);
-            f->v_indices[1] = f->v_indices[1] >= 0 ? f->v_indices[1]-- : f->v_indices[1] + i_v + 1;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[1] = temp > 0 ? temp-1 : temp + i_v + 1;
 
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &f->vt_indices[1]);
-                f->vt_indices[1] = f->vt_indices[1] >= 0 ? f->vt_indices[1]-- : f->vt_indices[1] + i_vt + 1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[1] = temp > 0 ? temp-1 : temp + i_vt + 1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &f->vn_indices[1]);
-                    f->vn_indices[1] = f->vn_indices[1] >= 0 ? f->vn_indices[1]-- : f->vn_indices[1] + i_vn + 1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[1] = temp > 0 ? temp-1 : temp + i_vn + 1;
                 }
             }
 
-            r = sv_parse_u32(&line, &f->v_indices[2]);
-            f->v_indices[2] = f->v_indices[2] >= 0 ? f->v_indices[2]-- : f->v_indices[2] + i_v + 1;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[2] = temp > 0 ? temp-1 : temp + i_v + 1;
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &f->vt_indices[2]);
-                f->vt_indices[2] = f->vt_indices[2] >= 0 ? f->vt_indices[2]-- : f->vt_indices[2] + i_vt + 1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[2] = temp > 0 ? temp-1 : temp + i_vt + 1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &f->vn_indices[2]);
-                    f->vn_indices[2] = f->vn_indices[2] >= 0 ? f->vn_indices[2]-- : f->vn_indices[2] + i_vn + 1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[2] = temp > 0 ? temp-1 : temp + i_vn + 1;
                 }
             }
         }
@@ -422,12 +438,12 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with(line, mtllib)) {
             line = sv_truncate_front(line, mtllib.size+1);
 
-            String fp = string_init_sv(string_arena, base_dir);
-            string_append_sv(string_arena, &fp, line);
+            String fp = string_init_sv(local_arena->arena, base_dir);
+            string_append_sv(local_arena->arena, &fp, line);
             StringView mtl_file = sv_from_string(fp);
 
             ObjMaterial* mat = current_mats++;
-            read_mtl_file(string_arena, mat, mtl_file);
+            read_mtl_file(persist_arena, mat, mtl_file);
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
         }
@@ -439,7 +455,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             current_group++;
             ObjGroup* g = current_group;
             i_g++;
-            g->name = string_init_sv(string_arena, group_name);
+            g->name = string_init_sv(persist_arena, group_name);
             g->material_index = current_material_index;
             g->face_count = 0;
             g->first_face_index = 0;
@@ -464,23 +480,20 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     // *(char*)0=0;
 
-    arena_alloc_free(string_arena);
     local_arena_alloc_reset(local_arena);
     return obj_model;
-#else
-#endif
 }
 
-Model* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
-    return (Model*)obj_model;
+ObjModel* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
+    return obj_model;
 }
 
-Model* model_create_default_model(Arena* arena) {
+ObjModel* model_create_default_model(Arena* arena) {
     return NULL;
 }
 
-Model* model_read(Arena* arena, StringView filepath) {
-    Model* model = NULL;
+ObjModel* model_read(Arena* arena, StringView filepath) {
+    ObjModel* model = NULL;
 
     StringView ext = sv_file_extension(filepath);
 
@@ -495,9 +508,9 @@ Model* model_read(Arena* arena, StringView filepath) {
     //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
     // }
     else {
+        *(volatile char*)0=0;
         model = model_create_default_model(arena);
     }
-
     return model;
 }
 

@@ -114,8 +114,9 @@ void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
 
 Model* read_obj_model_file(Arena* arena, string8 filepath);
 
-void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer);
+#include "libs/ads_model_loader.h"
+void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
+void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
 
 #endif

@@ -358,15 +358,15 @@ void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
 */
 
 
-void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer) {
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
+    for (u64 i=0; i<model->n_faces; ++i) {
+        ObjFace* f = model->faces + i;
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
+        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
+        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
 
         // Scale to center of the screen
         a.x = (a.x * 0.2f + 0.5f) * w;
@@ -581,7 +581,7 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_right_slope = (cz - az) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = by>h ? h : (u32)ceilf32(by);
+    u32 ye = by>h ? h : (u32)ceilf32(by < 0 ? 0 : by);
 
     f32 xs = ax + (ys - ay) * ad_inv_slope;
     f32 xe = ax + (ys - ay) * ae_inv_slope;
@@ -594,7 +594,7 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+        u32 x_end   = xe>w ? w : (u32)ceilf32( xe<0? 0 : xe );
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -666,7 +666,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_right_slope = (cz - bz) * y_delta_inv;
 
     u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = cy>h ? h : (u32)ceilf32(cy);
+    u32 ye = cy>h ? h : (u32)ceilf32(cy < 0 ? 0 : cy);
 
     f32 xs = dx + (ys - ay) * dc_inv_slope;
     f32 xe = ex + (ys - ay) * ec_inv_slope;
@@ -679,7 +679,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
 
     for (u32 y=ys; y<ye; y++) {
         u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+        u32 x_end   = xe>w ? w : (u32)ceilf32(xe<0 ? 0 : xe);
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -855,22 +855,23 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     }
 }
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-#if 1
+void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+// #define NORMALIZE
+#ifdef NORMALIZE
     f32 minx =  10000;
     f32 maxx = -10000;
     f32 miny =  10000;
     f32 maxy = -10000;
     f32 minz =  10000;
     f32 maxz = -10000;
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+    for (u64 i=0; i<model->n_faces; ++i) {
+        ObjFace* f = model->faces + i;
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
+        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
+        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
 
         minx = minx < a.x ? minx : a.x;
         minx = minx < b.x ? minx : b.x;
@@ -893,34 +894,59 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void
         maxz = maxz > b.z ? maxz : b.z;
         maxz = maxz > c.z ? maxz : c.z;
     }
+#else
+    f32 minx =  10;
+    f32 maxx = -10;
+    f32 miny =  10;
+    f32 maxy = -10;
+    f32 minz =  10;
+    f32 maxz = -10;
 #endif
 
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+    for (u64 i=0; i<model->n_faces; ++i) {
+        ObjFace* f = model->faces + i;
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
+        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
+        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
 
-        VertexAttrs va = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[0]-1);
-        VertexAttrs vb = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[1]-1);
-        VertexAttrs vc = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[2]-1);
+        // VertexAttrs va = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[0]-1);
+        // VertexAttrs vb = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[1]-1);
+        // VertexAttrs vc = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[2]-1);
+
+        VertexAttrs va;
+        VertexAttrs vb;
+        VertexAttrs vc;
+
 
         // Scale to center of the screen
-#if 1
+#if 0
         a.x = (a.x - minx) * h / (maxy-miny);
         b.x = (b.x - minx) * h / (maxy-miny);
         c.x = (c.x - minx) * h / (maxy-miny);
 
-        a.y = (a.y - 0.5f*miny) * h / (maxy-miny);
-        b.y = (b.y - 0.5f*miny) * h / (maxy-miny);
-        c.y = (c.y - 0.5f*miny) * h / (maxy-miny);
+        a.y = (a.y - miny) * h / (maxy-miny);
+        b.y = (b.y - miny) * h / (maxy-miny);
+        c.y = (c.y - miny) * h / (maxy-miny);
 
         a.z = (a.z - minz) / (maxz-minz);
         b.z = (b.z - minz) / (maxz-minz);
         c.z = (c.z - minz) / (maxz-minz);
+#else
+        // a.x = (a.x * 0.2f + 0.5f) * w;
+        // a.y = (a.y * 0.2f + 0.5f) * h;
+        // b.x = (b.x * 0.2f + 0.5f) * w;
+        // b.y = (b.y * 0.2f + 0.5f) * h;
+        // c.x = (c.x * 0.2f + 0.5f) * w;
+        // c.y = (c.y * 0.2f + 0.5f) * h;
+        a.x *= w;
+        a.y *= h;
+        b.x *= w;
+        b.y *= h;
+        c.x *= w;
+        c.y *= h;
 #endif
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);

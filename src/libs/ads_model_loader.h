@@ -62,17 +62,24 @@ typedef struct {
     ObjGroup* groups;
     ObjMaterial* materials;
 
+    uint32_t n_vertices;
+    uint32_t n_texcoords;
+    uint32_t n_normals;
+    uint32_t n_faces;
+    uint32_t n_groups;
+    uint32_t n_materials;
+
     // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;
 } ObjModel;
 
-typedef struct {
-} Model;
+// typedef struct {
+// } Model;
 
-Model*      model_read(Arena* arena, StringView filepath);
-ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
-Model*      model_create_default_model(Arena* arena);
-Model*      model_convert_from_obj(Arena* arena, ObjModel* obj_model);
+ObjModel*   model_read(Arena* arena, StringView filepath);
+// ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
+// ObjModel*   model_create_default_model(Arena* arena);
+// ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
 
 
 #endif // _ADS_MODEL_LOADER_H_

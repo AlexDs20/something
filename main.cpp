@@ -15,11 +15,11 @@
 #include "platform/memory.h"
 
 #include "libs/ads_string.h"
+#include "libs/ads_model_loader.h"
 
 #include "gf_profiling.c"
 
-
-int main() {
+int main(int argc, char** argv) {
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -32,12 +32,28 @@ int main() {
 
     // string8 file_path = string_from_cstr(scene_arena, "assets/backpack/backpack.obj");
     // string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/006 - Charizard/BR_Charizard.obj");
-    string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/dragon/dragon.obj");
+    // string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/dragon/dragon.obj");
     // string8 file_path = string_from_cstr(scene_arena, "../../../Downloads/sponza/sponza.obj");
-    Model* model = {0};
-    if (string_get_file_extension(file_path) == ".obj") {
-        model = read_obj_model_file(scene_arena, file_path);
+
+    StringView selection = sv_from_cstr(argv[1]);
+
+    StringView fp;
+    if ( sv_equal(selection, sv_from_cstr("1")) ) {
+        fp = sv_from_cstr("../../../Downloads/006 - Charizard/BR_Charizard.obj");
+    } else if ( sv_equal(selection, sv_from_cstr("2")) ) {
+        fp = sv_from_cstr("../../../Downloads/dragon/dragon.obj");
+    } else if ( sv_equal(selection, sv_from_cstr("3")) ) {
+        fp = sv_from_cstr("../../../Downloads/sponza/sponza.obj");
+    } else if  ( sv_equal(selection, sv_from_cstr("4")) ) {
+        fp = sv_from_cstr("assets/backpack/backpack.obj");
+    } else {
+        fp = sv_from_cstr("assets/cube.obj");
     }
+    ObjModel* model = model_read(scene_arena, fp);
+    // Model* model = {0};
+    // if (string_get_file_extension(file_path) == ".obj") {
+    //     model = read_obj_model_file(scene_arena, file_path);
+    // }
 
     // u32* win_buffer = model->material->map_Kd.buffer;
     // u32 canvas_w = model->material->map_Kd.width;
@@ -82,10 +98,10 @@ int main() {
             zbuffer[i] = zdefault.f;
         }
 
-        // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
+        draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
-        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
+        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
     }
