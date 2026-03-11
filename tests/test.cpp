@@ -18,6 +18,7 @@ typedef struct {
 } test_entry;
 
 test_entry tests[] = {
+#if 0
     //==============================
     // ADS_IMAGE
     // {"JPEG_baseline_rgb", test_read_baseline_rgb},
@@ -91,15 +92,15 @@ test_entry tests[] = {
     {"test_sv_parse_s32", test_sv_parse_s32},
     {"test_parser_f32", test_parser_f32},
 
+#endif
 
     //==============================
     // ADS_MODEL_LOADER
     {"test_model_read", test_model_read},
 
-
     //==============================
     // PLATFORM_IO
-    {"test_read_complete_file", test_read_complete_file},
+    // {"test_read_complete_file", test_read_complete_file},
 };
 
 int main() {

@@ -1043,7 +1043,7 @@ StringView sv_chop_by(StringView* sv, size_t pos) {
     sv->buffer += pos;
     sv->size -= pos;
     return (StringView){
-        .buffer = sv->buffer,
+        .buffer = sv->buffer-pos,
         .size = pos,
     };
 }

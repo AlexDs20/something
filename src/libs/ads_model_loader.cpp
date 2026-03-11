@@ -225,7 +225,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0, n_mats = 0;
     file = sv_trim_front(file);
     while (file.size != 0) {
-        // Hacking it
+        // Backing it
         if (file.buffer[0] == 'v') {
             switch (file.buffer[1]) {
                 case ' ': {
@@ -306,9 +306,8 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     int current_material_index = 0;
 
     // TODO: Handle the materials properly by also creating a default material
-
-    StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     while (file.size != 0) {
+        StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
         if (sv_starts_with_char(line, 'v')) {
             Vec3f* v = NULL;
             int r;
@@ -360,48 +359,57 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             StringView sep;
 
             // Parse indices and convert to point to correct elements
-            s32 temp;
-            r = sv_parse_s32(&line, &temp);
+            uint32_t temp;
+            r = sv_parse_u32(&line, &temp);
             f->v_indices[0] = temp > 0 ? temp-1 : temp + i_v + 1;
+            // f->v_indices[0] = temp-1;
 
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                r = sv_parse_u32(&line, &temp);
                 f->vt_indices[0] = temp > 0 ? temp-1 : temp + i_vt + 1;
+                // f->vt_indices[0] = temp-1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    r = sv_parse_u32(&line, &temp);
                     f->vn_indices[0] = temp > 0 ? temp-1 : temp + i_vn + 1;
+                    // f->vn_indices[0] = temp-1;
                 }
             }
 
-            r = sv_parse_s32(&line, &temp);
+            r = sv_parse_u32(&line, &temp);
             f->v_indices[1] = temp > 0 ? temp-1 : temp + i_v + 1;
+            // f->v_indices[1] = temp-1;
 
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                r = sv_parse_u32(&line, &temp);
                 f->vt_indices[1] = temp > 0 ? temp-1 : temp + i_vt + 1;
+                // f->vt_indices[1] = temp-1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    r = sv_parse_u32(&line, &temp);
                     f->vn_indices[1] = temp > 0 ? temp-1 : temp + i_vn + 1;
+                    // f->vn_indices[1] = temp-1;
                 }
             }
 
-            r = sv_parse_s32(&line, &temp);
+            r = sv_parse_u32(&line, &temp);
             f->v_indices[2] = temp > 0 ? temp-1 : temp + i_v + 1;
+            // f->v_indices[2] = temp-1;
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                r = sv_parse_u32(&line, &temp);
                 f->vt_indices[2] = temp > 0 ? temp-1 : temp + i_vt + 1;
+                // f->vt_indices[2] = temp-1;
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    r = sv_parse_u32(&line, &temp);
                     f->vn_indices[2] = temp > 0 ? temp-1 : temp + i_vn + 1;
+                    // f->vn_indices[2] = temp-1;
                 }
             }
         }
@@ -474,12 +482,20 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             printf("\n=====\n");
             *((char*)0) = 0;
         }
-
-        line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
     // *(char*)0=0;
-
+    // for (int i=0; i<obj_model->n_faces; i++) {
+    //     u32 a = obj_model->faces[i].v_indices[0];
+    //     u32 b = obj_model->faces[i].v_indices[1];
+    //     u32 c = obj_model->faces[i].v_indices[2];
+    //     printf("\nFace: %d, idx: (%u,%u,%u)", i, a, b, c);
+    //     printf("\nVertices:\n\t1: (%.4f,%.4f,%.4f)\n\t2: ",
+    //             obj_model->vertices[a].x,
+    //             obj_model->vertices[a].y,
+    //             obj_model->vertices[a].z
+    //     );
+    // }
     local_arena_alloc_reset(local_arena);
     return obj_model;
 }

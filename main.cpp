@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
     u32 running = 1;
 
     ColorContext frag_context = {
-        0xFF777777,
+        0xFFFFA500,
     };
 
     // TextureContext frag_context = {
@@ -98,10 +98,10 @@ int main(int argc, char** argv) {
             zbuffer[i] = zdefault.f;
         }
 
-        draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
+        // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
-        // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
+        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
         platform_render_to_window((u8*)win_buffer, canvas_w, canvas_h, &win);
     }

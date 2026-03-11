@@ -360,13 +360,13 @@ void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
 
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
     for (u64 i=0; i<model->n_faces; ++i) {
-        ObjFace* f = model->faces + i;
+        ObjFace f = model->faces[i];
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
-        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
-        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
+        Vertex a = *((Vertex*)model->vertices + f.v_indices[0]);
+        Vertex b = *((Vertex*)model->vertices + f.v_indices[1]);
+        Vertex c = *((Vertex*)model->vertices + f.v_indices[2]);
 
         // Scale to center of the screen
         a.x = (a.x * 0.2f + 0.5f) * w;
@@ -856,7 +856,7 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 }
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-// #define NORMALIZE
+//#define NORMALIZE
 #ifdef NORMALIZE
     f32 minx =  10000;
     f32 maxx = -10000;
@@ -869,9 +869,9 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
-        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
-        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
+        Vertex a = *((Vertex*)model->vertices + f->v_indices[0]);
+        Vertex b = *((Vertex*)model->vertices + f->v_indices[1]);
+        Vertex c = *((Vertex*)model->vertices + f->v_indices[2]);
 
         minx = minx < a.x ? minx : a.x;
         minx = minx < b.x ? minx : b.x;
@@ -935,18 +935,18 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
         b.z = (b.z - minz) / (maxz-minz);
         c.z = (c.z - minz) / (maxz-minz);
 #else
-        // a.x = (a.x * 0.2f + 0.5f) * w;
-        // a.y = (a.y * 0.2f + 0.5f) * h;
-        // b.x = (b.x * 0.2f + 0.5f) * w;
-        // b.y = (b.y * 0.2f + 0.5f) * h;
-        // c.x = (c.x * 0.2f + 0.5f) * w;
-        // c.y = (c.y * 0.2f + 0.5f) * h;
-        a.x *= w;
-        a.y *= h;
-        b.x *= w;
-        b.y *= h;
-        c.x *= w;
-        c.y *= h;
+        a.x = (a.x * 0.2f + 0.5f) * w;
+        a.y = (a.y * 0.2f + 0.5f) * h;
+        b.x = (b.x * 0.2f + 0.5f) * w;
+        b.y = (b.y * 0.2f + 0.5f) * h;
+        c.x = (c.x * 0.2f + 0.5f) * w;
+        c.y = (c.y * 0.2f + 0.5f) * h;
+        // a.x *= w;
+        // a.y *= h;
+        // b.x *= w;
+        // b.y *= h;
+        // c.x *= w;
+        // c.y *= h;
 #endif
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
