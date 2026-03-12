@@ -359,57 +359,48 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             StringView sep;
 
             // Parse indices and convert to point to correct elements
-            uint32_t temp;
-            r = sv_parse_u32(&line, &temp);
-            f->v_indices[0] = temp > 0 ? temp-1 : temp + i_v + 1;
-            // f->v_indices[0] = temp-1;
+            int32_t temp;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v + 1);
 
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &temp);
-                f->vt_indices[0] = temp > 0 ? temp-1 : temp + i_vt + 1;
-                // f->vt_indices[0] = temp-1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt + 1);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &temp);
-                    f->vn_indices[0] = temp > 0 ? temp-1 : temp + i_vn + 1;
-                    // f->vn_indices[0] = temp-1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn + 1);
                 }
             }
 
-            r = sv_parse_u32(&line, &temp);
-            f->v_indices[1] = temp > 0 ? temp-1 : temp + i_v + 1;
-            // f->v_indices[1] = temp-1;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v + 1);
 
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &temp);
-                f->vt_indices[1] = temp > 0 ? temp-1 : temp + i_vt + 1;
-                // f->vt_indices[1] = temp-1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt + 1);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &temp);
-                    f->vn_indices[1] = temp > 0 ? temp-1 : temp + i_vn + 1;
-                    // f->vn_indices[1] = temp-1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn + 1);
                 }
             }
 
-            r = sv_parse_u32(&line, &temp);
-            f->v_indices[2] = temp > 0 ? temp-1 : temp + i_v + 1;
-            // f->v_indices[2] = temp-1;
+            r = sv_parse_s32(&line, &temp);
+            f->v_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v + 1);
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_u32(&line, &temp);
-                f->vt_indices[2] = temp > 0 ? temp-1 : temp + i_vt + 1;
-                // f->vt_indices[2] = temp-1;
+                r = sv_parse_s32(&line, &temp);
+                f->vt_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt + 1);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_u32(&line, &temp);
-                    f->vn_indices[2] = temp > 0 ? temp-1 : temp + i_vn + 1;
-                    // f->vn_indices[2] = temp-1;
+                    r = sv_parse_s32(&line, &temp);
+                    f->vn_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn + 1);
                 }
             }
         }

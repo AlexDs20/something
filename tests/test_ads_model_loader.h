@@ -3,11 +3,11 @@
 int test_model_read(void) {
     String filepath;
     ObjModel* model;
-    // filepath = string_init_cstr(arena, "assets/backpack/backpack.obj");
-    // model = model_read(arena, sv_from_string(filepath));
-
-    filepath = string_init_cstr(arena, "assets/cube.obj");
+    clock_t start = clock();
+    filepath = string_init_cstr(arena, "assets/backpack/backpack.obj");
     model = model_read(arena, sv_from_string(filepath));
+    clock_t end = clock();
+    printf("\nElapsed: %.5fs", (double)(end-start) / CLOCKS_PER_SEC);
 
     // // ASSERT_NOT_NULL(model);
 
