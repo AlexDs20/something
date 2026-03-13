@@ -1261,5 +1261,19 @@ int test_parser_f32(void) {
     ASSERT_EQ(r, 0);
     ASSERT_FLOAT_EQ(v, expected, 0.00001);
 
+    str = string_init_cstr(arena, "1.5e-4");
+    sv = sv_from_string(str);
+    r = sv_parse_f32(&sv, &v);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_FLOAT_EQ(v, 0.00015f, 0.00001);
+
+    str = string_init_cstr(arena, "-1.5e-4");
+    sv = sv_from_string(str);
+    r = sv_parse_f32(&sv, &v);
+
+    ASSERT_EQ(r, 0);
+    ASSERT_FLOAT_EQ(v, -0.00015f, 0.00001);
+
     return 0;
 }

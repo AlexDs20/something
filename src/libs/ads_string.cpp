@@ -1312,6 +1312,7 @@ enum CharType {
     SV_CHAR_ALPHA = 0x4,
     SV_CHAR_DOT   = 0x8,
     SV_CHAR_NEG   = 0x10,
+    SV_CHAR_EXP   = 0x20,
 };
 
 static uint8_t LUT[256] = {
@@ -1337,6 +1338,8 @@ static uint8_t LUT[256] = {
 
     ['.']  = SV_CHAR_DOT,
 
+    ['e']  = SV_CHAR_EXP,
+    ['E']  = SV_CHAR_EXP,
     // TODO continue when needed
 };
 
@@ -1423,7 +1426,7 @@ int sv_parse_s32(StringView* sv, int32_t* out) {
     return 0;
 }
 
-static double power_table[18] = {
+static double inv_power_table[18] = {
     1.0,
     0.1,
     0.01,
@@ -1442,6 +1445,27 @@ static double power_table[18] = {
     0.000000000000001,
     0.0000000000000001,
     0.00000000000000001,
+};
+
+static double power_table[18] = {
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0,
+    100000.0,
+    1000000.0,
+    10000000.0,
+    100000000.0,
+    1000000000.0,
+    10000000000.0,
+    100000000000.0,
+    1000000000000.0,
+    10000000000000.0,
+    100000000000000.0,
+    1000000000000000.0,
+    10000000000000000.0,
+    100000000000000000.0,
 };
 
 int sv_parse_f32(StringView* sv, float* out) {
@@ -1464,15 +1488,20 @@ int sv_parse_f32(StringView* sv, float* out) {
         sv->size--;
     }
 
-    // Decimal
-    uint64_t value = 0.0;
+    // Integer part
+    uint64_t integer = 0;
     while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
-        value = value*10 + sv->buffer[0]-'0';
+        integer = integer*10 + sv->buffer[0]-'0';
         sv->buffer++;
         sv->size--;
     }
 
+    if (integer > FLT_MAX) {
+        return -1;
+    }
+
     // Fractional
+    double decimal = 0.0;
     if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_DOT)) {
         sv->buffer++;
         sv->size--;
@@ -1489,18 +1518,53 @@ int sv_parse_f32(StringView* sv, float* out) {
             sv->size--;
         }
 
-        float t = (float)(value + (double)frac * power_table[power<18 ? power : 17]);
-        if (t > FLT_MAX) {
-            return -1;
-        }
-        *out = sign * t;
-        return 0;
+        decimal = (double)(frac * inv_power_table[power<18 ? power : 17]);
     }
 
-    if (value > FLT_MAX) {
+    // Handle scientific notation
+    uint8_t exp = 0;
+    int8_t exp_sign = 1;
+    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_EXP)) {
+        sv->buffer++;
+        sv->size--;
+        exp = 1;
+
+        if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_NEG)) {
+            sv->buffer++;
+            sv->size--;
+            exp_sign = -1;
+        }
+        else if ((sv->size > 0) && (sv->buffer[0] == '+')) {
+            sv->buffer++;
+            sv->size--;
+        }
+
+        exp = 0;
+        while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+            exp = exp*10 + sv->buffer[0]-'0';
+            sv->buffer++;
+            sv->size--;
+        }
+    }
+
+    double result = 0.0f;
+    if (exp == 0) {
+        result = sign * ((double)integer + decimal);
+    }
+    else {
+        if (exp_sign == 1) {
+            result = sign * ((double)integer + decimal) * power_table[exp<18 ? exp : 17];
+        }
+        else {
+            result = sign * ((double)integer + decimal) * inv_power_table[exp<18 ? exp : 17];
+        }
+    }
+
+    if (result > (double)FLT_MAX) {
         return -1;
     }
-    *out = (float)(sign * value);
+
+    *out = (float)result;
     return 0;
 }
 
