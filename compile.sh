@@ -9,8 +9,8 @@ else
 fi
 
 
-FLAGS="-g -ggdb -pg -O0 -Wall"
-# FLAGS="-O3 -ffast-math"
+# FLAGS="-g -ggdb -pg -O0 -Wall"
+FLAGS="-O3 -ffast-math"
 FLAGS+=" -march=native -masm=intel"
 FLAGS+=" -finstrument-functions" # -fsanitize=address"
 # SRC+=" gf_profiling.c"
