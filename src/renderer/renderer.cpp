@@ -369,12 +369,12 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
         Vertex c = *((Vertex*)model->vertices + f.v_indices[2]);
 
         // Scale to center of the screen
-        a.x = (a.x * 0.2f + 0.5f) * w;
-        a.y = (a.y * 0.2f + 0.5f) * h;
-        b.x = (b.x * 0.2f + 0.5f) * w;
-        b.y = (b.y * 0.2f + 0.5f) * h;
-        c.x = (c.x * 0.2f + 0.5f) * w;
-        c.y = (c.y * 0.2f + 0.5f) * h;
+        a.x *= w;
+        a.y *= h;
+        b.x *= w;
+        b.y *= h;
+        c.x *= w;
+        c.y *= h;
 
         draw_line(framebuffer, w, h, &a, &b, 0xFFA500);
         draw_line(framebuffer, w, h, &b, &c, 0xFFA500);
@@ -790,119 +790,72 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     // Lower half triangle
     if (b->y == c->y) {
         if (b->x <= c->x) {
-            fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            // fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         } else {
             fill_flat_top_triangle(a, c, b, va, vc, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         }
     }
     // Upper half triangle
     else if (a->y == b->y) {
-        if (a->x <= b->x) {
-            fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        } else {
-            fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        }
+        // if (a->x <= b->x) {
+        //     fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        // } else {
+        //     fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        // }
     }
     else {
-        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-        f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
-        f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
-        f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
+        // f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+        // f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
+        // f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
+        // f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
-        Vertex extra = {
-            .x = extra_x,
-            .y = b->y,
-            .z = extra_z,
-        };
+        // Vertex extra = {
+        //     .x = extra_x,
+        //     .y = b->y,
+        //     .z = extra_z,
+        // };
 
-        f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
-        f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
-        f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
-        f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
-        f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
-        f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
+        // f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
+        // f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
+        // f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
+        // f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
+        // f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
+        // f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
 
-        f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
-        f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
-        f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
-        f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
-        f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
-        f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
+        // f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
+        // f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
+        // f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
+        // f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
+        // f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
+        // f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
 
-        VertexAttrs ve = {
-            .u = extra_u,
-            .v = extra_v,
-            .w = extra_w,
-            .nx = extra_nx,
-            .ny = extra_ny,
-            .nz = extra_nz,
-        };
+        // VertexAttrs ve = {
+        //     .u = extra_u,
+        //     .v = extra_v,
+        //     .w = extra_w,
+        //     .nx = extra_nx,
+        //     .ny = extra_ny,
+        //     .nz = extra_nz,
+        // };
 
-        if (b->y > 0) {
-            if (b->x <= extra.x) {
-                fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-            } else {
-                fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-            }
-        }
-        if (b->y < h) {
-            if (extra.x <= b->x) {
-                fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-            } else {
-                fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-            }
-        }
+        // if (b->y > 0) {
+        //     if (b->x <= extra.x) {
+        //         fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        //     } else {
+        //         fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        //     }
+        // }
+        // if (b->y < h) {
+        //     if (extra.x <= b->x) {
+        //         fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        //     } else {
+        //         fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        //     }
+        // }
     }
 }
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-//#define NORMALIZE
-#ifdef NORMALIZE
-    f32 minx =  10000;
-    f32 maxx = -10000;
-    f32 miny =  10000;
-    f32 maxy = -10000;
-    f32 minz =  10000;
-    f32 maxz = -10000;
-    for (u64 i=0; i<model->n_faces; ++i) {
-        ObjFace* f = model->faces + i;
-
-        // Only use the x y components atm
-        // Can work with perspective and camera later
-        Vertex a = *((Vertex*)model->vertices + f->v_indices[0]);
-        Vertex b = *((Vertex*)model->vertices + f->v_indices[1]);
-        Vertex c = *((Vertex*)model->vertices + f->v_indices[2]);
-
-        minx = minx < a.x ? minx : a.x;
-        minx = minx < b.x ? minx : b.x;
-        minx = minx < c.x ? minx : c.x;
-        maxx = maxx > a.x ? maxx : a.x;
-        maxx = maxx > b.x ? maxx : b.x;
-        maxx = maxx > c.x ? maxx : c.x;
-
-        miny = miny < a.y ? minx : a.y;
-        miny = miny < b.y ? minx : b.y;
-        miny = miny < c.y ? minx : c.y;
-        maxy = maxy > a.y ? maxx : a.y;
-        maxy = maxy > b.y ? maxx : b.y;
-        maxy = maxy > c.y ? maxx : c.y;
-
-        minz = minz < a.z ? minz : a.z;
-        minz = minz < b.z ? minz : b.z;
-        minz = minz < c.z ? minz : c.z;
-        maxz = maxz > a.z ? maxz : a.z;
-        maxz = maxz > b.z ? maxz : b.z;
-        maxz = maxz > c.z ? maxz : c.z;
-    }
-#else
-    f32 minx =  10;
-    f32 maxx = -10;
-    f32 miny =  10;
-    f32 maxy = -10;
-    f32 minz =  10;
-    f32 maxz = -10;
-#endif
-
     for (u64 i=0; i<model->n_faces; ++i) {
         ObjFace* f = model->faces + i;
 
@@ -912,42 +865,16 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
         Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
         Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
 
-        // VertexAttrs va = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[0]-1);
-        // VertexAttrs vb = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[1]-1);
-        // VertexAttrs vc = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[2]-1);
-
         VertexAttrs va;
         VertexAttrs vb;
         VertexAttrs vc;
 
-
-        // Scale to center of the screen
-#if 0
-        a.x = (a.x - minx) * h / (maxy-miny);
-        b.x = (b.x - minx) * h / (maxy-miny);
-        c.x = (c.x - minx) * h / (maxy-miny);
-
-        a.y = (a.y - miny) * h / (maxy-miny);
-        b.y = (b.y - miny) * h / (maxy-miny);
-        c.y = (c.y - miny) * h / (maxy-miny);
-
-        a.z = (a.z - minz) / (maxz-minz);
-        b.z = (b.z - minz) / (maxz-minz);
-        c.z = (c.z - minz) / (maxz-minz);
-#else
-        a.x = (a.x * 0.2f + 0.5f) * w;
-        a.y = (a.y * 0.2f + 0.5f) * h;
-        b.x = (b.x * 0.2f + 0.5f) * w;
-        b.y = (b.y * 0.2f + 0.5f) * h;
-        c.x = (c.x * 0.2f + 0.5f) * w;
-        c.y = (c.y * 0.2f + 0.5f) * h;
-        // a.x *= w;
-        // a.y *= h;
-        // b.x *= w;
-        // b.y *= h;
-        // c.x *= w;
-        // c.y *= h;
-#endif
+        a.x = (a.x + 0.5f) * w;
+        a.y = (a.y + 0.3f) * h;
+        b.x = (b.x + 0.5f) * w;
+        b.y = (b.y + 0.3f) * h;
+        c.x = (c.x + 0.5f) * w;
+        c.y = (c.y + 0.3f) * h;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }

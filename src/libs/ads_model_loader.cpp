@@ -334,6 +334,10 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
                 *((char*)0) = 0;
             }
 
+            if (sv_find(line, sv_from_cstr("e")) < 15) {
+                0;
+            }
+
             r = sv_parse_f32(&line, &v->x);
             r = sv_parse_f32(&line, &v->y);
             r = sv_parse_f32(&line, &v->z);
@@ -376,7 +380,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             }
 
             r = sv_parse_s32(&line, &temp);
-            f->v_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v + 1);
+            f->v_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v +1);
 
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
@@ -391,7 +395,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             }
 
             r = sv_parse_s32(&line, &temp);
-            f->v_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v + 1);
+            f->v_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v +1);
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
                 r = sv_parse_s32(&line, &temp);
