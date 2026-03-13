@@ -1518,7 +1518,7 @@ int sv_parse_f32(StringView* sv, float* out) {
             sv->size--;
         }
 
-        decimal = (double)(frac * inv_power_table[power<18 ? power : 17]);
+        decimal = (double)frac * inv_power_table[power<18 ? power : 17];
     }
 
     // Handle scientific notation
@@ -1527,7 +1527,6 @@ int sv_parse_f32(StringView* sv, float* out) {
     if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_EXP)) {
         sv->buffer++;
         sv->size--;
-        exp = 1;
 
         if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_NEG)) {
             sv->buffer++;
@@ -1539,7 +1538,6 @@ int sv_parse_f32(StringView* sv, float* out) {
             sv->size--;
         }
 
-        exp = 0;
         while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
             exp = exp*10 + sv->buffer[0]-'0';
             sv->buffer++;
@@ -1558,10 +1556,6 @@ int sv_parse_f32(StringView* sv, float* out) {
         else {
             result = sign * ((double)integer + decimal) * inv_power_table[exp<18 ? exp : 17];
         }
-    }
-
-    if (result > (double)FLT_MAX) {
-        return -1;
     }
 
     *out = (float)result;
