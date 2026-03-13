@@ -790,68 +790,68 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     // Lower half triangle
     if (b->y == c->y) {
         if (b->x <= c->x) {
-            // fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         } else {
             fill_flat_top_triangle(a, c, b, va, vc, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
         }
     }
     // Upper half triangle
     else if (a->y == b->y) {
-        // if (a->x <= b->x) {
-        //     fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        // } else {
-        //     fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        // }
+        if (a->x <= b->x) {
+            fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        } else {
+            fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+        }
     }
     else {
-        // f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
-        // f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
-        // f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
-        // f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
+        f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
+        f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
+        f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
+        f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
-        // Vertex extra = {
-        //     .x = extra_x,
-        //     .y = b->y,
-        //     .z = extra_z,
-        // };
+        Vertex extra = {
+            .x = extra_x,
+            .y = b->y,
+            .z = extra_z,
+        };
 
-        // f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
-        // f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
-        // f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
-        // f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
-        // f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
-        // f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
+        f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
+        f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
+        f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
+        f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
+        f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
+        f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
 
-        // f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
-        // f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
-        // f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
-        // f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
-        // f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
-        // f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
+        f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
+        f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
+        f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
+        f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
+        f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
+        f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
 
-        // VertexAttrs ve = {
-        //     .u = extra_u,
-        //     .v = extra_v,
-        //     .w = extra_w,
-        //     .nx = extra_nx,
-        //     .ny = extra_ny,
-        //     .nz = extra_nz,
-        // };
+        VertexAttrs ve = {
+            .u = extra_u,
+            .v = extra_v,
+            .w = extra_w,
+            .nx = extra_nx,
+            .ny = extra_ny,
+            .nz = extra_nz,
+        };
 
-        // if (b->y > 0) {
-        //     if (b->x <= extra.x) {
-        //         fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        //     } else {
-        //         fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        //     }
-        // }
-        // if (b->y < h) {
-        //     if (extra.x <= b->x) {
-        //         fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        //     } else {
-        //         fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
-        //     }
-        // }
+        if (b->y > 0) {
+            if (b->x <= extra.x) {
+                fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
+        }
+        if (b->y < h) {
+            if (extra.x <= b->x) {
+                fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            } else {
+                fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            }
+        }
     }
 }
 
