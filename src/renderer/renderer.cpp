@@ -869,12 +869,21 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
         VertexAttrs vb;
         VertexAttrs vc;
 
-        a.x = (a.x + 0.5f) * w;
+        float t;
+        t = a.x;
+        a.x = (a.z + 0.5f) * w;
         a.y = (a.y + 0.3f) * h;
-        b.x = (b.x + 0.5f) * w;
+        a.z = (t+0.05f) * 0.4f;
+
+        t = b.x;
+        b.x = (b.z + 0.5f) * w;
         b.y = (b.y + 0.3f) * h;
-        c.x = (c.x + 0.5f) * w;
+        b.z = (t+0.05f) * 0.4f;
+
+        t = c.x;
+        c.x = (c.z + 0.5f) * w;
         c.y = (c.y + 0.3f) * h;
+        c.z = (t+0.05f) * 0.4f;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }
