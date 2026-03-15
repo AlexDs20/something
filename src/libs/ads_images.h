@@ -2,7 +2,7 @@
 #define ADS_IMAGE_H
 
 #include "memory/allocators.h"
-#include "libs/libstring.h"
+#include "libs/ads_string.h"
 
 typedef struct Image Image;
 struct Image {
@@ -22,7 +22,7 @@ struct Image {
 // /* bs*, jpeg*? as void* */void read_image_info(filename, &width, &height, &components, &precision);
 // void read_image_file(filename, &width, &height, &components);
 
-Image read_image_file(Arena* arena, string8 filename);
+Image read_image_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
 #endif

@@ -1,4 +1,5 @@
 #include "libs/ads_model_loader.h"
+#include "platform/io.h"
 #include <stdio.h>
 
 // TODO remove from here

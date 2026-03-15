@@ -18,12 +18,11 @@ typedef struct {
 } test_entry;
 
 test_entry tests[] = {
-#if 0
     //==============================
     // ADS_IMAGE
-    // {"JPEG_baseline_rgb", test_read_baseline_rgb},
-    // {"JPEG_baseline_gray", test_read_baseline_gray},
-    // {"JPEG_baseline_gray_2", test_read_baseline_gray_2},
+    {"JPEG_baseline_rgb", test_read_baseline_rgb},
+    {"JPEG_baseline_gray", test_read_baseline_gray},
+    {"JPEG_baseline_gray_2", test_read_baseline_gray_2},
 
     //==============================
     // ADS_STRING
@@ -90,7 +89,6 @@ test_entry tests[] = {
 
     {"test_sv_parse_u32", test_sv_parse_u32},
     {"test_sv_parse_s32", test_sv_parse_s32},
-#endif
     {"test_parser_f32", test_parser_f32},
 
     //==============================

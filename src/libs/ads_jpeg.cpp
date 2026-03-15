@@ -424,7 +424,7 @@ void print_bs(BitStream* bs) {
     printf("  bit: %d\n", bs->bit_pos);
 }
 
-u8* current_ptr(BitStream* bs) {
+const u8* current_ptr(BitStream* bs) {
     return bs->data + bs->byte_pos;
 }
 
@@ -848,7 +848,7 @@ ImageParsingResult parse_define_huffman_table(Arena* arena, BitStream* bs, Jpeg*
         }
 
         // Allocate space for all symbols
-        u8* symbols = (u8*)arena_alloc_push_struct(arena, current_ptr(bs), num_symbols*sizeof(u8));
+        u8* symbols = (u8*)arena_alloc_push_struct(arena, (void*)current_ptr(bs), num_symbols*sizeof(u8));
         skip_nbytes(bs, num_symbols);
         length -= num_symbols;
 
@@ -1982,15 +1982,15 @@ ImageParsingResult parse_scans(Arena* persist_arena, Arena* local_arena, BitStre
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out) {
+ImageParsingResult decode_jpeg(Arena* persist_arena, StringView data, Image* out) {
     return decode_jpeg(persist_arena, data, out, false);
 }
 
 // TODO(alex): This should not use Arena and string8 but standard C types.
-ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, bool flip_vertically) {
+ImageParsingResult decode_jpeg(Arena* persist_arena, StringView data, Image* out, bool flip_vertically) {
     // Note: Current goal is to support baseline DCT 8 bits
     BitStream bs = {
-        .data = data.buffer,
+        .data = (u8*)data.buffer,
         .size = data.size,
         .byte_pos = 0,
         .bit_pos = 0
@@ -2229,13 +2229,14 @@ ImageParsingResult decode_jpeg(Arena* persist_arena, string8 data, Image* out, b
     return (ImageParsingResult){IMAGE_SUCCESS, 0};
 }
 
-int read_jpeg_info(string8 filename, u16* width, u16* height, u8* components, u8* precision) {
+int read_jpeg_info(StringView filename, u16* width, u16* height, u8* components, u8* precision) {
     int success = 1;
     // Note: Current goal is to support baseline DCT 8 bits
     LocalArena* local_arena = local_arena_alloc_create();
-    string8 data = read_file(local_arena->arena, filename);
+    // TODO fixme
+    String data = read_complete_file(local_arena->arena, filename);
     BitStream bs = {
-        .data = data.buffer,
+        .data = (u8*)data.buffer,
         .size = data.size,
         .byte_pos = 0,
         .bit_pos = 0

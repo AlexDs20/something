@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>     // UINT32_MAX, ...
 
+#include "memory/allocators.h"
+
 // TODO:
 // Small String Optimization
 // UTF8
