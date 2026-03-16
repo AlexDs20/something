@@ -1,9 +1,9 @@
 #ifndef _ADS_MODEL_LOADER_H_
 #define _ADS_MODEL_LOADER_H_
 
-#include "memory/allocators.h"
 #include "libs/ads_string.h"
-#include "platform/io.h"
+
+struct Arena;
 
 typedef struct {
     float x, y, z;

@@ -8,7 +8,7 @@
 #endif
 
 typedef enum {
-    LOG_TRACE = 1 << 0
+    LOG_TRACE = 1 << 0,
     LOG_DEBUG = 1 << 1,
     LOG_INFO  = 1 << 2,
     LOG_WARN  = 1 << 3,

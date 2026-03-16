@@ -1,11 +1,8 @@
+#include <stdio.h>
 #include "libs/ads_model_loader.h"
 #include "platform/io.h"
-#include <stdio.h>
-
-// TODO remove from here
-#define GiB (1024*1024*1024)    // GiB
-#define MiB (1024*1024)         // MiB
-#define KiB (1024)              // KiB
+#include "utils/defines.h"
+#include "memory/allocators.h"
 
 static uint32_t count_mtl_mats(StringView filepath) {
     LocalArena* local_arena = local_arena_alloc_create();
@@ -521,4 +518,3 @@ ObjModel* model_read(Arena* arena, StringView filepath) {
     }
     return model;
 }
-

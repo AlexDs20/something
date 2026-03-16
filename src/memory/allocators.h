@@ -3,12 +3,13 @@
 
 #include "utils/types.h"
 
-typedef struct {
+typedef struct Arena Arena;
+struct Arena {
     u8* buffer;
     u64 capacity;
     u64 top;
     u64 committed;
-} Arena;
+};
 
 Arena* arena_alloc_create(u64 capacity);
 Arena* arena_alloc_create_zero(u64 capacity);

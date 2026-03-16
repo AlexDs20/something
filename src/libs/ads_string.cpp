@@ -1,8 +1,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
-#include "utils/defines.h"
 
+#include "utils/defines.h"
 #include "memory/allocators.h"
 #include "libs/ads_string.h"
 

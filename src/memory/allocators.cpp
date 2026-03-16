@@ -1,10 +1,8 @@
-#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
 #include "utils/defines.h"
 #include "memory/allocators.h"
-#include "allocators.h"
-#include "utils/types.h"
 #include "platform/memory.h"
 
 #define DEFAULT_ALIGN (sizeof(void*))                       // Bytes

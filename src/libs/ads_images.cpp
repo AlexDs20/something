@@ -1,5 +1,8 @@
 #include "libs/ads_string.h"
+#include "memory/allocators.h"
+#include "libs/ads_images.h"
 #include "libs/ads_jpeg.h"
+#include "platform/io.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "extern/stb_image.h"

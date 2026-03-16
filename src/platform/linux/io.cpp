@@ -1,15 +1,12 @@
-#include <stdio.h>
-#include <string.h>
-#include "utils/defines.h"
-#include "platform/io.h"
-#include "errno.h"
-
 #include <sys/mman.h>       // mmap
 #include <sys/stat.h>       // stat
 #include <stdio.h>          // perror
 #include <fcntl.h>          // open, O_RDONLY
 #include <stdlib.h>         // exit, ...
 #include <unistd.h>         // close, write
+
+#include "memory/allocators.h"
+#include "platform/io.h"
 
 void read_n_bytes(char* filepath, unsigned int n, char* buffer) {
     int fd = open(filepath, O_RDONLY);
