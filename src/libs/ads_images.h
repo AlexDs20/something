@@ -2,7 +2,7 @@
 #define ADS_IMAGE_H
 
 #include "libs/ads_string.h"
-#include "utils/types.h"
+#include "base/base.h"
 
 // From "memory/allocators.h"
 struct Arena;

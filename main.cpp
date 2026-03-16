@@ -4,12 +4,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "base/base.h"
 #include "memory/allocators.h"
 #include "platform/window.h"
 #include "renderer/renderer.h"
 #include "libs/ads_images.h"
-#include "utils/types.h"
-#include "utils/defines.h"
 #include "platform/memory.h"
 
 #include "libs/ads_string.h"

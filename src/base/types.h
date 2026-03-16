@@ -1,5 +1,5 @@
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef _ADS_TYPES_H_
+#define _ADS_TYPES_H_
 #include <stdint.h>
 
 typedef uint8_t  u8;
@@ -112,4 +112,4 @@ typedef union {
     s32 data[3];
 } s32x3;
 
-#endif  // _TYPES_H
+#endif  // _ADS_TYPES_H_

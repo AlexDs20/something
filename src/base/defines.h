@@ -1,5 +1,5 @@
-#ifndef _DEFINES_H
-#define _DEFINES_H
+#ifndef _ADS_DEFINES_H_
+#define _ADS_DEFINES_H_
 
 #if defined(__clang__)
 #elif defined(__GNUC__)
@@ -31,4 +31,4 @@
 #define PANIC
 #endif
 
-#endif // _DEFINES_H
+#endif // _ADS_DEFINES_H_

@@ -2,7 +2,7 @@
 #define _H_PLATFORM_MEMORY
 #include <stddef.h>
 #include <unistd.h>
-#include "utils/types.h"
+#include "base/base.h"
 
 typedef struct {
     void* ptr;

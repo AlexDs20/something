@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include "libs/ads_string.h"
-#include "utils/types.h"
+#include "base/base.h"
 #include "libs/ads_images.h"
 
 // Forward declare

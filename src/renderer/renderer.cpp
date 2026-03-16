@@ -4,9 +4,7 @@
 #include <stdlib.h>
 
 #include "renderer/renderer.h"
-// #include "libs/ads_math.h"
 #include "libs/ads_images.h"
-#include "utils/defines.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);

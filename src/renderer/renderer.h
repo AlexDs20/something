@@ -1,9 +1,12 @@
 #ifndef _RENDERER_H
 #define _RENDERER_H
 
-#include "utils/types.h"
-#include "libs/ads_images.h"
-#include "memory/allocators.h"
+#include "base/base.h"
+
+//#include "libs/ads_images.h"
+struct Image;
+// #include "memory/allocators.h"
+struct Arena;
 
 typedef struct {
     float x, y, z;

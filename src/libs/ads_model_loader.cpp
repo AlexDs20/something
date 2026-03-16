@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "libs/ads_model_loader.h"
 #include "platform/io.h"
-#include "utils/defines.h"
+#include "base/base.h"
 #include "memory/allocators.h"
 
 static uint32_t count_mtl_mats(StringView filepath) {

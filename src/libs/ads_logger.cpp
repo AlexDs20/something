@@ -1,8 +1,7 @@
 #include <stdio.h>
 
 #include "libs/ads_logger.h"
-#include "libs/ads_string.h"
-#include "utils/defines.h"
+#include "base/base.h"
 
 typedef struct {
     uint64_t length;

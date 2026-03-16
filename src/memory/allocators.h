@@ -1,7 +1,7 @@
 #ifndef _ALLOCATORS_H
 #define _ALLOCATORS_H
 
-#include "utils/types.h"
+#include "base/base.h"
 
 typedef struct Arena Arena;
 struct Arena {
