@@ -286,4 +286,70 @@ f32x3 normalize(f32x3 a) ;
 f32 dot(f32x3 a, f32x3 b) ;
 f32x3 cross(f32x3 a, f32x3 b) ;
 
+
+// // TODO:
+// // f32 ...
+// typedef struct {
+//     float x, y;
+// } V2f32;
+//
+// typedef struct {
+//     float x, y, z;
+// } V3f32;
+//
+// typedef struct {
+//     float x, y, z, w;
+// } V4f32;
+//
+// typedef struct {
+// } F32;
+//
+// typedef union {
+//     float m[16];
+//     float m4[4][4];
+//     struct {
+//         float m00, m01, m02, m03;
+//         float m10, m11, m12, m13;
+//         float m20, m21, m22, m23;
+//         float m30, m31, m32, m33;
+//     };
+//     struct {
+//         v4f32 row0;
+//         v4f32 row1;
+//         v4f32 row2;
+//         v4f32 row3;
+//     }
+// } Mat4f32;
+//
+// typedef struct {
+//     /*
+//     Quaternion class.
+//     A quaternion q = r + i \hat{i} + j \hat{j} + k \hat{k}
+//                    = (r,i,j,k)
+//     where r is the real part and i,j,k satisfy:
+//         i^2=j^2=k^2=ijk=-1
+//
+//     Quaternions can be used to perform the rotation of 3D vectors:
+//         v = (x,y,z)
+//         1)
+//         -> Create a quaternion: q_v = (0,x,y,z)
+//         This quaternion/3d vector can be rotated by angle around the axis:
+//         angle = 2*PI/3
+//         axis[3] = {1,0,0}
+//         q_v_rotated = q_v.rotate(angle, axis[0], axis[1], axis[2])
+//
+//         2)
+//         Create a rotation quaternion and rotate the vector
+//         Quaternion = q_rot(angle, axis[0], axis[1], axis[2]);
+//         q_rot.convert_to_rotation();
+//         q_rot.rotate(v[0], v[1], v[2]);
+//
+//         3)
+//         Quaternion = q_rot(angle, axis[0], axis[1], axis[2]);
+//         q_rot.convert_to_rotation();
+//         q_v.rotate(q_rot);
+//     */
+// } Quatf32;
+
+
 #endif // _LIBMATH_H

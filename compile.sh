@@ -8,7 +8,6 @@ else
     ENTRYPOINT="main.cpp"
 fi
 
-
 # FLAGS="-g -ggdb -pg -O0 -Wall"
 FLAGS="-O3 -ffast-math"
 FLAGS+=" -march=native -masm=intel"

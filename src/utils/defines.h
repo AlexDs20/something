@@ -25,4 +25,10 @@
 #define ASSERT(x)       do { } while (0)
 #endif
 
+#if defined(__DEBUG__)
+#define PANIC           do { *(volatile char*) 0 = __LINE__; } while (0)
+#else
+#define PANIC
+#endif
+
 #endif // _DEFINES_H

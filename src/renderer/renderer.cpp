@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "renderer/renderer.h"
-#include "libs/ads_math.h"
+// #include "libs/ads_math.h"
 #include "libs/ads_images.h"
 #include "utils/defines.h"
 
@@ -15,6 +15,28 @@ void print(Vertex* v) {
 void print(VertexAttrs* va) {
     printf("VertexAttrs: uvw=(%f,%f,%f) n=(%f,%f,%f)\n", va->u, va->v, va->w, va->nx, va->ny, va->nz);
 }
+
+
+//==============================
+// TODO Temporary!
+static f32x3
+cross(f32x3 a, f32x3 b) {
+    f32x3 result = {
+        .x = a.y*b.z - a.z*b.y,      \
+        .y = a.z*b.x - a.x*b.z,      \
+        .z = a.x*b.y - a.y*b.x       \
+    };
+    return result;
+}
+static f32
+maxf32(f32 a, f32 b) {
+    return a > b ? a : b;
+}
+static f32
+minf32(f32 a, f32 b) {
+    return a < b ? a : b;
+}
+//==============================
 
 
 static float

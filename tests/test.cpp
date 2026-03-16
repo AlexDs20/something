@@ -98,6 +98,10 @@ test_entry tests[] = {
     //==============================
     // PLATFORM_IO
     // {"test_read_complete_file", test_read_complete_file},
+
+    //==============================
+    // ADS_MATH
+    // {"test_ads_math", test_ads_math},
 };
 
 int main() {
