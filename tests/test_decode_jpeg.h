@@ -1,7 +1,4 @@
 #include "libs/ads_images.h"
-#include "memory/allocators.h"
-#include "utils/types.h"
-#include "utils/defines.h"
 
 int test_read_baseline_rgb() {
     StringView filename = sv_from_cstr("assets/backpack/diffuse.jpg");

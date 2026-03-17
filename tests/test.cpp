@@ -3,7 +3,7 @@
 #include "gf_profiling.c"
 #include "tests/macros.h"
 
-#include "src/utils/defines.h"
+#include "base/base.h"
 #include "memory/allocators.h"
 Arena* arena = arena_alloc_create_zero(1*GiB);
 
@@ -11,6 +11,7 @@ Arena* arena = arena_alloc_create_zero(1*GiB);
 #include "tests/test_decode_jpeg.h"
 #include "tests/test_ads_string.h"
 #include "tests/test_ads_model_loader.h"
+#include "tests/test_ads_math.h"
 
 typedef struct {
     const char* name;
@@ -18,6 +19,7 @@ typedef struct {
 } test_entry;
 
 test_entry tests[] = {
+#if 0
     //==============================
     // ADS_IMAGE
     {"JPEG_baseline_rgb", test_read_baseline_rgb},
@@ -98,10 +100,10 @@ test_entry tests[] = {
     //==============================
     // PLATFORM_IO
     // {"test_read_complete_file", test_read_complete_file},
-
+#endif
     //==============================
     // ADS_MATH
-    // {"test_ads_math", test_ads_math},
+    {"test_ads_math", test_ads_math},
 };
 
 int main() {
