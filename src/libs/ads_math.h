@@ -98,7 +98,7 @@ static inline f32x3 f32x3_project(f32x3 a, f32x3 N)             { ASSERT(f32_equ
 static inline f32x3 f32x3_lerp_fast(f32x3 a, f32x3 b, f32 t)    { return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t}; }
 static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t)         { return {a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t, a.z * (1.0f - t) + b.z * t}; }
 static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return acosf(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
-static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equal(f32_length2(N), 1.0f)); ASSERT(f32_equal(f32_length2(i), 1.0f)); f32 dot_ni = f32x3_dot(N, i); f32 k = 1.0f - eta * eta * (1.0f - dot_ni * dot_ni); if (k < 0.0f) { return {0.0f, 0.0f, 0.0f}; } return eta * i - (eta * dot_ni + f32_sqrt(k)) * N; }
+static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); ASSERT(f32_equal(f32x3_length2(i), 1.0f)); f32 dot_ni = f32x3_dot(N, i); f32 k = 1.0f - eta * eta * (1.0f - dot_ni * dot_ni); if (k < 0.0f) { return {0.0f, 0.0f, 0.0f}; } return eta * i - (eta * dot_ni + f32_sqrt(k)) * N; }
 
 
 // f32x4
