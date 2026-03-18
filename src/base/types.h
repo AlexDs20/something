@@ -16,16 +16,6 @@ typedef float  f32;
 typedef double f64;
 
 typedef union {
-    u32 data;
-    struct {
-        u8 a, r, g, b;
-    };
-    struct {
-        u8 _, Y, Cb, Cr;
-    };
-} u32Bytes;
-
-typedef union {
     f32 f;
     u32 u;
 } f32Bits;
@@ -55,61 +45,36 @@ typedef union {
 
 typedef union {
     struct {
-        u32 x, y;
+        f32 x, y, z, w;
     };
     struct {
-        u32 u, v;
+        f32 r, g, b, a;
     };
-    u32 data[2];
-} u32x2;
+    f32 data[4];
+} f32x4;
+
+typedef union {
+    // float data[16];
+    // float m4[4][4];
+    // struct {
+    //     f32 m00, m01, m02, m03;
+    //     f32 m10, m11, m12, m13;
+    //     f32 m20, m21, m22, m23;
+    //     f32 m30, m31, m32, m33;
+    // };
+    // struct {
+    //     f32x4 row0;
+    //     f32x4 row1;
+    //     f32x4 row2;
+    //     f32x4 row3;
+    // };
+} f32x4x4;
 
 typedef union {
     struct {
-        u32 x, y, z;
+        f32 x, y, z, w;
     };
-    struct {
-        u32 u, v, w;
-    };
-    struct {
-        u32 r, g, b;
-    };
-    struct {
-        u32 Y, Cb, Cr;
-    };
-    u32 data[3];
-} u32x3;
-
-typedef union {
-    struct {
-        u32 a, r, g, b;
-    };
-    struct {
-        u32 _, Y, Cb, Cr;
-    };
-    u32 data[4];
-} u32x4;
-
-typedef union {
-    struct {
-        s32 x, y;
-    };
-    struct {
-        s32 u, v;
-    };
-    s32 data[2];
-} s32x2;
-
-typedef union {
-    struct {
-        s32 x, y, z;
-    };
-    struct {
-        s32 u, v, w;
-    };
-    struct {
-        s32 Y, Cb, Cr;
-    };
-    s32 data[3];
-} s32x3;
+    f32 data[4];
+} Quaternion;
 
 #endif  // _ADS_TYPES_H_

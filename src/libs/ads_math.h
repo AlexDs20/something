@@ -51,6 +51,7 @@ static inline f32   f32x2_cross(f32x2 a, f32x2 b)               { return a.x * b
 static inline f32x2 f32x2_perpendicular(f32x2 a)                { return {-a.y, a.x}; }
 static inline f32x2 f32x2_lerp(f32x2 a, f32x2 b, f32 t)         { return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t}; }
 static inline bool  f32x2_interval_overlap(f32x2 a, f32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
+static inline f32   f32x2_angle(f32x2 a, f32x2 b)               { return f32x2_dot(a, b) / (f32x2_length(a) * f32x2_length(b)); }
 
 
 // f32x3
@@ -80,25 +81,23 @@ static inline f32x3 f32x3_normalize(f32x3 a)                    { f32 len = f32x
 static inline f32x3 f32x3_cross(f32x3 a, f32x3 b)               { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 static inline f32x3 f32x3_reflect(f32x3 a, f32x3 N)             { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return a - 2 * f32x3_dot(a, N) * N; }
 static inline f32x3 f32x3_project(f32x3 a, f32x3 N)             { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32x3_dot(a, N) * N; }
-static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t);
-static inline f32   f32x3_angle(f32x3 a, f32x3 b);
+static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t)         { return {a.x + (b.x - a.x) * t, a.x + (b.y - a.y) * t, a.z + (b.z - a.z) * t}; }
+static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return f32x3_cross(a, b) / (f32x3_length(a)*f32x3_length(b)); }
 static inline f32x3 f32x3_refract(f32x3 a, f32x3 N, f32 eta);
 
 
 // f32x4
-typedef struct f32x4 f32x4;
-struct f32x4 {
-    f32 data[4];
-    struct {
-        f32 x, y, z, w;
-    };
-};
+f32x4 f32x4_make(f32 x, f32 y, f32 z, f32 w);
+f32x4 f32x4_splat(f32 a);
+f32x4 f32x4_min(f32x4 a, f32x4 b);
+f32x4 f32x4_max(f32x4 a, f32x4 b);
 f32x4 operator+(f32x4 a, f32x4 b);
 f32x4 operator+(f32   a, f32x4 b);
 f32x4 operator+(f32x4 a, f32   b);
 f32x4 operator-(f32x4 a, f32x4 b);
 f32x4 operator-(f32   a, f32x4 b);
 f32x4 operator-(f32x4 a, f32   b);
+f32x4 operator-(f32x4 a);
 f32x4 operator*(f32x4 a, f32x4 b);
 f32x4 operator*(f32   a, f32x4 b);
 f32x4 operator*(f32x4 a, f32   b);
@@ -107,33 +106,13 @@ f32x4 operator/(f32   a, f32x4 b);
 f32x4 operator/(f32x4 a, f32   b);
 bool  operator==(f32x4 a, f32x4 b);
 bool  operator!=(f32x4 a, f32x4 b);
+f32   f32x4_dot(f32x4 a, f32x4 b);
 f32   f32x4_length2(f32x4 a);
 f32   f32x4_length (f32x4 a);
 f32x4 f32x4_normalize(f32x4 a);
-f32   f32x4_dot(f32x4 a, f32x4 b);
 
 // Matrix 4x4
-typedef union {
-    float data[16];
-    float m4[4][4];
-    struct {
-        f32 m00, m01, m02, m03;
-        f32 m10, m11, m12, m13;
-        f32 m20, m21, m22, m23;
-        f32 m30, m31, m32, m33;
-    };
-    struct {
-        f32x4 row0;
-        f32x4 row1;
-        f32x4 row2;
-        f32x4 row3;
-    };
-} f32x4x4;
 
 // Quaternion
-typedef union {
-    struct { f32 x, y, z, w; };
-    f32 data[4];
-} Quaternion;
 
 #endif // _ADS_MATH_H_
