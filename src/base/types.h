@@ -1,6 +1,12 @@
-#ifndef _ADS_TYPES_H_
-#define _ADS_TYPES_H_
+#ifndef ADS_TYPES_H
+#define ADS_TYPES_H
 #include <stdint.h>
+
+#ifdef ADS_SSE
+#include <xmmintrin.h>
+#endif
+
+#include "base/defines.h"
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -43,14 +49,13 @@ typedef union {
     f32 data[3];
 } f32x3;
 
-typedef union {
-    struct {
-        f32 x, y, z, w;
-    };
-    struct {
-        f32 r, g, b, a;
-    };
+typedef union ALIGN(16) {
+    struct { f32 x, y, z, w; };
+    struct { f32 r, g, b, a; };
     f32 data[4];
+#ifdef ADS_SSE
+    __m128 v;
+#endif
 } f32x4;
 
 typedef union {
@@ -77,4 +82,4 @@ typedef union {
     f32 data[4];
 } Quaternion;
 
-#endif  // _ADS_TYPES_H_
+#endif  // ADS_TYPES_H

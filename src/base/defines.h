@@ -1,11 +1,22 @@
-#ifndef _ADS_DEFINES_H_
-#define _ADS_DEFINES_H_
+#ifndef ADS_DEFINES_H
+#define ADS_DEFINES_H
 
 #if defined(__clang__)
 #elif defined(__GNUC__)
 #elif defined(_MSC_VER)
 #elif defined(__INTEL_COMPILER)
 #else
+#endif
+
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+    #include <stdalign.h>
+    #define ALIGN(N) alignas(N)
+#elif defined(_MSC_VER)
+    #define ALIGN(N) __declspec(align(N))
+#elif defined(__GNUC__) || defined(__clang__)
+    #define ALIGN(N) __attribute__((aligned(N)))
+#else
+    #error "No alignment support for this compiler"
 #endif
 
 #define global static
@@ -31,4 +42,4 @@
 #define PANIC
 #endif
 
-#endif // _ADS_DEFINES_H_
+#endif // ADS_DEFINES_H
