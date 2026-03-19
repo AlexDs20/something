@@ -28,15 +28,13 @@
 #define MiB (1024*1024)          // MiB
 #define GiB (1024*1024*1024)     // GiB
 
-#define EPS (1e-6)
-
-#if defined(__DEBUG__)
+#if defined(ADS_DEBUG)
 #define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
 #else
 #define ASSERT(x)       do { } while (0)
 #endif
 
-#if defined(__DEBUG__)
+#if defined(ADS_DEBUG)
 #define PANIC           do { *(volatile char*) 0 = __LINE__; } while (0)
 #else
 #define PANIC

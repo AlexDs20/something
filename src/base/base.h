@@ -1,7 +1,7 @@
-#ifndef _ADS_BASE_H_
-#define _ADS_BASE_H_
+#ifndef ADS_BASE_H
+#define ADS_BASE_H
 
 #include "base/types.h"
 #include "base/defines.h"
 
-#endif //_ADS_BASE_H_
+#endif //ADS_BASE_H

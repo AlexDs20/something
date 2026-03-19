@@ -1,5 +1,5 @@
-#ifndef _PLATFORM_IO_H
-#define _PLATFORM_IO_H
+#ifndef PLATFORM_IO_H
+#define PLATFORM_IO_H
 
 #include "libs/ads_string.h"
 struct Arena;

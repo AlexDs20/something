@@ -1,5 +1,5 @@
-#ifndef _ADS_STRING_H_
-#define _ADS_STRING_H_
+#ifndef ADS_STRING_H
+#define ADS_STRING_H
 
 #include <stddef.h>     // size_t
 #include <stdarg.h>     // va_list
@@ -162,4 +162,4 @@ int     string_shrink_to_fit(struct Arena* arena, String* str);
 void    string_print(const String* str);
 void    string_debug_print(const String* string);
 
-#endif  // _ADS_STRING_H_
+#endif  // ADS_STRING_H

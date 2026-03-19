@@ -1,5 +1,5 @@
-#ifndef _RENDERER_H
-#define _RENDERER_H
+#ifndef ADS_RENDERER_H
+#define ADS_RENDERER_H
 
 #include "base/base.h"
 
@@ -69,4 +69,4 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
 
-#endif
+#endif // ADS_RENDERER_H

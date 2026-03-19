@@ -197,10 +197,12 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
     // printf("[%d,%d]\n", miny, maxy);
 }
 
+#define EPS (1e-6)
 f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
     f32x3 v1 = {.x = C->x-A->x, .y = B->x-A->x, .z = A->x-P.x};
     f32x3 v2 = {.x = C->y-A->y, .y = B->y-A->y, .z = A->y-P.y};
     f32x3 u = cross(v1, v2);
+
     if (absf32(u.z) <= EPS) {
         return {.x = -1, .y = -1, .z = -1};
     }

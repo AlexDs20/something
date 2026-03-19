@@ -58,21 +58,21 @@ typedef union ALIGN(16) {
 #endif
 } f32x4;
 
-typedef union {
-    // float data[16];
-    // float m4[4][4];
-    // struct {
-    //     f32 m00, m01, m02, m03;
-    //     f32 m10, m11, m12, m13;
-    //     f32 m20, m21, m22, m23;
-    //     f32 m30, m31, m32, m33;
-    // };
-    // struct {
-    //     f32x4 row0;
-    //     f32x4 row1;
-    //     f32x4 row2;
-    //     f32x4 row3;
-    // };
+typedef union ALIGN(16) {
+    float data[16];
+    float m4[4][4];
+    struct {
+        f32 m00, m01, m02, m03;
+        f32 m10, m11, m12, m13;
+        f32 m20, m21, m22, m23;
+        f32 m30, m31, m32, m33;
+    };
+    struct {
+        f32x4 row0;
+        f32x4 row1;
+        f32x4 row2;
+        f32x4 row3;
+    };
 } f32x4x4;
 
 typedef union {

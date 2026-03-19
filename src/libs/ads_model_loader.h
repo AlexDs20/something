@@ -1,5 +1,5 @@
-#ifndef _ADS_MODEL_LOADER_H_
-#define _ADS_MODEL_LOADER_H_
+#ifndef ADS_MODEL_LOADER_H
+#define ADS_MODEL_LOADER_H
 
 #include "libs/ads_string.h"
 
@@ -82,5 +82,4 @@ ObjModel*   model_read(Arena* arena, StringView filepath);
 // ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
 
 
-#endif // _ADS_MODEL_LOADER_H_
-
+#endif // ADS_MODEL_LOADER_H

@@ -1,5 +1,5 @@
-#ifndef _ADS_LOGGER_H_
-#define _ADS_LOGGER_H_
+#ifndef ADS_LOGGER_H
+#define ADS_LOGGER_H
 
 #include "libs/ads_string.h"
 
@@ -20,4 +20,4 @@ void log_sv(LogLevel lvl, StringView sv);
 void log_string(LogLevel lvl, String str);
 #define ADS_LOG(level, cstr)   log_sv(level, sv_from_cstr(cstr))
 
-#endif //_ADS_LOGGER_H_
+#endif //ADS_LOGGER_H

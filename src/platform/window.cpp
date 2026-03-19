@@ -1,8 +1,8 @@
-#if defined(_LINUX)
-#if defined(_X11)
+#ifdef ADS_LINUX
+#ifdef ADS_X11
 // TODO(alex): Handle Xlib / XKB
 #include "platform/linux/xlib.cpp"
-#elif defined(_WAYLAND)
+#elif defined(ADS_WAYLAND)
 // TODO(alex): Handle Wayland
 #endif
 // TODO(alex): Handle Windows + Mac

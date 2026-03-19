@@ -1,5 +1,5 @@
-#ifndef _ALLOCATORS_H
-#define _ALLOCATORS_H
+#ifndef ADS_ALLOCATORS_H
+#define ADS_ALLOCATORS_H
 
 #include "base/base.h"
 
@@ -84,4 +84,4 @@ Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 //  - Get pointer
 //  - Copy only data
 
-#endif  // _ALLOCATORS_H
+#endif  // ADS_ALLOCATORS_H

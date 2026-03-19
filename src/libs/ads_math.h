@@ -132,6 +132,12 @@ static inline f32x4 f32x4_normalize(f32x4 a)                    { f32 len2 = f32
 
 // Matrix 4x4
 // Row major pre-multiplication
+static inline f32x4x4 f32x4x4_make(f32x4 row0, f32x4 row1, f32x4 row2, f32x4 row3)  {f32x4x4 r; r.row0=row0; r.row1=row1; r.row2=row2; r.row3=row3;}
+static inline f32x4x4 operator+(f32x4x4 a, f32x4x4 b);
+static inline f32x4x4 operator-(f32x4x4 a, f32x4x4 b);
+static inline f32x4x4 operator*(f32x4x4 a, f32x4x4 b);
+static inline f32x4x4 operator*(f32x4x4 a, f32x4   b);
+static inline f32x4x4 f32x4x4_transpose(f32x4x4 a);
 
 // Quaternion
 
