@@ -13,7 +13,7 @@ FLAGS="-O3 -ffast-math"
 FLAGS+=" -march=native -masm=intel"
 FLAGS+=" -finstrument-functions" # -fsanitize=address"
 # SRC+=" gf_profiling.c"
-DEFINES="-D__DEBUG__"
+DEFINES="-DADS_DEBUG -DADS_SSE"
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I. -I./src/"
@@ -34,12 +34,12 @@ fi
 
 # Handle platform and define needed stuff
 if [[ $(uname) == "Linux" ]]; then
-    DEFINES="-D_LINUX ${DEFINES}"
+    DEFINES="-DADS_LINUX ${DEFINES}"
     if [[ $XDG_SESSION_TYPE == "x11" ]]; then
-        DEFINES="-D_X11 ${DEFINES}"
+        DEFINES="-DADS_X11 ${DEFINES}"
         LINKS="-lX11 ${LINKS}"
     elif [[ $XDG_SESSION_TYPE == "wayland" ]]; then
-        DEFINES="-D_WAYLAND ${DEFINES}"
+        DEFINES="-DADS_WAYLAND ${DEFINES}"
         echo "WAYLAND NOT SUPPORTED"
         exit -1
     fi
