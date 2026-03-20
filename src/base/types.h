@@ -60,7 +60,7 @@ typedef union ALIGN(16) {
 
 typedef union ALIGN(16) {
     float data[16];
-    float m4[4][4];
+    float m[4][4];
     struct {
         f32 m00, m01, m02, m03;
         f32 m10, m11, m12, m13;

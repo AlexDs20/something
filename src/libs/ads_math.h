@@ -131,13 +131,54 @@ static inline f32   f32x4_length (f32x4 a)                      { return f32_sqr
 static inline f32x4 f32x4_normalize(f32x4 a)                    { f32 len2 = f32x4_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return a * inv; }
 
 // Matrix 4x4
-// Row major pre-multiplication
-static inline f32x4x4 f32x4x4_make(f32x4 row0, f32x4 row1, f32x4 row2, f32x4 row3)  {f32x4x4 r; r.row0=row0; r.row1=row1; r.row2=row2; r.row3=row3;}
-static inline f32x4x4 operator+(f32x4x4 a, f32x4x4 b);
-static inline f32x4x4 operator-(f32x4x4 a, f32x4x4 b);
-static inline f32x4x4 operator*(f32x4x4 a, f32x4x4 b);
-static inline f32x4x4 operator*(f32x4x4 a, f32x4   b);
-static inline f32x4x4 f32x4x4_transpose(f32x4x4 a);
+// Row major
+static inline f32x4x4 f32x4x4_make(f32x4 row0, f32x4 row1, f32x4 row2, f32x4 row3)  {f32x4x4 r; r.row0=row0; r.row1=row1; r.row2=row2; r.row3=row3; return r;}
+static inline f32x4x4 operator+(f32x4x4 a, f32x4x4 b)           { f32x4x4 result; result.row0 = a.row0 + b.row0; result.row1 = a.row1 + b.row1; result.row2 = a.row2 + b.row2; result.row3 = a.row3 + b.row3; return result; }
+static inline f32x4x4 operator-(f32x4x4 a, f32x4x4 b)           { f32x4x4 result; result.row0 = a.row0 - b.row0; result.row1 = a.row1 - b.row1; result.row2 = a.row2 - b.row2; result.row3 = a.row3 - b.row3; return result; }
+static inline f32x4x4 operator*(f32x4x4 a, f32x4x4 b) {
+    f32x4x4 result = {0.0f};
+    result.m[0][0] = a.m[0][0]*b.m[0][0] + a.m[0][1]*b.m[1][0] + a.m[0][2]*b.m[2][0] + a.m[0][3]*b.m[3][0];
+    result.m[0][1] = a.m[0][0]*b.m[0][1] + a.m[0][1]*b.m[1][1] + a.m[0][2]*b.m[2][1] + a.m[0][3]*b.m[3][1];
+    result.m[0][2] = a.m[0][0]*b.m[0][2] + a.m[0][1]*b.m[1][2] + a.m[0][2]*b.m[2][2] + a.m[0][3]*b.m[3][2];
+    result.m[0][3] = a.m[0][0]*b.m[0][3] + a.m[0][1]*b.m[1][3] + a.m[0][2]*b.m[2][3] + a.m[0][3]*b.m[3][3];
+
+    result.m[1][0] = a.m[1][0]*b.m[0][0] + a.m[1][1]*b.m[1][0] + a.m[1][2]*b.m[2][0] + a.m[1][3]*b.m[3][0];
+    result.m[1][1] = a.m[1][0]*b.m[0][1] + a.m[1][1]*b.m[1][1] + a.m[1][2]*b.m[2][1] + a.m[1][3]*b.m[3][1];
+    result.m[1][2] = a.m[1][0]*b.m[0][2] + a.m[1][1]*b.m[1][2] + a.m[1][2]*b.m[2][2] + a.m[1][3]*b.m[3][2];
+    result.m[1][3] = a.m[1][0]*b.m[0][3] + a.m[1][1]*b.m[1][3] + a.m[1][2]*b.m[2][3] + a.m[1][3]*b.m[3][3];
+
+    result.m[2][0] = a.m[2][0]*b.m[0][0] + a.m[2][1]*b.m[1][0] + a.m[2][2]*b.m[2][0] + a.m[2][3]*b.m[3][0];
+    result.m[2][1] = a.m[2][0]*b.m[0][1] + a.m[2][1]*b.m[1][1] + a.m[2][2]*b.m[2][1] + a.m[2][3]*b.m[3][1];
+    result.m[2][2] = a.m[2][0]*b.m[0][2] + a.m[2][1]*b.m[1][2] + a.m[2][2]*b.m[2][2] + a.m[2][3]*b.m[3][2];
+    result.m[2][3] = a.m[2][0]*b.m[0][3] + a.m[2][1]*b.m[1][3] + a.m[2][2]*b.m[2][3] + a.m[2][3]*b.m[3][3];
+
+    result.m[3][0] = a.m[3][0]*b.m[0][0] + a.m[3][1]*b.m[1][0] + a.m[3][2]*b.m[2][0] + a.m[3][3]*b.m[3][0];
+    result.m[3][1] = a.m[3][0]*b.m[0][1] + a.m[3][1]*b.m[1][1] + a.m[3][2]*b.m[2][1] + a.m[3][3]*b.m[3][1];
+    result.m[3][2] = a.m[3][0]*b.m[0][2] + a.m[3][1]*b.m[1][2] + a.m[3][2]*b.m[2][2] + a.m[3][3]*b.m[3][2];
+    result.m[3][3] = a.m[3][0]*b.m[0][3] + a.m[3][1]*b.m[1][3] + a.m[3][2]*b.m[2][3] + a.m[3][3]*b.m[3][3];
+    return result;
+}
+static inline f32x4 operator*(f32x4x4 a, f32x4   b) {
+    f32x4 result;
+
+    result.data[0] = a.m[0][0]*b.data[0] + a.m[0][1]*b.data[1] + a.m[0][2]*b.data[2] + a.m[0][3]*b.data[3];
+    result.data[1] = a.m[1][0]*b.data[0] + a.m[1][1]*b.data[1] + a.m[1][2]*b.data[2] + a.m[1][3]*b.data[3];
+    result.data[2] = a.m[2][0]*b.data[0] + a.m[2][1]*b.data[1] + a.m[2][2]*b.data[2] + a.m[2][3]*b.data[3];
+    result.data[3] = a.m[3][0]*b.data[0] + a.m[3][1]*b.data[1] + a.m[3][2]*b.data[2] + a.m[3][3]*b.data[3];
+
+    return result;
+}
+static inline f32x4x4 f32x4x4_transpose(f32x4x4 a) {
+    f32x4x4 result;
+
+    for (u8 i=0; i<4; i++) {
+        for (u8 j=0; j<4; j++) {
+            result.m[i][j] = a.m[j][i];
+        }
+    }
+
+    return result;
+}
 
 // Quaternion
 

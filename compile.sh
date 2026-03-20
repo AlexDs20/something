@@ -13,7 +13,7 @@ FLAGS="-O3 -ffast-math"
 FLAGS+=" -march=native -masm=intel"
 FLAGS+=" -finstrument-functions" # -fsanitize=address"
 # SRC+=" gf_profiling.c"
-DEFINES="-DADS_DEBUG -DADS_SSE"
+DEFINES="-DADS_DEBUG" # -DADS_SSE"
 LINKS="-lc"
 LINKSDIR=
 INCLUDES="-I. -I./src/"
