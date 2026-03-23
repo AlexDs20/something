@@ -46,7 +46,12 @@ typedef union {
     struct {
         f32 r, g, b;
     };
-    f32 data[3];
+    struct {
+        f32 data[3];
+#ifdef ADS_SSE
+        f32 pad;
+#endif
+    };
 } f32x3;
 
 typedef union ALIGN(16) {
@@ -75,11 +80,8 @@ typedef union ALIGN(16) {
     };
 } f32x4x4;
 
-typedef union {
-    struct {
-        f32 x, y, z, w;
-    };
-    f32 data[4];
+typedef struct ALIGN(16) {
+    f32x4 d;
 } Quaternion;
 
 #endif  // ADS_TYPES_H
