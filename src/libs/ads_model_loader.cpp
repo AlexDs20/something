@@ -3,6 +3,11 @@
 #include "platform/io.h"
 #include "base/base.h"
 #include "memory/allocators.h"
+#include "libs/ads_images.h"
+
+// TODO: Hash map of currently loaded textures which contains a count of how many times its used
+//  So when free we free only when the count is down to 0
+//  Until I have made this we make it the ugly way by loading the textures several times
 
 static uint32_t count_mtl_mats(StringView filepath) {
     LocalArena* local_arena = local_arena_alloc_create();
@@ -27,7 +32,7 @@ static uint32_t count_mtl_mats(StringView filepath) {
     return n;
 }
 
-static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView filepath) {
+static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView filepath) {
     /*
      * Sources:
      * https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -35,6 +40,8 @@ static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView fil
      * https://paulbourke.net/dataformats/mtl/
      */
     LocalArena* local_arena = local_arena_alloc_create();
+
+    StringView basedir = sv_directory_name(filepath);
 
     String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
@@ -58,7 +65,7 @@ static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView fil
             }
 
             current_mats->name = sv_from_string(
-                    string_init_sv(string_arena, sv_trim_front(line))
+                    string_init_sv(persist_arena, sv_trim_front(line))
                     );
         }
         else if (sv_starts_with_cstr(line, "Ka ")) {        // ambient color
@@ -115,47 +122,111 @@ static void read_mtl_file(Arena* string_arena, ObjMaterial* mats, StringView fil
         // }
         else if (sv_starts_with_cstr(line, "map_Ka ")) {    // texture map ambient color
             line = sv_truncate_front(line, 7);
-            current_mats->map_Ka = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Ka = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Ka);
+            current_mats->map_Ka.data       = img.data;
+            current_mats->map_Ka.width      = img.width;
+            current_mats->map_Ka.height     = img.height;
+            current_mats->map_Ka.components = img.components;
         }
         else if (sv_starts_with_cstr(line, "map_Kd ")) {    // texture map diffuse color
             line = sv_truncate_front(line, 7);
-            current_mats->map_Kd = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Kd = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Kd);
+            current_mats->map_Kd.data       = img.data;
+            current_mats->map_Kd.width      = img.width;
+            current_mats->map_Kd.height     = img.height;
+            current_mats->map_Kd.components = img.components;
         }
         else if (sv_starts_with_cstr(line, "map_Ks ")) {    // texture map specular color
             line = sv_truncate_front(line, 7);
-            current_mats->map_Ks = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Ks = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Ks);
+            current_mats->map_Ks.data       = img.data;
+            current_mats->map_Ks.width      = img.width;
+            current_mats->map_Ks.height     = img.height;
+            current_mats->map_Ks.components = img.components;
         }
         // else if (sv_starts_with_cstr(line, "map_Ns ")) {    // specular highlight component
         // }
         else if (sv_starts_with_cstr(line, "map_d ")) {     // alpha texture map
             line = sv_truncate_front(line, 6);
-            current_mats->map_d = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_d = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_d);
+            current_mats->map_d.data       = img.data;
+            current_mats->map_d.width      = img.width;
+            current_mats->map_d.height     = img.height;
+            current_mats->map_d.components = img.components;
         }
         else if (sv_starts_with_cstr(line, "map_bump ")) {  // map_bump and bump: same
             line = sv_truncate_front(line, 9);
-            current_mats->map_Bump = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
         }
         else if (sv_starts_with_cstr(line, "map_Bump ")) {
             line = sv_truncate_front(line, 9);
-            current_mats->map_Bump = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
         }
         else if (sv_starts_with_cstr(line, "bump ")) {
             line = sv_truncate_front(line, 5);
-            current_mats->map_Bump = sv_from_string(
-                                    string_init_sv(string_arena, sv_trim_front(line))
-                                    );        }
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
+        }
         // else if (sv_starts_with_cstr(line, "disp ")) {      // displacement map
         // }
         // else if (sv_starts_with_cstr(line, "decal ")) {     // stencial decal texture
@@ -441,12 +512,12 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             ObjMaterial* mat = current_mats++;
             read_mtl_file(persist_arena, mat, mtl_file);
+
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
         }
         else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
             StringView group_name = sv_truncate_front(line, 2);
-            // printf("\n");
             // sv_print(group_name);
 
             current_group++;
@@ -473,18 +544,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
     }
 
-    // *(char*)0=0;
-    // for (int i=0; i<obj_model->n_faces; i++) {
-    //     u32 a = obj_model->faces[i].v_indices[0];
-    //     u32 b = obj_model->faces[i].v_indices[1];
-    //     u32 c = obj_model->faces[i].v_indices[2];
-    //     printf("\nFace: %d, idx: (%u,%u,%u)", i, a, b, c);
-    //     printf("\nVertices:\n\t1: (%.4f,%.4f,%.4f)\n\t2: ",
-    //             obj_model->vertices[a].x,
-    //             obj_model->vertices[a].y,
-    //             obj_model->vertices[a].z
-    //     );
-    // }
     local_arena_alloc_reset(local_arena);
     return obj_model;
 }
@@ -511,6 +570,8 @@ ObjModel* model_read(Arena* arena, StringView filepath) {
     }
     // else if (sv_equal(ext, sv_from_cstr(".gltf"))) {
     //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+    // }
+    // else if (sv_equal(ext, sv_from_cstr(".fbx"))) {
     // }
     else {
         *(volatile char*)0=0;

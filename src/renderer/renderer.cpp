@@ -3,8 +3,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "libs/ads_model_loader.h"
 #include "renderer/renderer.h"
-#include "libs/ads_images.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -279,23 +279,22 @@ void shader_frag_depth(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
 void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 width, u32 height, f32* zbuffer, u32* framebuffer) {
-    // TextureContext* texture_context = ((TextureContex*)shader_ctx);
-    // Check if ARGB ...
-    // u32 color = texture_context[texture_x*texture_w + texture_y];
-    // u32 color = 0xFF773377;
+    // va->u,v,w => are the texture coordinates
+    // w0, w1, w2 => barycentric coords
+
+    TextureContext* ctx = (TextureContext*)shader_ctx;
+    Texture* texture = ctx->texture;
+
     f32 u = w0*va->u + w1*vb->u + w2*vc->u;
     f32 v = w0*va->v + w1*vb->v + w2*vc->v;
     f32 w = w0*va->w + w1*vb->w + w2*vc->w;
-    // u32 color = (0xFF << 24) | ((u8)(255*u) << 16) | ((u8)(255*v) << 8) | ((u8)(255*w) << 0);
 
-    Image* texture = ((TextureContext*)(shader_ctx))->texture;
     // TODO: NEAREST or BILINEAR INTERP
     //  LoD?
     u32 texture_x = (u32)(u * texture->width);
     u32 texture_y = (u32)(v * texture->height);
 
     framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
-    // framebuffer[y*width+x] = color;
 }
 
 inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
@@ -607,6 +606,13 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 }
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    static bool shown = false;
+    if (!shown) {
+        printf("\nmodel->materials[0].map_Kd.data: %p", model->materials[0].map_Kd.data);
+        printf("\nmodel->texcoords: %p", model->texcoords);
+        printf("\n");
+        shown = true;
+    }
     for (u64 i=0; i<model->n_faces; ++i) {
         ObjFace* f = model->faces + i;
 
@@ -616,25 +622,39 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
         Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
         Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
 
-        VertexAttrs va;
-        VertexAttrs vb;
-        VertexAttrs vc;
+        VertexAttrs va = {
+            .u = (model->texcoords + f->vt_indices[0])->x,
+            .v = (model->texcoords + f->vt_indices[0])->y,
+            .w = (model->texcoords + f->vt_indices[0])->z,
+            .nx = (model->normals  + f->vn_indices[0])->x,
+            .ny = (model->normals  + f->vn_indices[0])->y,
+            .nz = (model->normals  + f->vn_indices[0])->z,
+        };
+        VertexAttrs vb = {
+            .u = (model->texcoords + f->vt_indices[1])->x,
+            .v = (model->texcoords + f->vt_indices[1])->y,
+            .w = (model->texcoords + f->vt_indices[1])->z,
+            .nx = (model->normals  + f->vn_indices[1])->x,
+            .ny = (model->normals  + f->vn_indices[1])->y,
+            .nz = (model->normals  + f->vn_indices[1])->z,
+        };
+        VertexAttrs vc = {
+            .u = (model->texcoords + f->vt_indices[2])->x,
+            .v = (model->texcoords + f->vt_indices[2])->y,
+            .w = (model->texcoords + f->vt_indices[2])->z,
+            .nx = (model->normals  + f->vn_indices[2])->x,
+            .ny = (model->normals  + f->vn_indices[2])->y,
+            .nz = (model->normals  + f->vn_indices[2])->z,
+        };
 
-        float t;
-        t = a.x;
-        a.x = (a.z + 0.5f) * w;
-        a.y = (a.y + 0.3f) * h;
-        a.z = (t+0.05f) * 0.4f;
+        a.x = (a.x / 10 + 0.5f) * w;
+        a.y = (a.y / 10 + 0.3f) * h;
 
-        t = b.x;
-        b.x = (b.z + 0.5f) * w;
-        b.y = (b.y + 0.3f) * h;
-        b.z = (t+0.05f) * 0.4f;
+        b.x = (b.x / 10 + 0.5f) * w;
+        b.y = (b.y / 10 + 0.3f) * h;
 
-        t = c.x;
-        c.x = (c.z + 0.5f) * w;
-        c.y = (c.y + 0.3f) * h;
-        c.z = (t+0.05f) * 0.4f;
+        c.x = (c.x / 10 + 0.5f) * w;
+        c.y = (c.y / 10 + 0.3f) * h;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }

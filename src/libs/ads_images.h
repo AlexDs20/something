@@ -40,4 +40,5 @@ struct ImageParsingResult {
 Image read_image_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
+
 #endif

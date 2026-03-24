@@ -63,27 +63,33 @@ Image read_image_file(Arena* persist_arena, StringView filename) {
     LocalArena* local_arena = local_arena_alloc_create();
     u64 checkpoint = arena_alloc_checkpoint(persist_arena);
 
-    sv_print(filename);
     String data_str = read_complete_file(local_arena->arena, filename);
     StringView data = sv_from_string(data_str);
     StringView extension = sv_file_extension(filename);
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
     if (sv_equal(extension, sv_from_cstr(".jpg")) || sv_equal(extension, sv_from_cstr(".jpeg"))) {
-        u16 width;
-        u16 height;
-        u8 components;
-        u8 precision;
-        read_jpeg_info(filename, &width, &height, &components, &precision);
-
+        // u16 width;
+        // u16 height;
+        // u8 components;
+        // u8 precision;
+        // read_jpeg_info(filename, &width, &height, &components, &precision);
         result = decode_jpeg(persist_arena, data, &out);
+
+        // const char* f = sv_as_cstr(local_arena->arena, filename);
+        // int w, h, c;
+        // out.gray = stbi_load(f, &w, &h, &c, 4);
+        // out.width = w;
+        // out.height = h;
+        // out.components = c;
     } else if (sv_equal(extension, sv_from_cstr(".png"))) {
         const char* f = sv_as_cstr(local_arena->arena, filename);
         int w, h, c;
-        // out.gray = stbi_load(f, &w, &h, &c, 0);
+        out.gray = stbi_load(f, &w, &h, &c, 0);
         out.width = w;
         out.height = h;
         out.components = c;
+
         // TODO(alex): Own png decoder
         // decode_png(persist_arena, data, &out);
     } else {

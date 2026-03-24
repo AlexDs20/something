@@ -3,10 +3,12 @@
 
 #include "base/base.h"
 
-//#include "libs/ads_images.h"
-struct Image;
+//#include "libs/ads_model_loader.h"
+struct ObjModel;
+struct Texture;
 // #include "memory/allocators.h"
 struct Arena;
+
 
 typedef struct {
     float x, y, z;
@@ -46,8 +48,7 @@ typedef struct {
 } ColorContext;
 
 typedef struct {
-    Image* texture;
-    u64 face_idx;
+    Texture* texture;
 } TextureContext;
 
 void shader_frag_color  (void* shader_ctx,
@@ -64,7 +65,6 @@ void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
 
 
-#include "libs/ads_model_loader.h"
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);

@@ -13,6 +13,14 @@ typedef struct {
     float u, v;
 } Vec2f;
 
+typedef struct Texture Texture;
+struct Texture {
+    unsigned int* data;
+    unsigned short width;
+    unsigned short height;
+    unsigned char components;
+};
+
 typedef struct {
     StringView name;        // newmtl
 
@@ -29,11 +37,17 @@ typedef struct {
     uint32_t illum;         // illumination
 
     // Textures
-    StringView map_Ka;      // ambient color
-    StringView map_Kd;      // diffuse texture
-    StringView map_Ks;      // specular texture
-    StringView map_Bump;    // normal map
-    StringView map_d;       // alpha texture map
+    StringView sv_map_Ka;      // ambient color
+    StringView sv_map_Kd;      // diffuse texture
+    StringView sv_map_Ks;      // specular texture
+    StringView sv_map_Bump;    // normal map
+    StringView sv_map_d;       // alpha texture map
+
+    Texture map_Ka;
+    Texture map_Kd;
+    Texture map_Ks;
+    Texture map_Bump;
+    Texture map_d;
 } ObjMaterial;
 
 typedef struct {
@@ -54,7 +68,8 @@ typedef struct {
     int material_index;
 } ObjGroup;
 
-typedef struct {
+typedef struct ObjModel;
+struct ObjModel {
     Vec3f* vertices;
     Vec3f* texcoords;
     Vec3f* normals;
@@ -71,7 +86,7 @@ typedef struct {
 
     // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;
-} ObjModel;
+};
 
 // typedef struct {
 // } Model;
@@ -80,6 +95,5 @@ ObjModel*   model_read(Arena* arena, StringView filepath);
 // ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
 // ObjModel*   model_create_default_model(Arena* arena);
 // ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
-
 
 #endif // ADS_MODEL_LOADER_H

@@ -10,6 +10,8 @@ constexpr f32 F32_EPSILON = 1e-6f;
 constexpr f32 F32_ABS_EPSILON = 1e-8f;
 
 // f32
+static inline f32   f32_ninf(void)                              { f32Bits t = {.u = 0xFF800000}; return t.f; }
+static inline f32   f32_inf(void)                               { f32Bits t = {.u = 0x7F800000}; return t.f; }
 static inline f32   f32_min(f32 a, f32 b)                       { return a < b ? a : b; }
 static inline f32   f32_max(f32 a, f32 b)                       { return a > b ? a : b; }
 static inline f32   f32_clamp(f32 x, f32 a, f32 b)              { return f32_min(f32_max(x, a), b); }
@@ -251,8 +253,8 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
     ASSERT(f32_equal(quat_length2(q), 1.0f));
     // For unit quaternion => inverse is just conjugate
     Quaternion q_inv = quat_conjugate(q);
-    Quaternion q = quat_prod(quat_prod(q, quat_make_f32x3(v)), q_inv);
-    return f32x3_make(q.d.x, q.d.y, q.d.z);
+    Quaternion r = quat_prod(quat_prod(q, quat_make_f32x3(v)), q_inv);
+    return f32x3_make(r.d.x, r.d.y, r.d.z);
 }
 
 #endif // ADS_MATH_H
