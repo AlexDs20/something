@@ -4,9 +4,11 @@
 
 #include "base/base.h"
 
-constexpr f32 F32_PI      = 3.1415926535897932384f;
-constexpr f32 F32_TAU     = 6.2831853071795864769f;
-constexpr f32 F32_EPSILON = 1e-6f;
+constexpr f32 F32_PI_HALF   = 1.5707963267948966192f;
+constexpr f32 F32_PI        = 3.1415926535897932384f;
+constexpr f32 F32_3_PI_HALF = 4.7123889803846898577f;
+constexpr f32 F32_TAU       = 6.2831853071795864769f;
+constexpr f32 F32_EPSILON   = 1e-6f;
 constexpr f32 F32_ABS_EPSILON = 1e-8f;
 
 // f32
@@ -102,6 +104,15 @@ static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t)         { return {a.x * 
 static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return acosf(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
 static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); ASSERT(f32_equal(f32x3_length2(i), 1.0f)); f32 dot_ni = f32x3_dot(N, i); f32 k = 1.0f - eta * eta * (1.0f - dot_ni * dot_ni); if (k < 0.0f) { return {0.0f, 0.0f, 0.0f}; } return eta * i - (eta * dot_ni + f32_sqrt(k)) * N; }
 
+static inline f32x3 f32x3_transform_point(const f32x4x4& m, f32x3 p) {
+    f32x3 result;
+    result.x = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2] * p.z + m.m[0][3];
+    result.y = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2] * p.z + m.m[1][3];
+    result.z = m.m[2][0] * p.x + m.m[2][1] * p.y + m.m[2][2] * p.z + m.m[2][3];
+    return result;
+}
+static inline f32x3 f32x3_transform_vector(const f32x4x4& m, f32x3 p);
+
 
 // f32x4
 static inline f32x4 f32x4_make(f32 x, f32 y, f32 z, f32 w)      { return {x, y, z, w}; }
@@ -132,12 +143,14 @@ static inline f32   f32x4_length2(f32x4 a)                      { return a.x * a
 static inline f32   f32x4_length (f32x4 a)                      { return f32_sqrt(f32x4_length2(a)); }
 static inline f32x4 f32x4_normalize(f32x4 a)                    { f32 len2 = f32x4_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return a * inv; }
 
+static inline f32x3 f32x4_perspective_divide(f32x4 a);
+
 // Matrix 4x4
 // Row major
 static inline f32x4x4 f32x4x4_make(f32x4 row0, f32x4 row1, f32x4 row2, f32x4 row3)  {f32x4x4 r; r.row0=row0; r.row1=row1; r.row2=row2; r.row3=row3; return r;}
 static inline f32x4x4 operator+(const f32x4x4& a, const f32x4x4& b)           { f32x4x4 result; result.row0 = a.row0 + b.row0; result.row1 = a.row1 + b.row1; result.row2 = a.row2 + b.row2; result.row3 = a.row3 + b.row3; return result; }
 static inline f32x4x4 operator-(const f32x4x4& a, const f32x4x4& b)           { f32x4x4 result; result.row0 = a.row0 - b.row0; result.row1 = a.row1 - b.row1; result.row2 = a.row2 - b.row2; result.row3 = a.row3 - b.row3; return result; }
-static inline f32x4x4 operator*(const f32x4x4& a, const f32x4x4& b) {
+static inline f32x4x4 f32x4x4_mul(const f32x4x4& a, const f32x4x4& b) {
     f32x4x4 result = {0.0f};
     result.m[0][0] = a.m[0][0]*b.m[0][0] + a.m[0][1]*b.m[1][0] + a.m[0][2]*b.m[2][0] + a.m[0][3]*b.m[3][0];
     result.m[0][1] = a.m[0][0]*b.m[0][1] + a.m[0][1]*b.m[1][1] + a.m[0][2]*b.m[2][1] + a.m[0][3]*b.m[3][1];
@@ -159,6 +172,9 @@ static inline f32x4x4 operator*(const f32x4x4& a, const f32x4x4& b) {
     result.m[3][2] = a.m[3][0]*b.m[0][2] + a.m[3][1]*b.m[1][2] + a.m[3][2]*b.m[2][2] + a.m[3][3]*b.m[3][2];
     result.m[3][3] = a.m[3][0]*b.m[0][3] + a.m[3][1]*b.m[1][3] + a.m[3][2]*b.m[2][3] + a.m[3][3]*b.m[3][3];
     return result;
+}
+static inline f32x4x4 operator*(const f32x4x4& a, const f32x4x4& b) {
+    return f32x4x4_mul(a, b);
 }
 static inline f32x4 operator*(const f32x4x4& a, f32x4   b) {
     f32x4 result;
@@ -196,6 +212,83 @@ static inline f32x4x4 f32x4x4_transpose(const f32x4x4& a) {
     return result;
 }
 
+static inline f32x4x4 f32x4x4_identity(void) {
+    f32x4x4 result = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    return result;
+}
+
+static inline f32x4x4 f32x4x4_translate(f32x3 t) {
+    f32x4x4 result = {
+        1.0f, 0.0f, 0.0f, t.x,
+        0.0f, 1.0f, 0.0f, t.y,
+        0.0f, 0.0f, 1.0f, t.z,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    return result;
+}
+
+static inline f32x4x4 f32x4x4_scale_f32(f32 s) {
+    f32x4x4 result = {
+           s, 0.0f, 0.0f, 0.0f,
+        0.0f,    s, 0.0f, 0.0f,
+        0.0f, 0.0f,    s, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    return result;
+}
+
+static inline f32x4x4 f32x4x4_scale_f32x3(f32x3 s) {
+    f32x4x4 result = {
+         s.x, 0.0f, 0.0f, 0.0f,
+        0.0f,  s.y, 0.0f, 0.0f,
+        0.0f, 0.0f,  s.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    return result;
+}
+
+static inline f32x4x4 f32x4x4_inverse(const f32x4x4& m);
+
+static inline f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
+
+static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
+
+static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
+
+static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
+    f32x4x4 m = f32x4x4_identity();
+
+    f32 xx = q.d.x * q.d.x;
+    f32 yy = q.d.y * q.d.y;
+    f32 zz = q.d.z * q.d.z;
+    f32 xy = q.d.x * q.d.y;
+    f32 xz = q.d.x * q.d.z;
+    f32 yz = q.d.y * q.d.z;
+    f32 wx = q.d.w * q.d.x;
+    f32 wy = q.d.w * q.d.y;
+    f32 wz = q.d.w * q.d.z;
+
+    m.m[0][0] = 1.0f - 2.0f * (yy + zz);
+    m.m[0][1] = 2.0f * (xy - wz);
+    m.m[0][2] = 2.0f * (xz + wy);
+
+    m.m[1][0] = 2.0f * (xy + wz);
+    m.m[1][1] = 1.0f - 2.0f * (xx + zz);
+    m.m[1][2] = 2.0f * (yz - wx);
+
+    m.m[2][0] = 2.0f * (xz - wy);
+    m.m[2][1] = 2.0f * (yz + wx);
+    m.m[2][2] = 1.0f - 2.0f * (xx + yy);
+    return m;
+}
+
+
+
 // Quaternion
 static inline Quaternion quat_make(f32 x, f32 y, f32 z, f32 w)  { Quaternion q; q.d = f32x4_make(x, y, z, w); return q;}
 static inline Quaternion quat_make_f32x3(f32x3 a)               { Quaternion q; q.d.x = a.x; q.d.y = a.y; q.d.z = a.z; q.d.w = 0.0f; return q;}
@@ -210,7 +303,6 @@ static inline Quaternion quat_prod(Quaternion a, Quaternion b)  { Quaternion q;
     q.d.z = a.d.w*b.d.z + a.d.x*b.d.y - a.d.y*b.d.x + a.d.z*b.d.w;
     q.d.w = a.d.w*b.d.w - a.d.x*b.d.x - a.d.y*b.d.y - a.d.z*b.d.z;
     return q;
-
 }
 static inline Quaternion quat_conjugate(Quaternion a)           { Quaternion q = quat_make(-a.d.x, -a.d.y, -a.d.z, a.d.w); return q; }
 static inline f32 quat_length2(Quaternion a)                    { return f32x4_length2(a.d); }
@@ -236,25 +328,32 @@ static inline Quaternion quat_make_rotation(f32x3 rot_axis, f32 theta) {
     return q;
 }
 
-/*
- *
- * static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
- *     ASSERT(f32_equal(quat_length2(q), 1.0f));
- *     f32x3 q_vec = f32x3_make(q.d.x, q.d.y, q.d.z);
- *     f32x3 t = 2.0f * f32x3_cross(q_vec, v);
- *     return v + q.d.w * t + f32x3_cross(q_vec, t);
- * }
- *
- * */
-
 
 static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
-    // Use cross-product instead?
+    // From wiki:
+    // r_vec = p_vec + 2*cos(theta/2)sin(theta/2) * (u x p) + 2 * sin2(theta/2) * u x (u x p)
     ASSERT(f32_equal(quat_length2(q), 1.0f));
-    // For unit quaternion => inverse is just conjugate
-    Quaternion q_inv = quat_conjugate(q);
-    Quaternion r = quat_prod(quat_prod(q, quat_make_f32x3(v)), q_inv);
-    return f32x3_make(r.d.x, r.d.y, r.d.z);
+    f32x3 sin_rot = f32x3_make(q.d.x, q.d.y, q.d.z);
+    f32x3 t = 2.0f * f32x3_cross(sin_rot, v);
+    return v + q.d.w * t + f32x3_cross(sin_rot, t);
 }
+
+static inline Quaternion quat_slerp(Quaternion a, Quaternion b, f32 t);
+
+static inline Quaternion quat_make_euler(f32 pitch, f32 yaw, f32 roll);
+
+#ifdef ADS_DEBUG
+#include <stdio.h>
+#define debug_print_f32(v)                  do { printf("\nf32 %s = %f", #v, (v)); } while(0)
+#define debug_print_f32x3(v)                do { printf("\nf32x3 %s = (%f,%f,%f)", #v, (v).x, (v).y, (v).z); } while(0)
+#define debug_print_f32x4(v)                do { printf("\nf32x4 %s = (%f,%f,%f,%f)", #v, (v).x, (v).y, (v).z, (v).w); } while(0)
+#define debug_print_quat(v)                 do { printf("\nquat %s = (%f,%f,%f,%f)", #v, (v).x, (v).y, (v).z, (v).w); } while(0)
+#define debug_print_f32x4x4(v)              do { debug_print_f32x4((v).row0); debug_print_f32x4((v).row1); debug_print_f32x4((v).row2); debug_print_f32x4((v).row3);   } while(0)
+#else
+#define debug_print_f32(x)
+#define debug_print_f32x3(v)
+#define debug_print_f32x4(v)
+#define debug_print_f32x4x4(v)
+#endif
 
 #endif // ADS_MATH_H

@@ -5,6 +5,7 @@
 
 #include "libs/ads_model_loader.h"
 #include "renderer/renderer.h"
+#include "libs/ads_math.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -249,20 +250,6 @@ void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u3
     }
 }
 
-u32 random_color(u64 v) {
-    u32 c = 0xFFFFFF * (v / (f64)RAND_MAX);
-    return c;
-}
-
-static f32 ceilf32(f32 d) {
-    f32 trunc = (f32)((s32)d);
-    if (trunc < d) {
-        return trunc+1.0f;
-    } else {
-        return trunc;
-    }
-}
-
 void shader_frag_color(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
@@ -330,8 +317,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_left_slope  = (bz - az) * y_delta_inv;
     z_right_slope = (cz - az) * y_delta_inv;
 
-    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = by>h ? h : (u32)ceilf32(by < 0 ? 0 : by);
+    u32 ys = ay<0 ? 0 : (u32)f32_ceil(ay);
+    u32 ye = by>h ? h : (u32)f32_ceil(by < 0 ? 0 : by);
 
     f32 xs = ax + (ys - ay) * ad_inv_slope;
     f32 xe = ax + (ys - ay) * ae_inv_slope;
@@ -343,8 +330,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
-        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32( xe<0? 0 : xe );
+        u32 x_start = xs<0 ? 0 : (u32)f32_ceil(xs);
+        u32 x_end   = xe>w ? w : (u32)f32_ceil( xe<0? 0 : xe );
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -415,8 +402,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_left_slope  = (cz - az) * y_delta_inv;
     z_right_slope = (cz - bz) * y_delta_inv;
 
-    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = cy>h ? h : (u32)ceilf32(cy < 0 ? 0 : cy);
+    u32 ys = ay<0 ? 0 : (u32)f32_ceil(ay);
+    u32 ye = cy>h ? h : (u32)f32_ceil(cy < 0 ? 0 : cy);
 
     f32 xs = dx + (ys - ay) * dc_inv_slope;
     f32 xe = ex + (ys - ay) * ec_inv_slope;
@@ -428,8 +415,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
     f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
-        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32(xe<0 ? 0 : xe);
+        u32 x_start = xs<0 ? 0 : (u32)f32_ceil(xs);
+        u32 x_end   = xe>w ? w : (u32)f32_ceil(xe<0 ? 0 : xe);
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -606,21 +593,14 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 }
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-    static bool shown = false;
-    if (!shown) {
-        printf("\nmodel->materials[0].map_Kd.data: %p", model->materials[0].map_Kd.data);
-        printf("\nmodel->texcoords: %p", model->texcoords);
-        printf("\n");
-        shown = true;
-    }
     for (u64 i=0; i<model->n_faces; ++i) {
         ObjFace* f = model->faces + i;
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)(model->vertices + f->v_indices[0]);
-        Vertex b = *(Vertex*)(model->vertices + f->v_indices[1]);
-        Vertex c = *(Vertex*)(model->vertices + f->v_indices[2]);
+        f32x3 _a = *(f32x3*)(model->vertices + f->v_indices[0]);
+        f32x3 _b = *(f32x3*)(model->vertices + f->v_indices[1]);
+        f32x3 _c = *(f32x3*)(model->vertices + f->v_indices[2]);
 
         VertexAttrs va = {
             .u = (model->texcoords + f->vt_indices[0])->x,
@@ -647,14 +627,23 @@ void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, v
             .nz = (model->normals  + f->vn_indices[2])->z,
         };
 
-        a.x = (a.x / 10 + 0.5f) * w;
-        a.y = (a.y / 10 + 0.3f) * h;
+        TextureContext* tc = (TextureContext*)shader_context;
+        _a = f32x3_transform_point(*tc->world, _a);
+        _b = f32x3_transform_point(*tc->world, _b);
+        _c = f32x3_transform_point(*tc->world, _c);
 
-        b.x = (b.x / 10 + 0.5f) * w;
-        b.y = (b.y / 10 + 0.3f) * h;
+        Vertex a = *(Vertex*)(&_a);
+        Vertex b = *(Vertex*)(&_b);
+        Vertex c = *(Vertex*)(&_c);
 
-        c.x = (c.x / 10 + 0.5f) * w;
-        c.y = (c.y / 10 + 0.3f) * h;
+        a.x *= w;
+        a.y *= h;
+
+        b.x *= w;
+        b.y *= h;
+
+        c.x *= w;
+        c.y *= h;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }

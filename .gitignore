@@ -3,5 +3,3 @@ gmon.out
 perf.data*
 TODO.md
 *.s
-
-ignore/

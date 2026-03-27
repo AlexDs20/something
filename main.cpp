@@ -17,6 +17,21 @@
 
 #include "gf_profiling.c"
 
+struct Transform {
+    f32x3 position;
+    f32x3 scale;
+    Quaternion rotation;
+};
+
+f32x4x4 f32x4x4_from_transform(const Transform& t) {
+    f32x4x4 S = f32x4x4_scale_f32x3(t.scale);
+    f32x4x4 R = f32x4x4_from_quat(t.rotation);
+    f32x4x4 T = f32x4x4_translate(t.position);
+    return f32x4x4_mul(T, f32x4x4_mul(R, S));
+    // return f32x4x4_mul(T, S);
+    return T * R * S;
+}
+
 int main(int argc, char** argv) {
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
@@ -31,21 +46,31 @@ int main(int argc, char** argv) {
     StringView selection = sv_from_cstr(argv[1]);
 
     StringView fp;
+    // TODO: Have platform filesystem support
     if ( sv_equal(selection, sv_from_cstr("1")) ) {
         fp = sv_from_cstr("assets/backpack/backpack.obj");
     } else if ( sv_equal(selection, sv_from_cstr("2")) ) {
-        fp = sv_from_cstr("ignore/assets/sponza.obj");
+        fp = sv_from_cstr("ignore/assets/sponza/sponza.obj");
     } else if ( sv_equal(selection, sv_from_cstr("3")) ) {
-        fp = sv_from_cstr("ignore/assets/fireplace_room.obj");
+        fp = sv_from_cstr("ignore/assets/fireplace/fireplace_room.obj");
     } else if  ( sv_equal(selection, sv_from_cstr("4")) ) {
-        fp = sv_from_cstr("ignore/assets/dragon.obj");
+        fp = sv_from_cstr("ignore/assets/dragon/dragon.obj");
     } else if  ( sv_equal(selection, sv_from_cstr("5")) ) {
-        fp = sv_from_cstr("ignore/assets/gallery.obj");
+        fp = sv_from_cstr("ignore/assets/gallery/gallery.obj");
     } else {
-        fp = sv_from_cstr("assets/cube.obj");
+        fp = sv_from_cstr("assets/backpack/backpack.obj");
     }
 
     ObjModel* model = model_read(scene_arena, fp);
+
+    Transform t = {
+        .position = f32x3_make(0.5f, 0.4f, 0.0f),
+        .scale    = f32x3_make(0.15f, 0.15f, 0.15f),
+        .rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f),
+    };
+
+    f32x4x4 world = f32x4x4_from_transform(t);
+    debug_print_f32x4x4(world);
 
     // u32* win_buffer = model->material->map_Kd.buffer;
     // u32 canvas_w = model->material->map_Kd.width;
@@ -67,9 +92,15 @@ int main(int argc, char** argv) {
 
     TextureContext frag_context = {
         .texture = &(model->materials[0].map_Kd),
+        .world = &world,
     };
 
+    f32 theta = 0.0f;
     while (running) {
+        t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), theta);
+        theta += (F32_TAU / 120.0f);
+        world = f32x4x4_from_transform(t);
+        // frag_context.world = &wor
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 

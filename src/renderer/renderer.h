@@ -49,6 +49,7 @@ typedef struct {
 
 typedef struct {
     Texture* texture;
+    f32x4x4* world;
 } TextureContext;
 
 void shader_frag_color  (void* shader_ctx,
