@@ -10,11 +10,11 @@
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
     #include <stdalign.h>
-    #define ALIGN(N) alignas(N)
+    #define ALIGNAS(N) alignas(N)
 #elif defined(_MSC_VER)
-    #define ALIGN(N) __declspec(align(N))
+    #define ALIGNAS(N) __declspec(align(N))
 #elif defined(__GNUC__) || defined(__clang__)
-    #define ALIGN(N) __attribute__((aligned(N)))
+    #define ALIGNAS(N) __attribute__((aligned(N)))
 #else
     #error "No alignment support for this compiler"
 #endif

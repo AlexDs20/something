@@ -72,7 +72,7 @@ void* arena_alloc_get(Arena* arena, u64 pos) {
 
 void* arena_alloc_push(Arena* arena, u64 size) {
     return arena_alloc_push_aligned(arena, size, DEFAULT_ALIGN);
-};
+}
 
 void* arena_alloc_push_aligned(Arena* arena, u64 size, u64 alignment) {
     bool power_of_two = (alignment & (alignment-1)) == 0;
@@ -300,14 +300,14 @@ void arena_debug_map(Arena* arena, u64 width) {
     putchar('\n');
 }
 
-#if not defined(LOCAL_ARENA_POOL_COUNT)
-#define LOCAL_ARENA_POOL_COUNT 10
+#if !defined(ADS_LOCAL_ARENA_POOL_COUNT)
+#define ADS_LOCAL_ARENA_POOL_COUNT 10
 #endif
 #define LOCAL_ARENA_CAPACITY (1*GiB)
-global LocalArena local_arena_pool[LOCAL_ARENA_POOL_COUNT] = {0};
+global LocalArena local_arena_pool[ADS_LOCAL_ARENA_POOL_COUNT] = {0};
 
 void local_arena_pool_init(void) {
-    for (u64 i=0; i<LOCAL_ARENA_POOL_COUNT; ++i) {
+    for (u64 i=0; i<ADS_LOCAL_ARENA_POOL_COUNT; ++i) {
         if (local_arena_pool[i].arena == 0) {
             local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
             local_arena_pool[i].used = 0;
@@ -318,7 +318,7 @@ void local_arena_pool_init(void) {
 
 LocalArena* local_arena_alloc_create(void) {
     LocalArena* out = 0;
-    for (u64 i=0; i<LOCAL_ARENA_POOL_COUNT; i++) {
+    for (u64 i=0; i<ADS_LOCAL_ARENA_POOL_COUNT; i++) {
         // Initialize the local arena if it hasn't been done yet
         if (local_arena_pool[i].arena == 0) {
             local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
@@ -331,7 +331,7 @@ LocalArena* local_arena_alloc_create(void) {
     if (out) {
         out->used = 1;
     } else {
-        printf("No more local arenas available. Used: %d of %d.\n", LOCAL_ARENA_POOL_COUNT, LOCAL_ARENA_POOL_COUNT);
+        printf("No more local arenas available. Used: %d of %d.\n", ADS_LOCAL_ARENA_POOL_COUNT, ADS_LOCAL_ARENA_POOL_COUNT);
     }
     return out;
 }

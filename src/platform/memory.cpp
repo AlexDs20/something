@@ -1,4 +1,5 @@
 #if defined(ADS_LINUX)
 #include "platform/linux/memory.cpp"
-#elif defined(ADS_WINDOW)
+#else
+#error "Only Linux support at the moment"
 #endif

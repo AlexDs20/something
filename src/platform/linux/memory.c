@@ -58,6 +58,6 @@ bool os_memory_decommit(void* addr, u64 size) {
     return true;
 }
 
-u64 os_memory_page_size() {
+u64 os_memory_page_size(void) {
     return sysconf(_SC_PAGESIZE);
 }

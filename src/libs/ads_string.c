@@ -309,10 +309,6 @@ int string_prepend_fmt(Arena* arena, String* str, const char* fmt, ...) {
 }
 
 int string_prepend_sv(Arena* arena, String* str, StringView pre) {
-    size_t new_size;
-    char* arena_top;
-    char* tmp;
-
     if ((str == NULL) || (str->buffer == NULL) || (pre.buffer == NULL)) {
         return -1;
     }
@@ -746,6 +742,8 @@ int string_replace_all(Arena* arena, String* str, StringView target, StringView 
         return 0;
     }
 
+    // TODO: Do inplace if target and replacement are the same size
+
     size_t count = 0;
     StringView sv = sv_from_string(*str);
     StringView search_sv = sv;
@@ -791,7 +789,7 @@ int string_replace_all(Arena* arena, String* str, StringView target, StringView 
     search_sv = sv;
     char* write_p = new_buffer;
 
-    while(search_sv.size >= 0) {
+    while(search_sv.size >= target.size) {
         size_t p = sv_find(search_sv, target);
 
         if (p == search_sv.size) {
@@ -902,7 +900,7 @@ int string_shrink_to_fit(Arena* arena, String* str) {
 
 void string_debug_print(const String* s) {
     printf("String Debug Info:\n");
-    printf(" String:      %p\n",             s);
+    printf(" String:      %p\n",      (void*)s);
     if (s == NULL) return;
     if (s->buffer != NULL) {
     printf("  buffer:     %p\n",             s->buffer);
@@ -1109,6 +1107,7 @@ bool sv_ends_with(StringView sv, StringView post) {
     return _compare(sv.buffer + sv.size-post.size, post.buffer, post.size) == 0;
 }
 
+#if !(defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__))
 static size_t _BMH_search(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
@@ -1137,6 +1136,7 @@ static size_t _BMH_search(StringView haystack, StringView needle) {
     }
     return haystack.size;
 }
+#endif
 
 static size_t _BMH_rsearch(StringView haystack, StringView needle) {
     /*
@@ -1239,7 +1239,6 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         return _BMH_rsearch(haystack, needle);
     }
     else {
-        const unsigned char* p = h;
         size_t remaining = haystack.size - needle.size + 1;
         while (true) {
             const unsigned char* match = (const unsigned char*) memrchr((void*)h, n[0], remaining);
@@ -1344,7 +1343,7 @@ static uint8_t LUT[256] = {
 };
 
 static void _sv_trim_front(StringView* sv) {
-    while ((sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_SPACE)) {
+    while ((sv->size>0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_SPACE)) {
         sv->buffer++;
         sv->size--;
     }
@@ -1357,7 +1356,7 @@ int sv_parse_u32(StringView* sv, uint32_t* out) {
 
     _sv_trim_front(sv);
 
-    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+    if ((sv->size == 0) || !(LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
         return -1;
     }
 
@@ -1366,7 +1365,7 @@ int sv_parse_u32(StringView* sv, uint32_t* out) {
     // UINT32_MAX = 4_294_967_295
     const uint32_t limit     = UINT32_MAX / 10;
     const uint32_t remainder = UINT32_MAX % 10;
-    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+    while ( (sv->size>0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
         uint32_t digit = sv->buffer[0]-'0';
         if ( (v>limit) || ((v==limit) && (digit > remainder)) ) {
             return -1;
@@ -1391,7 +1390,7 @@ int sv_parse_s32(StringView* sv, int32_t* out) {
     }
 
     int sign = 1;
-    if (LUT[sv->buffer[0]] & SV_CHAR_NEG) {
+    if (LUT[(u8)sv->buffer[0]] & SV_CHAR_NEG) {
         sign = -1;
         sv->buffer++;
         sv->size--;
@@ -1400,7 +1399,7 @@ int sv_parse_s32(StringView* sv, int32_t* out) {
         sv->buffer++;
         sv->size--;
     }
-    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+    if ((sv->size == 0) || !(LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
         return -1;
     }
 
@@ -1410,7 +1409,7 @@ int sv_parse_s32(StringView* sv, int32_t* out) {
     const uint32_t limit = INT32_MAX / 10;
     const uint32_t remainder = sign==1 ? 7 : 8;
 
-    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+    while ( (sv->size>0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
         uint32_t digit = sv->buffer[0]-'0';
 
         if (v > limit || (v==limit && digit > remainder)) {
@@ -1478,7 +1477,7 @@ int sv_parse_f32(StringView* sv, float* out) {
     }
 
     int sign = 1;
-    if (LUT[sv->buffer[0]] & SV_CHAR_NEG) {
+    if (LUT[(u8)sv->buffer[0]] & SV_CHAR_NEG) {
         sign = -1;
         sv->buffer++;
         sv->size--;
@@ -1490,7 +1489,7 @@ int sv_parse_f32(StringView* sv, float* out) {
 
     // Integer part
     uint64_t integer = 0;
-    while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+    while (sv->size>0 && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
         integer = integer*10 + sv->buffer[0]-'0';
         sv->buffer++;
         sv->size--;
@@ -1502,13 +1501,13 @@ int sv_parse_f32(StringView* sv, float* out) {
 
     // Fractional
     double decimal = 0.0;
-    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_DOT)) {
+    if ((sv->size > 0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DOT)) {
         sv->buffer++;
         sv->size--;
 
         uint64_t frac = 0;
         uint8_t power = 0;
-        while(sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        while(sv->size>0 && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
             if (power < 18) {
                 frac = frac * 10 + sv->buffer[0]-'0';
                 power++;
@@ -1524,11 +1523,11 @@ int sv_parse_f32(StringView* sv, float* out) {
     // Handle scientific notation
     uint8_t exp = 0;
     int8_t exp_sign = 1;
-    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_EXP)) {
+    if ((sv->size > 0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_EXP)) {
         sv->buffer++;
         sv->size--;
 
-        if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_NEG)) {
+        if ((sv->size > 0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_NEG)) {
             sv->buffer++;
             sv->size--;
             exp_sign = -1;
@@ -1538,7 +1537,7 @@ int sv_parse_f32(StringView* sv, float* out) {
             sv->size--;
         }
 
-        while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        while (sv->size>0 && (LUT[(u8)sv->buffer[0]] & SV_CHAR_DIGIT)) {
             exp = exp*10 + sv->buffer[0]-'0';
             sv->buffer++;
             sv->size--;

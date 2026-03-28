@@ -1,3 +1,15 @@
+## Documentation
+### Defines:
+- *ADS_LINUX*: To be set when compiling on linux
+    - No alternatives at the moment
+- *ADS_X11*: To be set when using X11 server on linux
+    - No alternatives currently implemented
+- *ADS_USE_EXTERNAL*: To be set if wanting to use external libraries instead of ADS implementations
+- *ADS_DEBUG*:
+- *ADS_SSE*:
+
+
+
 # TODO
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
