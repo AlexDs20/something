@@ -10,9 +10,7 @@ struct Texture;
 struct Arena;
 
 
-typedef struct {
-    float x, y, z;
-} Vertex;
+typedef f32x3 Vertex;
 
 typedef struct {
     float u, v, w;

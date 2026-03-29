@@ -273,12 +273,9 @@ static inline f32x4x4 f32x4x4_scale_f32x3(f32x3 s) {
 }
 
 // static inline f32x4x4 f32x4x4_inverse(const f32x4x4& m);
-
-static inline f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
-
-static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
-
-static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
+// static inline f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
+// static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
+// static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
 
 static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
     f32x4x4 m = f32x4x4_identity();
@@ -358,9 +355,8 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
     return f32x3_add(v, f32x3_add(f32x3_mull_f32(q.d.w, t), f32x3_cross(sin_rot, t)));
 }
 
-static inline Quaternion quat_slerp(Quaternion a, Quaternion b, f32 t);
-
-static inline Quaternion quat_make_euler(f32 pitch, f32 yaw, f32 roll);
+// static inline Quaternion quat_slerp(Quaternion a, Quaternion b, f32 t);
+// static inline Quaternion quat_make_euler(f32 pitch, f32 yaw, f32 roll);
 
 #ifdef ADS_DEBUG
 #include <stdio.h>

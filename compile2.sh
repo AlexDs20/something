@@ -6,7 +6,7 @@ INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
 function compile () {
-    gcc $INCLUDES $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
+    clang++ $INCLUDES $DEFINES -std=c++11 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
     echo $1
 }
 
@@ -46,6 +46,8 @@ function compile () {
 # FILE=src/libs/ads_string.c
 # compile $FILE
 
+FILE=src/renderer/renderer.cpp
+compile $FILE
 
 echo "DONE"
 

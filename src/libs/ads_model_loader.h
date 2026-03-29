@@ -8,13 +8,7 @@
 extern "C" {
 #endif
 
-typedef struct {
-    float x, y, z;
-} Vec3f;
-
-typedef struct {
-    float u, v;
-} Vec2f;
+typedef f32x3 Vec3f;
 
 typedef struct Texture Texture;
 struct Texture {
