@@ -78,7 +78,7 @@ int toggle_fullscreen(Display* display, Window window) {
 
 // TODO: Add support for RGB and GREY currently only RGBA
 Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METHOD) {
-    Win win = {};
+    Win win = {0};
     win.w = w;
     win.h = h;
     win.draw_method = DRAW_METHOD;
@@ -86,8 +86,7 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METH
     win.display = XOpenDisplay(0);
     if (!win.display) {
         printf("Failed opening display!\n");
-        win = {};
-        return(win);
+        return (Win){0};
     }
 
     int screen = DefaultScreen(win.display);
@@ -98,8 +97,7 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METH
     Status status = XMatchVisualInfo(win.display, screen, screen_bit_depth, TrueColor, &vis_info);
     if(status == 0) {
       printf("No matching visual info\n");
-      win = {};
-      return(win);
+      return (Win){0};
     }
     win.visual = vis_info.visual;
     win.depth = vis_info.depth;
@@ -140,8 +138,7 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METH
     if (!win.window) {
         printf("Failed creating a window!\n");
         XCloseDisplay(win.display);
-        win = {};
-        return(win);
+        return (Win){0};
     }
 
     XStoreName(win.display, win.window, title);
@@ -159,7 +156,6 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METH
 
     int offset = 0;
     win.bitmap_pad = 32;
-    int bytes_per_line = w*4;
     win.xim = XCreateImage(
             win.display,
             win.visual,
@@ -209,17 +205,16 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     /*
      * Data in the buffer should be in the order: left to right, bottom up
      */
-    if ((buffer == nullptr) | (window == nullptr)) {
+    if ((buffer == NULL) | (window == NULL)) {
         return;
     }
-    if (window->buffer == nullptr) {
+    if (window->buffer == NULL) {
         return;
     }
 
     // Buffer image format is RGBA and u8*
     // and window->buffer is u32*
     u8* src = buffer;
-    u8* dst = (u8*)window->buffer;
 
     int rshift = trailing_zero_bits(window->visual->red_mask);
     int gshift = trailing_zero_bits(window->visual->green_mask);
@@ -297,7 +292,7 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
                 u8 r = p[0];
                 u8 g = p[1];
                 u8 b = p[2];
-                u8 a = p[3];
+                // u8 a = p[3];
 
                 u64 dst_idx = window_offset + i;
                 window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
@@ -317,7 +312,7 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
                 u8 r = d[0];
                 u8 g = d[1];
                 u8 b = d[2];
-                u8 a = d[3];
+                // u8 a = d[3];
 
                 u64 dst_idx = (window_offset + i);
                 window->buffer[dst_idx] = (r<<rshift) | (g<<gshift) | (b<<bshift);
@@ -467,8 +462,8 @@ bool platform_handle_events(Win* win) {
                 while (XCheckTypedEvent(win->display, ConfigureNotify, &next_event)) {
                     event = next_event;
                 }
-                int new_w = event.xconfigure.width;
-                int new_h = event.xconfigure.height;
+                unsigned int new_w = (unsigned int)event.xconfigure.width;
+                unsigned int new_h = (unsigned int)event.xconfigure.height;
                 if (new_w != win->w || new_h != win->h) {
                     win->w = new_w;
                     win->h = new_h;
@@ -485,7 +480,7 @@ bool platform_handle_events(Win* win) {
                 }
             } break;
             case ClientMessage: {
-                if (event.xclient.data.l[0] == win->wm_delete_window) {
+                if ((long unsigned int)event.xclient.data.l[0] == win->wm_delete_window) {
                     running = 0;
                 }
             } break;

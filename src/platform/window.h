@@ -5,7 +5,7 @@
 #include <X11/Xutil.h>
 #include "base/base.h"
 
-struct Arena;
+#include "memory/allocators.h"
 
 //============
 // DRAW_METHOD
@@ -15,8 +15,8 @@ struct Arena;
 
 
 typedef struct {
-    int w;
-    int h;
+    unsigned int w;
+    unsigned int h;
     Display* display;
     Visual* visual;
     int depth;

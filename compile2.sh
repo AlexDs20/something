@@ -1,7 +1,36 @@
 #!/bin/bash
 
+DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE"
+INCLUDES="-I./src/ -I./"
+LINKS="-lX11"
+
+function compile () {
+    gcc -I./src/ $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
+    echo $1
+}
+
+FILE=src/platform/linux/memory.c
+compile $FILE
+
+FILE=src/platform/linux/io.c
+compile $FILE
+
+FILE=src/platform/io.c
+compile $FILE
+
+FILE=src/platform/linux/xlib.c
+compile $FILE
+
+FILE=src/memory/allocators.c
+compile $FILE
+
 FILE=src/libs/ads_string.c
-gcc -I./src/ -D_GNU_SOURCE -std=c99 -Wall -Wextra -Werror -Wpedantic -c $FILE -o /tmp/a.o
+compile $FILE
+
+FILE=src/platform/memory.c
+compile $FILE
+
+
 echo "DONE"
 
 #
