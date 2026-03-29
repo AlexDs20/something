@@ -6,7 +6,7 @@ INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
 function compile () {
-    clang $INCLUDES $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
+    gcc $INCLUDES $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
     echo $1
 }
 
@@ -33,14 +33,14 @@ function compile () {
 #
 # FILE=src/libs/ads_images.c
 # compile $FILE
-
-FILE=src/libs/ads_jpeg.c
-compile $FILE
-
-# FILE=src/libs/ads_model_loader.c
+#
+# FILE=src/libs/ads_jpeg.c
 # compile $FILE
 #
 # FILE=src/libs/ads_math.h
+# compile $FILE
+#
+# FILE=src/libs/ads_model_loader.c
 # compile $FILE
 #
 # FILE=src/libs/ads_string.c

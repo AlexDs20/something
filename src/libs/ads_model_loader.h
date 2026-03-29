@@ -4,6 +4,10 @@
 #include "libs/ads_string.h"
 #include "memory/allocators.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     float x, y, z;
 } Vec3f;
@@ -94,5 +98,9 @@ ObjModel*   model_read(Arena* arena, StringView filepath);
 // ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
 // ObjModel*   model_create_default_model(Arena* arena);
 // ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // ADS_MODEL_LOADER_H

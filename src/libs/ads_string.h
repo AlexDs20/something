@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Forward def Arena from allocators.h
 struct Arena;
 
@@ -162,5 +166,9 @@ int     string_shrink_to_fit(struct Arena* arena, String* str);
 
 void    string_print(const String* str);
 void    string_debug_print(const String* string);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // ADS_STRING_H

@@ -6,6 +6,10 @@
 
 #include "memory/allocators.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Image Image;
 struct Image {
     u8* data;
@@ -33,5 +37,9 @@ struct ImageParsingResult {
 Image read_image_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
