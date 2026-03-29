@@ -1,11 +1,12 @@
 #!/bin/bash
 
 DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE"
+# DEFINES+=" -DADS_USE_EXTERNAL"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
 function compile () {
-    gcc -I./src/ $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
+    gcc $INCLUDES $DEFINES -std=c99 -Wall -Wextra -Werror -Wpedantic -c $1 -o /tmp/a.o
     echo $1
 }
 
@@ -29,13 +30,16 @@ function compile () {
 #
 # FILE=src/memory/allocators.c
 # compile $FILE
-#
-# FILE=src/libs/ads_model_loader.c
-# compile $FILE
 
-FILE=src/libs/ads_math.h
+FILE=src/libs/ads_images.c
 compile $FILE
 
+# FILE=src/libs/ads_model_loader.c
+# compile $FILE
+#
+# FILE=src/libs/ads_math.h
+# compile $FILE
+#
 # FILE=src/libs/ads_string.c
 # compile $FILE
 
