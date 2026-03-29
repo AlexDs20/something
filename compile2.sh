@@ -45,8 +45,11 @@ function compile () {
 #
 # FILE=src/libs/ads_string.c
 # compile $FILE
+#
+# FILE=src/renderer/renderer.cpp
+# compile $FILE
 
-FILE=src/renderer/renderer.cpp
+FILE=src/main.cpp
 compile $FILE
 
 echo "DONE"

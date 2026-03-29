@@ -34,7 +34,7 @@ typedef struct {
     Atom wm_delete_window;
 } Win;
 
-Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METHOD);
+Win platform_init_win(unsigned int w, unsigned int h, const char* title, int DRAW_METHOD);
 bool platform_handle_events(Win* win);
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window);
 void platform_cleanup_window(Win win);

@@ -27,12 +27,10 @@ f32x4x4 f32x4x4_from_transform(const Transform& t) {
     f32x4x4 S = f32x4x4_scale_f32x3(t.scale);
     f32x4x4 R = f32x4x4_from_quat(t.rotation);
     f32x4x4 T = f32x4x4_translate(t.position);
-    return f32x4x4_mul(T, f32x4x4_mul(R, S));
-    // return f32x4x4_mul(T, S);
     return T * R * S;
 }
 
-int main(int argc, char** argv) {
+int main(int /*argc*/, char** argv) {
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -63,11 +61,10 @@ int main(int argc, char** argv) {
 
     ObjModel* model = model_read(scene_arena, fp);
 
-    Transform t = {
-        .position = f32x3_make(0.5f, 0.4f, 0.0f),
-        .scale    = f32x3_make(0.15f, 0.15f, 0.15f),
-        .rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f),
-    };
+    Transform t;
+    t.position = f32x3_make(0.5f, 0.4f, 0.0f);
+    t.scale    = f32x3_make(0.15f, 0.15f, 0.15f);
+    t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f);
 
     f32x4x4 world = f32x4x4_from_transform(t);
     debug_print_f32x4x4(world);
@@ -90,10 +87,9 @@ int main(int argc, char** argv) {
     //     0xFFFFA500,
     // };
 
-    TextureContext frag_context = {
-        .texture = &(model->materials[0].map_Kd),
-        .world = &world,
-    };
+    TextureContext frag_context;
+    frag_context.texture = &(model->materials[0].map_Kd);
+    frag_context.world = &world;
 
     f32 theta = 0.0f;
     while (running) {
@@ -116,7 +112,7 @@ int main(int argc, char** argv) {
         // on little-endian: 0xAABBGGRR
         // on big-endian: 0xRRGGBBAA
 
-        for (int i=0; i<canvas_h*canvas_w; i++) {
+        for (u64 i=0; i<canvas_h*canvas_w; i++) {
             win_buffer[i] = bg_color;
             zbuffer[i] = ninf;
         }
