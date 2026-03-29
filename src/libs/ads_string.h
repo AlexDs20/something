@@ -4,6 +4,7 @@
 #include <stddef.h>     // size_t
 #include <stdarg.h>     // va_list
 #include <stdint.h>
+#include <stdbool.h>
 
 // Forward def Arena from allocators.h
 struct Arena;

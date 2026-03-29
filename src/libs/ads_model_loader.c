@@ -8,7 +8,6 @@
 // TODO: Hash map of currently loaded textures which contains a count of how many times its used
 //  So when free we free only when the count is down to 0
 //  Until I have made this we make it the ugly way by loading the textures several times
-
 static uint32_t count_mtl_mats(StringView filepath) {
     LocalArena* local_arena = local_arena_alloc_create();
     uint32_t n = 0;
@@ -48,7 +47,6 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
     ObjMaterial* current_mats = NULL;
 
-    StringView space    = sv_from_cstr(" ");
     StringView new_line = sv_from_cstr("\n");
     StringView newmtl   = sv_from_cstr("newmtl ");
 
@@ -124,13 +122,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 7);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Ka = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Ka);
-            current_mats->map_Ka.data       = img.data;
+            current_mats->map_Ka.data       = (u32*)img.data;
             current_mats->map_Ka.width      = img.width;
             current_mats->map_Ka.height     = img.height;
             current_mats->map_Ka.components = img.components;
@@ -139,13 +137,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 7);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Kd = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Kd);
-            current_mats->map_Kd.data       = img.data;
+            current_mats->map_Kd.data       = (u32*)img.data;
             current_mats->map_Kd.width      = img.width;
             current_mats->map_Kd.height     = img.height;
             current_mats->map_Kd.components = img.components;
@@ -154,13 +152,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 7);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Ks = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Ks);
-            current_mats->map_Ks.data       = img.data;
+            current_mats->map_Ks.data       = (u32*)img.data;
             current_mats->map_Ks.width      = img.width;
             current_mats->map_Ks.height     = img.height;
             current_mats->map_Ks.components = img.components;
@@ -171,13 +169,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 6);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_d = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_d);
-            current_mats->map_d.data       = img.data;
+            current_mats->map_d.data       = (u32*)img.data;
             current_mats->map_d.width      = img.width;
             current_mats->map_d.height     = img.height;
             current_mats->map_d.components = img.components;
@@ -186,13 +184,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 9);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
-            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;
             current_mats->map_Bump.components = img.components;
@@ -201,13 +199,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 9);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
-            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;
             current_mats->map_Bump.components = img.components;
@@ -216,13 +214,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             line = sv_truncate_front(line, 5);
 
             String fp = string_init_sv(local_arena->arena, basedir);
-            int status = string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
             string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
             Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
-            current_mats->map_Bump.data       = img.data;
+            current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;
             current_mats->map_Bump.components = img.components;
@@ -270,7 +268,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             printf("\n=====\n");
             string_print(&err);
             printf("\n=====\n");
-            *(char*)0 = 0;
+            PANIC;
         }
 
         line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
@@ -345,7 +343,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     ObjFace* vec_faces         = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
     ObjGroup* vec_groups       = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
     ObjMaterial* vec_materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
-    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0, i_g = 0;
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0;
 
     obj_model->vertices = vec_vertex;
     obj_model->texcoords = vec_texcoords;
@@ -369,7 +367,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     ObjMaterial* current_mats = vec_materials;
 
     // Default group in case nothing is given in the obj file
-    *current_group = {0};
+    *current_group = (ObjGroup){0};
     current_group->name = string_init_cstr(persist_arena, "default");
     int current_shading_group = 0;
     int current_material_index = 0;
@@ -379,7 +377,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
         if (sv_starts_with_char(line, 'v')) {
             Vec3f* v = NULL;
-            int r;
 
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
@@ -400,18 +397,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
             // }
             else {
-                *((char*)0) = 0;
+                PANIC;
             }
 
-            r = sv_parse_f32(&line, &v->x);
-            r = sv_parse_f32(&line, &v->y);
-            r = sv_parse_f32(&line, &v->z);
+            sv_parse_f32(&line, &v->x);
+            sv_parse_f32(&line, &v->y);
+            sv_parse_f32(&line, &v->z);
         }
         else if (sv_starts_with_char(line, 'f')) {      // face
             // TODO:
             //  - Add support for n-gons?
             line = sv_truncate_front(line, 2);
-            int r;
 
             if (current_group->face_count == 0) {
                 current_group->first_face_index = i_f;
@@ -429,46 +425,46 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             // Parse indices and convert to point to correct elements
             int32_t temp;
-            r = sv_parse_s32(&line, &temp);
+            sv_parse_s32(&line, &temp);
             f->v_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
 
             sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                sv_parse_s32(&line, &temp);
                 f->vt_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    sv_parse_s32(&line, &temp);
                     f->vn_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
                 }
             }
 
-            r = sv_parse_s32(&line, &temp);
+            sv_parse_s32(&line, &temp);
             f->v_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
 
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                sv_parse_s32(&line, &temp);
                 f->vt_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    sv_parse_s32(&line, &temp);
                     f->vn_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
                 }
             }
 
-            r = sv_parse_s32(&line, &temp);
+            sv_parse_s32(&line, &temp);
             f->v_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
             sep = sv_chop_by(&line, 1);
             if (sv_equal(sep, delim)) {
-                r = sv_parse_s32(&line, &temp);
+                sv_parse_s32(&line, &temp);
                 f->vt_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
 
                 sep = sv_chop_by(&line, 1);
                 if (sv_equal(sep, delim)) {
-                    r = sv_parse_s32(&line, &temp);
+                    sv_parse_s32(&line, &temp);
                     f->vn_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
                 }
             }
@@ -479,7 +475,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
                 current_shading_group = 0;
             }
             else {
-                int r = sv_parse_s32(&line, &current_shading_group);
+                sv_parse_s32(&line, &current_shading_group);
             }
         }
         // else if (sv_starts_with_char(line, 'l')) {      // line element
@@ -489,7 +485,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
             // int found = 0;
-            for (int i=0; i<n_mats; i++) {
+            for (uint32_t i=0; i<n_mats; i++) {
                 ObjMaterial* m = vec_materials + i;
                 if (sv_equal(line, m->name)) {
                     // found = 1;
@@ -522,7 +518,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             current_group++;
             ObjGroup* g = current_group;
-            i_g++;
             g->name = string_init_sv(persist_arena, group_name);
             g->material_index = current_material_index;
             g->face_count = 0;
@@ -540,7 +535,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             printf("\n=====\n");
             string_print(&err);
             printf("\n=====\n");
-            *((char*)0) = 0;
+            PANIC;
         }
     }
 
@@ -548,11 +543,11 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     return obj_model;
 }
 
-ObjModel* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
+ObjModel* model_convert_from_obj(/*Arena* arena, */ObjModel* obj_model) {
     return obj_model;
 }
 
-ObjModel* model_create_default_model(Arena* arena) {
+ObjModel* model_create_default_model(void /*Arena* arena*/) {
     return NULL;
 }
 
@@ -566,7 +561,7 @@ ObjModel* model_read(Arena* arena, StringView filepath) {
         StringView file_content = sv_from_string(file);
         StringView base_dir = sv_directory_name(filepath);
         ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
-        model = model_convert_from_obj(arena, obj_model);
+        model = model_convert_from_obj(/*arena, */obj_model);
     }
     // else if (sv_equal(ext, sv_from_cstr(".gltf"))) {
     //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
@@ -574,8 +569,8 @@ ObjModel* model_read(Arena* arena, StringView filepath) {
     // else if (sv_equal(ext, sv_from_cstr(".fbx"))) {
     // }
     else {
-        *(volatile char*)0=0;
-        model = model_create_default_model(arena);
+        PANIC;
+        model = model_create_default_model(/*arena*/);
     }
     return model;
 }

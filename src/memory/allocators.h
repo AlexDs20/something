@@ -3,6 +3,10 @@
 
 #include "base/base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Arena Arena;
 struct Arena {
     u8* buffer;
@@ -83,5 +87,9 @@ Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 // TODO:
 //  - Get pointer
 //  - Copy only data
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // ADS_ALLOCATORS_H

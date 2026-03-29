@@ -9,26 +9,35 @@ function compile () {
     echo $1
 }
 
-FILE=src/platform/linux/memory.c
+# FILE=src/platform/linux/io.c
+# compile $FILE
+#
+# FILE=src/platform/linux/memory.c
+# compile $FILE
+#
+# FILE=src/platform/linux/xlib.c
+# compile $FILE
+#
+# FILE=src/platform/io.c
+# compile $FILE
+#
+# FILE=src/platform/memory.c
+# compile $FILE
+#
+# FILE=src/platform/window.c
+# compile $FILE
+#
+# FILE=src/memory/allocators.c
+# compile $FILE
+#
+# FILE=src/libs/ads_model_loader.c
+# compile $FILE
+
+FILE=src/libs/ads_math.h
 compile $FILE
 
-FILE=src/platform/linux/io.c
-compile $FILE
-
-FILE=src/platform/io.c
-compile $FILE
-
-FILE=src/platform/linux/xlib.c
-compile $FILE
-
-FILE=src/memory/allocators.c
-compile $FILE
-
-FILE=src/libs/ads_string.c
-compile $FILE
-
-FILE=src/platform/memory.c
-compile $FILE
+# FILE=src/libs/ads_string.c
+# compile $FILE
 
 
 echo "DONE"

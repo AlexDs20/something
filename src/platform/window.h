@@ -13,6 +13,9 @@
 #define ADSV_NEAREST    1
 #define ADSV_BILINEAR   2
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     unsigned int w;
@@ -35,5 +38,9 @@ Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METH
 bool platform_handle_events(Win* win);
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window);
 void platform_cleanup_window(Win win);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // PLATFORM_WINDOW_H

@@ -9,13 +9,7 @@ struct Arena;
 
 typedef struct Image Image;
 struct Image {
-    union {
-        u32* data;
-        u32* buffer;
-        u8* gray;
-        u32* rgb;
-        u32* rgba;
-    };
+    u8* data;
     u32 width;
     u32 height;
     u8 components;

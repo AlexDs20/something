@@ -2,8 +2,7 @@
 #define ADS_MODEL_LOADER_H
 
 #include "libs/ads_string.h"
-
-struct Arena;
+#include "memory/allocators.h"
 
 typedef struct {
     float x, y, z;
@@ -68,7 +67,7 @@ typedef struct {
     int material_index;
 } ObjGroup;
 
-typedef struct ObjModel;
+typedef struct ObjModel ObjModel;
 struct ObjModel {
     Vec3f* vertices;
     Vec3f* texcoords;
