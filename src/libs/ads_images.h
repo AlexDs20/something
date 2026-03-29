@@ -4,8 +4,7 @@
 #include "libs/ads_string.h"
 #include "base/base.h"
 
-// From "memory/allocators.h"
-struct Arena;
+#include "memory/allocators.h"
 
 typedef struct Image Image;
 struct Image {
