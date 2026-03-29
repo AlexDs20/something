@@ -77,7 +77,7 @@ int toggle_fullscreen(Display* display, Window window) {
 }
 
 // TODO: Add support for RGB and GREY currently only RGBA
-Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METHOD) {
+Win platform_init_win(unsigned int w, unsigned int h, const char* title, int DRAW_METHOD) {
     Win win = {0};
     win.w = w;
     win.h = h;
