@@ -1,8 +1,11 @@
 #ifndef ADS_IMAGE_H
 #define ADS_IMAGE_H
 
-#include "memory/allocators.h"
-#include "libs/libstring.h"
+#include "libs/ads_string.h"
+#include "base/base.h"
+
+// From "memory/allocators.h"
+struct Arena;
 
 typedef struct Image Image;
 struct Image {
@@ -19,10 +22,23 @@ struct Image {
     u8 precision;
 };
 
+// TODO(alex): Have real errors
+typedef enum {
+    IMAGE_SUCCESS = 0,
+    IMAGE_FAIL,
+} ImageError;
+
+typedef struct ImageParsingResult ImageParsingResult;
+struct ImageParsingResult {
+    ImageError status;
+    const char* error_message;
+};
+
 // /* bs*, jpeg*? as void* */void read_image_info(filename, &width, &height, &components, &precision);
 // void read_image_file(filename, &width, &height, &components);
 
-Image read_image_file(Arena* arena, string8 filename);
+Image read_image_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
+
 #endif

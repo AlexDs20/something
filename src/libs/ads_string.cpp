@@ -1,25 +1,12 @@
-#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <float.h>
 
+#include "base/base.h"
 #include "memory/allocators.h"
 #include "libs/ads_string.h"
 
-#if 0
-typedef struct {
-    const char* buffer;
-    size_t size;                    // bytes excluding \0
-} StringView;
-
-typedef struct {
-    char* buffer;
-    size_t size;                    // Length of string excluding \0 (like strlen)
-    size_t capacity;                // Total allocated size including \0
-} String;
-#endif
-
-static size_t get_new_capacity(size_t old_capacity, size_t new_size) {
+static size_t _get_new_capacity(size_t old_capacity, size_t new_size) {
     size_t new_cap;
     if (old_capacity > SIZE_MAX / 2) {
         if (new_size == SIZE_MAX) {
@@ -31,7 +18,7 @@ static size_t get_new_capacity(size_t old_capacity, size_t new_size) {
     return new_cap > 16 ? new_cap : 16;
 }
 
-static int compare(const void* v1, const void* v2, size_t len) {
+static int _compare(const void* v1, const void* v2, size_t len) {
 #if 1
     return memcmp(v1, v2, len);
 #else
@@ -48,7 +35,7 @@ static int compare(const void* v1, const void* v2, size_t len) {
 #endif
 }
 
-static int resize_and_shift_memory_logic(Arena* arena, String* str, size_t pos, size_t rm_len, size_t insert_len) {
+static int _resize_and_shift_memory_logic(Arena* arena, String* str, size_t pos, size_t rm_len, size_t insert_len) {
     if (str == NULL || str->buffer == NULL) {
         return -1;
     }
@@ -62,7 +49,7 @@ static int resize_and_shift_memory_logic(Arena* arena, String* str, size_t pos, 
 
     // If we grow beyond the current capacity => need more space
     if (new_size + 1 > str->capacity) {
-        size_t new_capacity = get_new_capacity(str->capacity, new_size);
+        size_t new_capacity = _get_new_capacity(str->capacity, new_size);
         char* arena_top = (char*)arena_alloc_used_location(arena);
 
         if (arena_top == str->buffer + str->capacity) {
@@ -148,7 +135,7 @@ String string_init_vfmt(Arena* arena, const char* fmt, va_list args) {
         return (String){0};
     }
     size_t len = (size_t)n;
-    size_t capacity = get_new_capacity(0, len);
+    size_t capacity = _get_new_capacity(0, len);
 
     if (len < sizeof(fmt_buffer)) {
         char* buf = (char*) arena_alloc_push(arena, capacity);
@@ -187,7 +174,7 @@ String string_init_sv(Arena* arena, StringView sv) {
         return (String){0};
     }
 
-    str.capacity = get_new_capacity(0, sv.size);
+    str.capacity = _get_new_capacity(0, sv.size);
     str.buffer = (char*) arena_alloc_push(arena, str.capacity);
 
     if (str.buffer == NULL) {
@@ -208,7 +195,7 @@ const char* string_as_cstr(const String* str) {
 }
 
 static int append_memory_logic(Arena* arena, String* str, size_t append_len) {
-    return resize_and_shift_memory_logic(arena, str, str->size, 0, append_len);
+    return _resize_and_shift_memory_logic(arena, str, str->size, 0, append_len);
 }
 
 int string_append_vfmt(Arena* arena, String* str, const char* fmt, va_list args){
@@ -273,7 +260,7 @@ int string_append_sv(Arena* arena, String* str, StringView append) {
 }
 
 static int prepend_memory_logic(Arena* arena, String* str, size_t prepend_len) {
-    return resize_and_shift_memory_logic(arena, str, 0, 0, prepend_len);
+    return _resize_and_shift_memory_logic(arena, str, 0, 0, prepend_len);
 }
 
 int string_prepend_vfmt(Arena* arena, String* str, const char* fmt, va_list args) {
@@ -367,7 +354,7 @@ int string_prepend_sv(Arena* arena, String* str, StringView pre) {
 }
 
 static int insert_memory_logic(Arena* arena, String* str, size_t pos, size_t ins_len) {
-    return resize_and_shift_memory_logic(arena, str, pos, 0, ins_len);
+    return _resize_and_shift_memory_logic(arena, str, pos, 0, ins_len);
 }
 
 int string_insert_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
@@ -478,7 +465,7 @@ int string_insert_sv(Arena* arena, String* str, size_t pos, StringView ins) {
 
 static int overwrite_memory_logic(Arena* arena, String* str, size_t pos, size_t len) {
     size_t rm_len = pos+len > str->size ? str->size - pos : len;
-    return resize_and_shift_memory_logic(arena, str, pos, rm_len, len);
+    return _resize_and_shift_memory_logic(arena, str, pos, rm_len, len);
 }
 
 int string_overwrite_vfmt(Arena* arena, String* str, size_t pos, const char* fmt, va_list args) {
@@ -586,7 +573,7 @@ int string_erase(String* str, size_t pos, size_t len) {
 }
 
 static int erase_and_insert_memory_logic(Arena* arena, String* str, size_t pos, size_t rm_len, size_t insert_len) {
-    return resize_and_shift_memory_logic(arena, str, pos, rm_len, insert_len);
+    return _resize_and_shift_memory_logic(arena, str, pos, rm_len, insert_len);
 }
 
 int string_erase_and_insert_sv(Arena* arena, String* str, size_t pos, size_t len, StringView sv) {
@@ -793,7 +780,7 @@ int string_replace_all(Arena* arena, String* str, StringView target, StringView 
     size_t new_size = grows ? str->size + size_difference : str->size - size_difference;
 
     // Allocate a new string
-    size_t new_capacity = get_new_capacity(0, new_size);
+    size_t new_capacity = _get_new_capacity(0, new_size);
     char* new_buffer = (char*)arena_alloc_push(arena, new_capacity);
     if (new_buffer == NULL)  {
         return -1;
@@ -843,15 +830,16 @@ int string_clear(String* str) {
     return 0;
 }
 
-String string_deep_copy(Arena* arena, const String* str) {
-    if ((str == NULL) || (str->buffer == NULL)) return (String){0};
+// TODO
+String string_deep_copy(Arena* arena, String str) {
+    if (str.buffer == NULL) return (String){0};
 
     size_t checkpoint = arena_alloc_checkpoint(arena);
-    void* p = arena_alloc_push_struct(arena, (void*)str->buffer, str->size+1);
+    void* p = arena_alloc_push_struct(arena, (void*)str.buffer, str.size+1);
     if (p == NULL) return (String){0};
 
-    if (str->capacity > str->size+1) {
-        void* tmp = arena_alloc_push_unaligned(arena, str->capacity - (str->size+1));
+    if (str.capacity > str.size+1) {
+        void* tmp = arena_alloc_push_unaligned(arena, str.capacity - (str.size+1));
         if (tmp == NULL) {
             arena_alloc_restore(arena, checkpoint);
             return (String){0};
@@ -860,8 +848,8 @@ String string_deep_copy(Arena* arena, const String* str) {
 
     return (String){
         .buffer = (char*)p,
-        .size = str->size,
-        .capacity = str->capacity,
+        .size = str.size,
+        .capacity = str.capacity,
     };
 }
 
@@ -893,18 +881,20 @@ int string_shrink_to_fit(Arena* arena, String* str) {
     if (str == NULL || str->buffer == NULL) {
         return -1;
     }
-    void* arena_top = arena_alloc_used_location(arena);
-    if (arena_top == NULL) {
-        return -1;
-    }
-    // Capacity not changed because not on top of arena
-    if ((uintptr_t)arena_top != (uintptr_t)str->buffer + str->capacity) {
-        // NOTE: Not sure what to return here...
-        return -1;
-    }
-    void* t = arena_alloc_pop_to(arena, str->buffer + str->size+1);
-    if (t == NULL) {
-        return -1;
+    // Try to move the top of the arena
+    if (arena != NULL) {
+        void* arena_top = arena_alloc_used_location(arena);
+        if (arena_top == NULL) {
+            return -1;
+        }
+
+        // Pop when on top of arena
+        if ((uintptr_t)arena_top == (uintptr_t)str->buffer + str->capacity) {
+            void* t = arena_alloc_pop_to(arena, str->buffer + str->size+1);
+            if (t == NULL) {
+                return -1;
+            }
+        }
     }
     str->capacity = str->size + 1;
     return 0;
@@ -948,7 +938,7 @@ StringView sv_from_cstr(const char* cstr) {
 }
 
 StringView sv_from_string(String str) {
-    return str.buffer ? (StringView){ .buffer = str.buffer, .size = str.size } : (StringView){0};
+    return (StringView){ .buffer = str.buffer, .size = str.size };
 }
 
 StringView sv_slice_sv(StringView sv, size_t start, size_t len) {
@@ -969,12 +959,23 @@ StringView sv_truncate_front(StringView sv, size_t len) {
     };
 }
 
+void sv_truncate_front_inplace(StringView* sv, size_t len) {
+    if (len > sv->size) return;
+    sv->buffer += len;
+    sv->size -= len;
+}
+
 StringView sv_truncate_back(StringView sv, size_t len) {
     if (len > sv.size) return (StringView){0};
     return (StringView){
         .buffer = sv.buffer,
         .size = sv.size-len,
     };
+}
+
+void sv_truncate_back_inplace(StringView* sv, size_t len) {
+    if (len > sv->size) return;
+    sv->size -= len;
 }
 
 StringView sv_trim_front(StringView sv) {
@@ -986,18 +987,15 @@ StringView sv_trim_front(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.size == 0) return sv;
-    size_t i = 0;
-    while (i < sv.size) {
-        unsigned char c = sv.buffer[i];
-        if (!((c >= 9 && c <= 13) || c == 32)) {
-            break;
-        }
-        i++;
-    }
-    return (StringView){
-        .buffer = sv.buffer+i,
-        .size = sv.size-i,
+
+    const char* p = sv.buffer;
+    const char* end = sv.buffer + sv.size;
+
+    for (;p<end && (*p == 32 || (*p >= 9 && *p <=13) ); p++) {}
+
+    return (StringView) {
+        .buffer = p,
+        .size = (size_t)(end-p),
     };
 }
 
@@ -1010,26 +1008,20 @@ StringView sv_trim_back(StringView sv) {
      *  '\r': 13
      *  ' ': 32
      */
-    if (sv.size == 0) return sv;
-    while (sv.size > 0) {
-        unsigned char c = sv.buffer[sv.size-1];
-        if (!((c>=9 && c<=13) || (c == 32))) {
-            break;
-        }
-        sv.size--;
-    }
-    return sv;
+
+    const char* p = sv.buffer;
+    const char* end = sv.buffer + sv.size - 1;
+
+    for (;p<end && (*end == 32 || (*end >= 9 && *end <=13) ); end--) {}
+
+    return (StringView) {
+        .buffer = p,
+        .size = (size_t)(end-p+1),
+    };
 }
 
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
-    if (sv == NULL || sv->buffer == NULL || delim.buffer == NULL) {
-        return (StringView){0};
-    }
-    if (delim.size == 0) {
-        return (StringView){.buffer=sv->buffer, .size=0};
-    }
     size_t pos = sv_find(*sv, delim);
-    // TODO: I think this if is useless
     if (pos == sv->size) {
         StringView out = sv_from_sv(*sv);
         sv->buffer += sv->size;
@@ -1044,19 +1036,33 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim) {
     };
 }
 
+StringView sv_chop_by(StringView* sv, size_t pos) {
+    if (pos > sv->size) {
+        return (StringView){0};
+    }
+    sv->buffer += pos;
+    sv->size -= pos;
+    return (StringView){
+        .buffer = sv->buffer-pos,
+        .size = pos,
+    };
+}
+
 bool sv_equal(StringView sv1, StringView sv2) {
     if (sv1.size != sv2.size) return false;
 
-    return compare(sv1.buffer, sv2.buffer, sv1.size) == 0;
+    return _compare(sv1.buffer, sv2.buffer, sv1.size) == 0;
 }
 
 int sv_compare(const StringView* sv1, const StringView* sv2) {
     // <0 if sv1 < sv2
     // =0 if sv1 == sv2
     // >0 if sv1 > sv2
+    ASSERT(sv1 != NULL);
+    ASSERT(sv2 != NULL);
     size_t len = sv1->size<sv2->size ? sv1->size : sv2->size;
 
-    int cmp = compare(sv1->buffer, sv2->buffer, len);
+    int cmp = _compare(sv1->buffer, sv2->buffer, len);
     if (cmp != 0) return cmp;
 
     if (sv1->size < sv2->size) return -1;
@@ -1065,22 +1071,45 @@ int sv_compare(const StringView* sv1, const StringView* sv2) {
 }
 
 bool sv_starts_with(StringView sv, StringView pre) {
-    if (sv.buffer == NULL || pre.buffer == NULL || pre.size > sv.size) {
+    // if (sv.buffer == NULL || pre.buffer == NULL || pre.size > sv.size) {
+    //     return false;
+    // }
+    // ASSERT(sv.buffer != NULL);
+    // ASSERT(pre.buffer != NULL);
+    if (pre.size == 0) {
+        return true;
+    }
+    if (pre.size > sv.size) {
         return false;
     }
 
-    return compare(sv.buffer, pre.buffer, pre.size) == 0;
+    return _compare(sv.buffer, pre.buffer, pre.size) == 0;
+}
+
+bool sv_starts_with_char(StringView sv, char c) {
+    if (sv.size == 0) {
+        return false;
+    }
+    return sv.buffer[0] == c;
 }
 
 bool sv_ends_with(StringView sv, StringView post) {
-    if (sv.buffer == NULL || post.buffer == NULL || sv.size < post.size) {
+    // if (sv.buffer == NULL || post.buffer == NULL || sv.size < post.size) {
+    //     return false;
+    // }
+    // ASSERT(sv.buffer != NULL);
+    // ASSERT(post.buffer != NULL);
+    if (post.size == 0) {
+        return true;
+    }
+    if (post.size > sv.size)  {
         return false;
     }
 
-    return compare(sv.buffer + sv.size-post.size, post.buffer, post.size) == 0;
+    return _compare(sv.buffer + sv.size-post.size, post.buffer, post.size) == 0;
 }
 
-static size_t BMH_search(StringView haystack, StringView needle) {
+static size_t _BMH_search(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
@@ -1109,7 +1138,7 @@ static size_t BMH_search(StringView haystack, StringView needle) {
     return haystack.size;
 }
 
-static size_t BMH_rsearch(StringView haystack, StringView needle) {
+static size_t _BMH_rsearch(StringView haystack, StringView needle) {
     /*
      * Boyer-Moore-Horspool fallback for better perf than naive if not on linux.
      * https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore%E2%80%93Horspool_algorithm
@@ -1142,9 +1171,11 @@ static size_t BMH_rsearch(StringView haystack, StringView needle) {
 // TODO(alex): Now wiki had an implementation of BMH, apparently, there is something even
 // better called two way search. TBC
 size_t sv_find(StringView haystack, StringView needle) {
-    if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return haystack.size;
-    }
+    // if (haystack.buffer == NULL || needle.buffer == NULL) {
+    //     return haystack.size;
+    // }
+    // ASSERT( haystack.buffer != NULL );
+    // ASSERT( needle.buffer != NULL );
     if (needle.size == 0) return 0;
     if (needle.size > haystack.size) return haystack.size;
 
@@ -1166,7 +1197,7 @@ size_t sv_find(StringView haystack, StringView needle) {
         return match != NULL ? (size_t)(match - h) : haystack.size;
     }
     else if (needle.size > 6) {         // Just a "random" number, BMH is better for larger needles
-        return BMH_search(haystack, needle);
+        return _BMH_search(haystack, needle);
     }
     else {
         size_t remaining = haystack.size - needle.size + 1;
@@ -1190,9 +1221,9 @@ size_t sv_find(StringView haystack, StringView needle) {
 }
 
 size_t sv_rfind(StringView haystack, StringView needle) {
-    if (haystack.buffer == NULL || needle.buffer == NULL) {
-        return haystack.size;
-    }
+    // if (haystack.buffer == NULL || needle.buffer == NULL) {
+    //     return haystack.size;
+    // }
     if (needle.size == 0) return haystack.size;
     if (needle.size > haystack.size) return haystack.size;
 
@@ -1205,7 +1236,7 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         return match != NULL ? (size_t)(match-h) : haystack.size;
     }
     else if (needle.size > 6) {
-        return BMH_rsearch(haystack, needle);
+        return _BMH_rsearch(haystack, needle);
     }
     else {
         const unsigned char* p = h;
@@ -1226,19 +1257,7 @@ size_t sv_rfind(StringView haystack, StringView needle) {
         return haystack.size;
     }
 #else
-    return BMH_rsearch(haystack, needle);
-
-    // size_t i = haystack.size-needle.size;
-    // while (true) {
-    //     if ((h[i] == n[0]) && (memcmp(h+i , n, needle.size) == 0)) {
-    //         return i;
-    //     }
-    //     if (i == 0) {
-    //         break;
-    //     }
-    //     i--;
-    // }
-    // return haystack.size;
+    return _BMH_rsearch(haystack, needle);
 #endif
 }
 
@@ -1270,6 +1289,277 @@ StringView sv_directory_name(StringView sv){
         return sv;
     }
     return (StringView){.buffer=sv.buffer, .size=pos+1};
+}
+
+const char* sv_as_cstr(Arena* arena, StringView sv) {
+    if (sv.size == 0) {
+        return "";
+    }
+    char* t = (char*)arena_alloc_push_struct(arena, (void*)sv.buffer, sv.size);
+    if (t == NULL) {
+        return "";
+    }
+    arena_alloc_push_unaligned(arena, 1);
+    t[sv.size] = '\0';
+    return t;
+}
+
+// PARSING
+
+enum CharType {
+    SV_CHAR_SPACE = 0x1,
+    SV_CHAR_DIGIT = 0x2,
+    SV_CHAR_ALPHA = 0x4,
+    SV_CHAR_DOT   = 0x8,
+    SV_CHAR_NEG   = 0x10,
+    SV_CHAR_EXP   = 0x20,
+};
+
+static uint8_t LUT[256] = {
+    [' ']  = SV_CHAR_SPACE,
+    ['\t'] = SV_CHAR_SPACE,
+    ['\n'] = SV_CHAR_SPACE,
+    ['\r'] = SV_CHAR_SPACE,
+    ['\v'] = SV_CHAR_SPACE,
+    ['\f'] = SV_CHAR_SPACE,
+
+    ['0']  = SV_CHAR_DIGIT,
+    ['1']  = SV_CHAR_DIGIT,
+    ['2']  = SV_CHAR_DIGIT,
+    ['3']  = SV_CHAR_DIGIT,
+    ['4']  = SV_CHAR_DIGIT,
+    ['5']  = SV_CHAR_DIGIT,
+    ['6']  = SV_CHAR_DIGIT,
+    ['7']  = SV_CHAR_DIGIT,
+    ['8']  = SV_CHAR_DIGIT,
+    ['9']  = SV_CHAR_DIGIT,
+
+    ['-']  = SV_CHAR_NEG,
+
+    ['.']  = SV_CHAR_DOT,
+
+    ['e']  = SV_CHAR_EXP,
+    ['E']  = SV_CHAR_EXP,
+    // TODO continue when needed
+};
+
+static void _sv_trim_front(StringView* sv) {
+    while ((sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_SPACE)) {
+        sv->buffer++;
+        sv->size--;
+    }
+}
+
+int sv_parse_u32(StringView* sv, uint32_t* out) {
+    if (sv == NULL || sv->buffer == NULL) {
+        return -1;
+    }
+
+    _sv_trim_front(sv);
+
+    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        return -1;
+    }
+
+    uint32_t v = 0;
+
+    // UINT32_MAX = 4_294_967_295
+    const uint32_t limit     = UINT32_MAX / 10;
+    const uint32_t remainder = UINT32_MAX % 10;
+    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        uint32_t digit = sv->buffer[0]-'0';
+        if ( (v>limit) || ((v==limit) && (digit > remainder)) ) {
+            return -1;
+        }
+        v = v*10 + digit;
+        sv->buffer++;
+        sv->size--;
+    }
+    *out = v;
+
+    return 0;
+}
+
+int sv_parse_s32(StringView* sv, int32_t* out) {
+    if (sv == NULL || sv->buffer == NULL) {
+        return -1;
+    }
+
+    _sv_trim_front(sv);
+    if (sv->size == 0) {
+        return -1;
+    }
+
+    int sign = 1;
+    if (LUT[sv->buffer[0]] & SV_CHAR_NEG) {
+        sign = -1;
+        sv->buffer++;
+        sv->size--;
+    }
+    else if (sv->buffer[0] == '+') {
+        sv->buffer++;
+        sv->size--;
+    }
+    if ((sv->size == 0) || !(LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        return -1;
+    }
+
+    uint32_t v = 0;
+    // INT32_MAX =  2_147_483_647
+    // INT32_MIN = -2_147_483_648
+    const uint32_t limit = INT32_MAX / 10;
+    const uint32_t remainder = sign==1 ? 7 : 8;
+
+    while ( (sv->size>0) && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        uint32_t digit = sv->buffer[0]-'0';
+
+        if (v > limit || (v==limit && digit > remainder)) {
+                return -1;
+        }
+        v = v*10 + digit;
+        sv->buffer++;
+        sv->size--;
+    }
+
+    // Two's complement abuse-ish
+    *out = (int32_t)(sign==1 ? v : -v);
+    return 0;
+}
+
+static double inv_power_table[18] = {
+    1.0,
+    0.1,
+    0.01,
+    0.001,
+    0.0001,
+    0.00001,
+    0.000001,
+    0.0000001,
+    0.00000001,
+    0.000000001,
+    0.0000000001,
+    0.00000000001,
+    0.000000000001,
+    0.0000000000001,
+    0.00000000000001,
+    0.000000000000001,
+    0.0000000000000001,
+    0.00000000000000001,
+};
+
+static double power_table[18] = {
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0,
+    100000.0,
+    1000000.0,
+    10000000.0,
+    100000000.0,
+    1000000000.0,
+    10000000000.0,
+    100000000000.0,
+    1000000000000.0,
+    10000000000000.0,
+    100000000000000.0,
+    1000000000000000.0,
+    10000000000000000.0,
+    100000000000000000.0,
+};
+
+int sv_parse_f32(StringView* sv, float* out) {
+    if (sv == NULL || sv->buffer == NULL) {
+        return -1;
+    }
+    _sv_trim_front(sv);
+    if (sv->size == 0) {
+        return -1;
+    }
+
+    int sign = 1;
+    if (LUT[sv->buffer[0]] & SV_CHAR_NEG) {
+        sign = -1;
+        sv->buffer++;
+        sv->size--;
+    }
+    else if (sv->buffer[0] == '+') {
+        sv->buffer++;
+        sv->size--;
+    }
+
+    // Integer part
+    uint64_t integer = 0;
+    while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+        integer = integer*10 + sv->buffer[0]-'0';
+        sv->buffer++;
+        sv->size--;
+    }
+
+    if (integer > FLT_MAX) {
+        return -1;
+    }
+
+    // Fractional
+    double decimal = 0.0;
+    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_DOT)) {
+        sv->buffer++;
+        sv->size--;
+
+        uint64_t frac = 0;
+        uint8_t power = 0;
+        while(sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+            if (power < 18) {
+                frac = frac * 10 + sv->buffer[0]-'0';
+                power++;
+            }
+
+            sv->buffer++;
+            sv->size--;
+        }
+
+        decimal = (double)frac * inv_power_table[power<18 ? power : 17];
+    }
+
+    // Handle scientific notation
+    uint8_t exp = 0;
+    int8_t exp_sign = 1;
+    if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_EXP)) {
+        sv->buffer++;
+        sv->size--;
+
+        if ((sv->size > 0) && (LUT[sv->buffer[0]] & SV_CHAR_NEG)) {
+            sv->buffer++;
+            sv->size--;
+            exp_sign = -1;
+        }
+        else if ((sv->size > 0) && (sv->buffer[0] == '+')) {
+            sv->buffer++;
+            sv->size--;
+        }
+
+        while (sv->size>0 && (LUT[sv->buffer[0]] & SV_CHAR_DIGIT)) {
+            exp = exp*10 + sv->buffer[0]-'0';
+            sv->buffer++;
+            sv->size--;
+        }
+    }
+
+    double result = 0.0f;
+    if (exp == 0) {
+        result = sign * ((double)integer + decimal);
+    }
+    else {
+        if (exp_sign == 1) {
+            result = sign * ((double)integer + decimal) * power_table[exp<18 ? exp : 17];
+        }
+        else {
+            result = sign * ((double)integer + decimal) * inv_power_table[exp<18 ? exp : 17];
+        }
+    }
+
+    *out = (float)result;
+    return 0;
 }
 
 void sv_print(StringView sv) {

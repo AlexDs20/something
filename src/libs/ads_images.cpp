@@ -1,5 +1,8 @@
-#include "libs/libstring.h"
+#include "libs/ads_string.h"
+#include "memory/allocators.h"
+#include "libs/ads_images.h"
 #include "libs/ads_jpeg.h"
+#include "platform/io.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "extern/stb_image.h"
@@ -33,11 +36,11 @@ bool read_image_info(filename, &width, &height, &components){
 
     LocalArena* local_arena = local_arena_alloc_create();
 
-    string8 data = read_file(local_arena->arena, filename);
-    string8 extension = string_get_file_extension(filename);
+    StringView data = read_complete_file(local_arena->arena, filename);
+    StringView extension = sv_file_extension(filename);
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
-    if (extension == ".jpg" || extension == ".jpeg") {
+    if (sv_equal(extension, sv_from_cstr(".jpg")) || sv_equal(extension, sv_from_cstr(".jpeg")) {
         // result = read_jpeg_info(data, width, height, components);
         result = {IMAGE_FAIL, "Not implemented"};
     }
@@ -55,43 +58,49 @@ bool read_image_info(filename, &width, &height, &components){
 }
 */
 
-Image read_image_file(Arena* persist_arena, string8 filename) {
+Image read_image_file(Arena* persist_arena, StringView filename) {
     Image out = {};
     LocalArena* local_arena = local_arena_alloc_create();
     u64 checkpoint = arena_alloc_checkpoint(persist_arena);
 
-    string_print(filename);
-    string8 data = read_file(local_arena->arena, filename);
-    string8 extension = string_get_file_extension(filename);
+    String data_str = read_complete_file(local_arena->arena, filename);
+    StringView data = sv_from_string(data_str);
+    StringView extension = sv_file_extension(filename);
 
     ImageParsingResult result = {IMAGE_SUCCESS, 0};
-    if (extension == ".jpg" || extension == ".jpeg") {
-
-        u16 width;
-        u16 height;
-        u8 components;
-        u8 precision;
-        read_jpeg_info(filename, &width, &height, &components, &precision);
-
+    if (sv_equal(extension, sv_from_cstr(".jpg")) || sv_equal(extension, sv_from_cstr(".jpeg"))) {
+        // u16 width;
+        // u16 height;
+        // u8 components;
+        // u8 precision;
+        // read_jpeg_info(filename, &width, &height, &components, &precision);
         result = decode_jpeg(persist_arena, data, &out);
-    } else if (extension == ".png"){
-        char* f = string_to_cstr(local_arena->arena, filename);
+
+        // const char* f = sv_as_cstr(local_arena->arena, filename);
+        // int w, h, c;
+        // out.gray = stbi_load(f, &w, &h, &c, 4);
+        // out.width = w;
+        // out.height = h;
+        // out.components = c;
+    } else if (sv_equal(extension, sv_from_cstr(".png"))) {
+        const char* f = sv_as_cstr(local_arena->arena, filename);
         int w, h, c;
-        // out.gray = stbi_load(f, &w, &h, &c, 0);
+        out.gray = stbi_load(f, &w, &h, &c, 0);
         out.width = w;
         out.height = h;
         out.components = c;
+
         // TODO(alex): Own png decoder
         // decode_png(persist_arena, data, &out);
     } else {
         printf("File format not supported: extension = ");
-        string_print(extension);
+        sv_print(extension);
     }
 
     if (result.status != IMAGE_SUCCESS) {
         arena_alloc_restore_zero(persist_arena, checkpoint);
         printf("Failed parsing file: ");
-        string_print(filename);
+        sv_print(filename);
         printf(" with error: %s\n", result.error_message);
         create_missing_image(persist_arena, &out);
     }

@@ -1,9 +1,11 @@
-#ifndef _PLATFORM_WINDOW_H
-#define _PLATFORM_WINDOW_H
+#ifndef PLATFORM_WINDOW_H
+#define PLATFORM_WINDOW_H
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include "memory/allocators.h"
+#include "base/base.h"
+
+struct Arena;
 
 //============
 // DRAW_METHOD
@@ -34,4 +36,4 @@ bool platform_handle_events(Win* win);
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window);
 void platform_cleanup_window(Win win);
 
-#endif // _PLATFORM_WINDOW_H
+#endif // PLATFORM_WINDOW_H

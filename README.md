@@ -1,24 +1,20 @@
 # TODO
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
-    - [ ] Progressive decoding
+    - [x] Progressive decoding
     - [ ] Check the output data format => u8*
     - [ ] Check memory alloc strategy
     - [ ] Value off by 1 maybe? Check
     - [ ] Allow returning 1, 3 or 4 components as requested by a user
-    - [ ] Get the info about the jpeg image without decoding
-    - [ ] Allow flipping along y.
-    - [ ] Test code on thousands of images
-- Renderer:
-    - [ ] Add another implementation for rasterizing using bounding box
-    - [ ] Add rendering texture on mesh
+    - [x] Get the info about the jpeg image without decoding
+    - [x] Allow flipping along y.
+    - [x] Test code on many images
 - Libs:
-    - [ ] String
     - [ ] Image
         - [X] JPEG
         - [ ] PNG
     - [ ] DataStructures
-        - [ ] Vector
+        - [X] Vector (to revisit)
         - [ ] HashMap
     - [ ] LIBC
     - [ ] IMGUI
@@ -30,10 +26,15 @@
     - [ ] Text format: true type?
 
 # Implemented
-- Window using Xlib with scaling nearest / bilinear or no scaling
-- Basic jpeg decoder
-- .obj parser
-- Basic software renderer drawing triangles as wireframe or filling
+- [x] Arena
+- [x] String
+- [x] Window using Xlib with scaling nearest / bilinear or no scaling
+- [x] Basic jpeg decoder
+- Renderer:
+    - [x] Add another implementation for rasterizing using bounding box
+    - [x] Add rendering texture on mesh
+    - [x] .obj parser
+    - [x] Basic software renderer drawing triangles as wireframe or filling
 
 # Notes:
 - Rendering to X11 requires data stored in bottom up fashion

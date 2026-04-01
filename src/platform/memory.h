@@ -1,8 +1,8 @@
-#ifndef _H_PLATFORM_MEMORY
-#define _H_PLATFORM_MEMORY
+#ifndef PLATFORM_MEMORY_H
+#define PLATFORM_MEMORY_H
 #include <stddef.h>
 #include <unistd.h>
-#include "utils/types.h"
+#include "base/base.h"
 
 typedef struct {
     void* ptr;
@@ -16,4 +16,4 @@ MemoryBlock os_memory_commit(void* addr, u64 size);
 bool os_memory_decommit(void* addr, u64 size);
 u64 os_memory_page_size();
 
-#endif  // _H_PLATFORM_MEMORY
+#endif  // PLATFORM_MEMORY_H

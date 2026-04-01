@@ -1,10 +1,8 @@
-#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "utils/defines.h"
+
+#include "base/base.h"
 #include "memory/allocators.h"
-#include "allocators.h"
-#include "utils/types.h"
 #include "platform/memory.h"
 
 #define DEFAULT_ALIGN (sizeof(void*))                       // Bytes
@@ -98,7 +96,7 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size) {
     u64 needed = arena->top + size;
     if (needed > arena->capacity) {
         printf("Arena overflow. Not enough space left.\n");
-        *(char*)0 = 0;
+        *(volatile char*) 0 = 0;
         return 0;
     }
     if (needed > arena->committed) {
@@ -346,7 +344,7 @@ void local_arena_alloc_reset(LocalArena* local_arena) {
 //==============================
 // Vector
 
-Vector* vector_alloc_create(Arena* arena, u64 element_size) {
+Vector* vector_alloc_create(Arena* arena, u64 struct_size) {
     u64 checkpoint = arena_alloc_checkpoint(arena);
     Vector* vector = (Vector*)arena_alloc_push(arena, sizeof(Vector));
     if (!vector) {
@@ -358,7 +356,27 @@ Vector* vector_alloc_create(Arena* arena, u64 element_size) {
         return 0;
     }
     vector->count = 0;
-    vector->element_size = element_size;
+    vector->element_size = struct_size;
+    vector->arena = arena;
+    return vector;
+}
+
+// #define arena_alloc_push(arena, TYPE)   (TYPE*)arena_alloc_push(arena, sizeof(TYPE))
+
+Vector* vector_alloc_create_size(Arena* arena, u64 struct_size, u64 n) {
+    u64 checkpoint = arena_alloc_checkpoint(arena);
+    Vector* vector = (Vector*)arena_alloc_push(arena, sizeof(Vector));
+    if (!vector) {
+        return 0;
+    }
+    vector->buffer = (u8*)arena_alloc_push(arena, n * struct_size);
+    if (!vector->buffer) {
+        *(volatile char*) 0 = 0 ;
+        arena_alloc_restore(arena, checkpoint);
+        return 0;
+    }
+    vector->count = 0;
+    vector->element_size = struct_size;
     vector->arena = arena;
     return vector;
 }
@@ -426,8 +444,7 @@ void* vector_alloc_get(Vector* vector, u64 index) {
     if (!vector) {
         return 0;
     }
-    void* data = (void*)(vector->buffer + index * vector->element_size);
-    return data;
+    return (void*)(vector->buffer + index * vector->element_size);
 }
 
 Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector) {

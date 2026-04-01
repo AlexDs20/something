@@ -8,10 +8,11 @@
 
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <X11/extensions/XShm.h>
+// #include <X11/extensions/XShm.h>
 
+#include "base/base.h"
 #include "platform/window.h"
-#include "utils/defines.h"
+#include "memory/allocators.h"
 
 // https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
 
@@ -331,106 +332,106 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
 void print_event_type(int event_type) {
         switch (event_type) {
             case KeyPress: {
-                printf("\t KeyPress\n");
+                printf("\n\t KeyPress");
             } break;
             case KeyRelease: {
-                printf("\t KeyRelease\n");
+                printf("\n\t KeyRelease");
             } break;
             case ButtonPress: {
-                printf("\t ButtonPress\n");
+                printf("\n\t ButtonPress");
             } break;
             case ButtonRelease: {
-                printf("\t ButtonRelease\n");
+                printf("\n\t ButtonRelease");
             } break;
             case MotionNotify: {
-                printf("\t MotionNotify\n");
+                printf("\n\t MotionNotify");
             } break;
             case EnterNotify: {
-                printf("\t EnterNotify\n");
+                printf("\n\t EnterNotify");
             } break;
             case LeaveNotify: {
-                printf("\t LeaveNotify\n");
+                printf("\n\t LeaveNotify");
             } break;
             case FocusIn: {
-                printf("\t FocusIn\n");
+                printf("\n\t FocusIn");
             } break;
             case FocusOut: {
-                printf("\t FocusOut\n");
+                printf("\n\t FocusOut");
             } break;
             case KeymapNotify: {
-               printf("\t KeymapNotify\n");
+               printf("\n\t KeymapNotify");
             } break;
             case Expose: {
-                printf("\t Expose\n");
+                printf("\n\t Expose");
             } break;
             case GraphicsExpose: {
-                printf("\t GraphicsExpose\n");
+                printf("\n\t GraphicsExpose");
             } break;
             case NoExpose: {
-                printf("\t NoExpose\n");
+                printf("\n\t NoExpose");
             } break;
             case VisibilityNotify: {
-                printf("\t VisibilityNotify\n");
+                printf("\n\t VisibilityNotify");
             } break;
             case CreateNotify: {
-                printf("\t CreateNotify\n");
+                printf("\n\t CreateNotify");
             } break;
             case DestroyNotify: {
-                printf("\t DestroyNotify\n");
+                printf("\n\t DestroyNotify");
             } break;
             case UnmapNotify: {
-                printf("\t UnmapNotify\n");
+                printf("\n\t UnmapNotify");
             } break;
             case MapNotify: {
-                printf("\t MapNotify\n");
+                printf("\n\t MapNotify");
             } break;
             case MapRequest: {
-                printf("\t MapRequest\n");
+                printf("\n\t MapRequest");
             } break;
             case ReparentNotify: {
-                printf("\t ReparentNotify\n");
+                printf("\n\t ReparentNotify");
             } break;
             case ConfigureNotify: {
-                printf("\t ConfigureNotify\n");
+                printf("\n\t ConfigureNotify");
             } break;
             case ConfigureRequest: {
-                printf("\t ConfigureRequest\n");
+                printf("\n\t ConfigureRequest");
             } break;
             case GravityNotify: {
-                printf("\t GravityNotify\n");
+                printf("\n\t GravityNotify");
             } break;
             case ResizeRequest: {
-                printf("\t ResizeRequest\n");
+                printf("\n\t ResizeRequest");
             } break;
             case CirculateNotify: {
-                printf("\t CirculateNotify\n");
+                printf("\n\t CirculateNotify");
             } break;
             case CirculateRequest: {
-                printf("\t CirculateRequest\n");
+                printf("\n\t CirculateRequest");
             } break;
             case PropertyNotify: {
-                printf("\t PropertyNotify\n");
+                printf("\n\t PropertyNotify");
             } break;
             case SelectionClear: {
-                printf("\t SelectionClear\n");
+                printf("\n\t SelectionClear");
             } break;
             case SelectionRequest: {
-                printf("\t SelectionRequest\n");
+                printf("\n\t SelectionRequest");
             } break;
             case SelectionNotify: {
-                printf("\t SelectionNotify\n");
+                printf("\n\t SelectionNotify");
             } break;
             case ColormapNotify: {
-                printf("\t ColormapNotify\n");
+                printf("\n\t ColormapNotify");
             } break;
             case ClientMessage: {
-                printf("\t ClientMessage\n");
+                printf("\n\t ClientMessage");
             } break;
             case MappingNotify: {
-                printf("\t MappingNotify\n");
+                printf("\n\t MappingNotify");
             } break;
             case GenericEvent: {
-               printf("\t GenericEvent\n");
+               printf("\n\t GenericEvent");
            } break;
         }
 }
@@ -451,13 +452,13 @@ bool platform_handle_events(Win* win) {
                 }
             } break;
             case KeyPress: {
-                printf("Key pressed!\n");
+                printf("\nKey pressed!");
                 if (event.xkey.keycode == XKeysymToKeycode(win->display, XK_f)) {
                     toggle_fullscreen(win->display, win->window);
                 }
             } break;
             case KeyRelease: {
-                printf("Key released!\n");
+                printf("\nKey released!");
             } break;
             case ConfigureNotify: {
                 // Go through all the ConfigureNotify events in the queue (they get removed from the queue)
@@ -471,7 +472,7 @@ bool platform_handle_events(Win* win) {
                 if (new_w != win->w || new_h != win->h) {
                     win->w = new_w;
                     win->h = new_h;
-                    printf("Window size: (%d,%d) = %.3f MB\n", win->w, win->h, (float)(win->w*win->h*win->pixel_bytes/1024.0f/1024.0f));
+                    printf("\nWindow size: (%d,%d) = %.3f MB", win->w, win->h, (float)(win->w*win->h*win->pixel_bytes/1024.0f/1024.0f));
 
                     // set the data to null so that the DestroyImage doesn't free the buffer
                     win->xim->data = 0;

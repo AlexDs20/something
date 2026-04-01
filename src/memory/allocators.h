@@ -1,14 +1,15 @@
-#ifndef _ALLOCATORS_H
-#define _ALLOCATORS_H
+#ifndef ADS_ALLOCATORS_H
+#define ADS_ALLOCATORS_H
 
-#include "utils/types.h"
+#include "base/base.h"
 
-typedef struct {
+typedef struct Arena Arena;
+struct Arena {
     u8* buffer;
     u64 capacity;
     u64 top;
     u64 committed;
-} Arena;
+};
 
 Arena* arena_alloc_create(u64 capacity);
 Arena* arena_alloc_create_zero(u64 capacity);
@@ -23,6 +24,8 @@ void* arena_alloc_push_unaligned(Arena* arena, u64 size);
 void* arena_alloc_push_zero(Arena* arena, u64 size);
 void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment);
 void* arena_alloc_push_zero_unaligned(Arena* arena, u64 size);
+// TODO: rename push_struct to push_data
+// TODO: Implement push struct zero
 void* arena_alloc_push_struct(Arena* arena, void* data, u64 size);
 void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment);
 void* arena_alloc_push_struct_unaligned(Arena* arena, void* data, u64 size);
@@ -64,7 +67,9 @@ typedef struct {
     u64 element_size;
 } Vector;
 
-Vector* vector_alloc_create(Arena* arena, u64 size);
+Vector* vector_alloc_create(Arena* arena, u64 struct_size);
+Vector* vector_alloc_create_size(Arena* arena, u64 struct_size, u64 n_elem);
+// TODO: Add support to push but no data and get the pointer back
 void* vector_alloc_push(Vector* vector, void* data);
 void vector_alloc_pop(Vector* vector);
 void vector_alloc_pop_zero(Vector* vector);
@@ -75,4 +80,8 @@ u64 vector_alloc_count(Vector* vector);
 void* vector_alloc_get(Vector* vector, u64 index);
 Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 
-#endif  // _ALLOCATORS_H
+// TODO:
+//  - Get pointer
+//  - Copy only data
+
+#endif  // ADS_ALLOCATORS_H

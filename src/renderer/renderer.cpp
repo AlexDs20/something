@@ -3,12 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "libs/ads_model_loader.h"
 #include "renderer/renderer.h"
 #include "libs/ads_math.h"
-#include "libs/libstring.h"
-#include "libs/ads_images.h"
-#include "utils/defines.h"
-#include "platform/io.h"
 
 void print(Vertex* v) {
     printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
@@ -18,275 +15,28 @@ void print(VertexAttrs* va) {
     printf("VertexAttrs: uvw=(%f,%f,%f) n=(%f,%f,%f)\n", va->u, va->v, va->w, va->nx, va->ny, va->nz);
 }
 
-void print(Normal* n) {
-    printf("Normal: (%f,%f,%f)\n", n->x, n->y, n->z);
+
+//==============================
+// TODO Temporary!
+static f32x3
+cross(f32x3 a, f32x3 b) {
+    f32x3 result = {
+        .x = a.y*b.z - a.z*b.y,      \
+        .y = a.z*b.x - a.x*b.z,      \
+        .z = a.x*b.y - a.y*b.x       \
+    };
+    return result;
 }
-
-void print(TexCoord* t) {
-    printf("TexCoord: (%f,%f,%f)\n", t->u, t->v, t->w);
+static f32
+maxf32(f32 a, f32 b) {
+    return a > b ? a : b;
 }
-
-// void print(Face* f) {
-//     printf("Face: vertex: (%d,%d,%d)  texture: (%d,%d,%d)  normal: (%d,%d,%d)\n",
-//             f->v[0], f->v[1], f->v[2],
-//             f->vt[0], f->vt[1], f->vt[2],
-//             f->vn[0], f->vn[1], f->vn[2]
-//             );
-// }
-
-
-f32x3 string_to_f32x3(Arena* arena, string8 data) {
-    f32x3 out = {0};
-    u64 space = string_find_first(data, ' ');
-    string8 r = string_substring(data, 0, space);
-    out.r = atof(string_to_cstr(arena, r));
-
-    string_move_forward(&data, space+1);
-    space = string_find_first(data, ' ');
-    string8 g = string_substring(data, 0, space);
-    out.g = atof(string_to_cstr(arena, g));
-
-    string_move_forward(&data, space+1);
-    space = string_find_first(data, ' ');
-    string8 b = string_substring(data, 0, space);
-    out.b = atof(string_to_cstr(arena, b));
-    return out;
+static f32
+minf32(f32 a, f32 b) {
+    return a < b ? a : b;
 }
+//==============================
 
-
-Material* read_mtl_file(Arena* arena, string8 file_path) {
-    LocalArena* local_arena = local_arena_alloc_create();
-
-    string8 dirname = string_dirname(file_path);
-    string8 content = read_file(local_arena->arena, file_path);
-
-    Material* material = (Material*)arena_alloc_push(arena, sizeof(Material));
-
-    u64 line_start = 0;
-    for (u64 i=0; i<content.size; i++) {
-        if ((content.buffer[i] == '\n') || (i == content.size-1)) {
-            u64 line_end = i-1;
-            if (i == content.size-1) {
-                line_end = i;
-            }
-            string8 line = string_substring(content, line_start, line_end+1);
-            if (string_starts_with(line, "newmtl ")) {
-                string8 mtl_name = string_substring(line, 7, line.size);
-                string8 name = string_copy_to_arena(arena, mtl_name);
-                material->name = name;
-            } else if (string_starts_with(line, "Ns ")) {
-                string8 data = string_substring(line, 3, line.size);
-                char* c_data = string_to_cstr(local_arena->arena, data);
-                material->Ns = atof(c_data);
-            } else if (string_starts_with(line, "Ka ")) {
-                string8 data = string_substring(line, 3, line.size);
-                material->Ka = string_to_f32x3(arena, data);
-            } else if (string_starts_with(line, "Kd ")) {
-                string8 data = string_substring(line, 3, line.size);
-                material->Kd = string_to_f32x3(arena, data);
-            } else if (string_starts_with(line, "Ks ")) {
-                string8 data = string_substring(line, 3, line.size);
-                material->Ks = string_to_f32x3(arena, data);
-            } else if (string_starts_with(line, "Ke ")) {
-                string8 data = string_substring(line, 3, line.size);
-                material->Ke = string_to_f32x3(arena, data);
-            } else if (string_starts_with(line, "Ni ")) {
-                string8 data = string_substring(line, 3, line.size);
-                char* c_data = string_to_cstr(local_arena->arena, data);
-                material->Ni = atof(c_data);
-            } else if (string_starts_with(line, "d ")) {
-                string8 data = string_substring(line, 2, line.size);
-                char* c_data = string_to_cstr(local_arena->arena, data);
-                material->d = atof(c_data);
-            } else if (string_starts_with(line, "illum ")) {
-                string8 data = string_substring(line, 6, line.size);
-                char* c_data = string_to_cstr(local_arena->arena, data);
-                material->illum = atol(c_data);
-            } else if (string_starts_with(line, "map_Kd ")) {
-                string8 filename = string_substring(line, 7, line.size);
-                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Kd = read_image_file(arena, complete_path);
-            } else if (string_starts_with(line, "map_Bump ")) {
-                string8 filename = string_substring(line, 9, line.size);
-                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Bump = read_image_file(arena, complete_path);
-            } else if (string_starts_with(line, "map_Ks ")) {
-                string8 filename = string_substring(line, 7, line.size);
-                string8 complete_path = string_join_strings(local_arena->arena, dirname, filename);
-                material->map_Ks = read_image_file(arena, complete_path);
-            }
-            line_start = i+1;
-        }
-    }
-
-    local_arena_alloc_reset(local_arena);
-    return material;
-}
-
-/*
-    From wiki
-    symbol meanings:
-    # -> comments
-    v x y z [w=1] -> vertex coords
-    vn x y z -> vertex normals (seems to have n instead)
-    vt u [v=0] [w=0] -> texture coordinates 2D sometimes 3D
-    vp u [v] [w] -> vertex parameter
-    f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ... -> face definition usually a triangle     index 1-based not all are present (vt vn)
-    l a b c d e -> line element
-
-    mtllib [external .mtl file name]
-    usemtl [material name]
-
-    o => object name
-     g => group name
-
-    s 1  => smooth shading
-     s off
-
-    Using fgets()? and sscanf()?
-*/
-Model* read_obj_model_file(Arena* arena, string8 file_path) {
-    LocalArena* local_arena = local_arena_alloc_create();
-
-    string8 dirname = string_dirname(file_path);
-    string8 file = read_file(local_arena->arena, file_path);
-    u64 checkpoint = arena_alloc_checkpoint(local_arena->arena);
-
-    u64 start_line = 0;
-    u64 end_line   = 0;
-    u64 size_line  = 0;
-
-    Arena* vertices_arena   = arena_alloc_create(1*GiB);
-    Arena* vertex_attrs_arena   = arena_alloc_create(1*GiB);
-    Arena* faces_arena      = arena_alloc_create(1*GiB);
-    Arena* tex_coords_arena = arena_alloc_create(1*GiB);
-    Arena* normals_arena    = arena_alloc_create(1*GiB);
-
-    Vector* vertices   = vector_alloc_create(vertices_arena, sizeof(Vertex));
-    Vector* vertex_attrs = vector_alloc_create(vertex_attrs_arena, sizeof(VertexAttrs));
-    Vector* faces      = vector_alloc_create(faces_arena, sizeof(Face));
-    Vector* tex_coords = vector_alloc_create(tex_coords_arena, sizeof(TexCoord));
-    Vector* normals    = vector_alloc_create(normals_arena, sizeof(Normal));
-
-    u32 line_buffer_length = 128;
-    char* line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
-    Material* material = 0;
-
-    for (u64 i=0; i<file.size; i++) {
-        if (file.buffer[i] == '\n' || (i==file.size-1)) {
-            // Get current line
-            end_line = i-1;
-            if (i == file.size-1) {
-                end_line = i;
-            }
-            size_line = end_line - start_line + 1;
-
-            if (size_line >= 3) {
-                // Make line_buffer bigger if needed
-                if (size_line >= line_buffer_length) {         // = because we add a \0 at the end of the string
-                    // arena_alloc_restore(local_arena->arena, checkpoint);         // Should be done but I want to use the local arena for other stuff and don't want to lose it all
-                    line_buffer_length = 2*size_line;
-                    line_buffer = (char*)arena_alloc_push(local_arena->arena, line_buffer_length);
-                }
-                memcpy((void*)line_buffer, (void*)&file.buffer[start_line], size_line);
-                line_buffer[size_line] = '\0';
-
-                // Process the line
-                char first = line_buffer[0];
-                char second = line_buffer[1];
-                char third = line_buffer[2];
-                if (first == 'v') {                                                 // Could be v vn vt vp
-                    if (second == ' ') {
-                        // process vertex
-                        Vertex v = {};
-                        VertexAttrs va = {};
-                        sscanf(line_buffer, "v %f %f %f", &v.x, &v.y, &v.z);
-                        vector_alloc_push(vertices, (void*)&v);
-                        vector_alloc_push(vertex_attrs, (void*)&va);
-                    } else if (second == 'n') {
-                        // process normal
-                        Normal n = {};
-                        sscanf(line_buffer, "vn %f %f %f", &n.x, &n.y, &n.z);
-                        vector_alloc_push(normals, (void*)&n);
-
-                    } else if (second == 't') {
-                        // process texture
-                        TexCoord t = {};
-                        sscanf(line_buffer, "vt %f %f", &t.u, &t.v);
-                        vector_alloc_push(tex_coords, (void*)&t);
-                    } else if (second == 'p') {
-                        // process vertex parameter
-                    }
-                } else if (first == 'f') {
-                    Face f = {};
-                    int texture[3] = {};
-                    int normal[3] = {};
-                    sscanf(line_buffer, "f %d/%d/%d %d/%d/%d %d/%d/%d",
-                            &f.v[0], &texture[0], &normal[0],
-                            &f.v[1], &texture[1], &normal[1],
-                            &f.v[2], &texture[2], &normal[2]);
-                    vector_alloc_push(faces, (void*)&f);
-
-                    // Create the Vertex Attributes
-                    for (u8 k=0; k<3; k++) {
-                        TexCoord* tc = (TexCoord*)vector_alloc_get(tex_coords, texture[k]-1);
-                        Normal* n = (Normal*)vector_alloc_get(normals, normal[k]-1);
-                        VertexAttrs* va = (VertexAttrs*)vector_alloc_get(vertex_attrs, f.v[k]-1);
-                        va->u = tc->u;
-                        va->v = tc->v;
-                        va->w = tc->w;
-                        va->nx = n->x;
-                        va->ny = n->y;
-                        va->nz = n->z;
-
-                    }
-                } else if (first == 'o') {                                          // Object
-                    // process object
-                    // if (++tmp_o_count>1) break;
-                } else if (first == 'g') {                                          // Group
-                    // process group
-                } else if (first == 's') {                                          // smooth shading
-                    if (third == 'o') {
-                        // process shading off
-                    } else {
-                        // process shading (intensity?)
-                    }
-                } else if (first == 'm') {                                          // mtllib (external .mtl file name)
-                    string8 l = { .buffer=(u8*)&file.buffer[start_line], .size=size_line };
-                    string8 mtllib = string_from_cstr(local_arena->arena, "mtllib");
-
-                    if (string_starts_with(l, mtllib)) {
-                        string8 mat_file = string_substring(l, string_find_first(l, ' ')+1, l.size);
-                        string8 complete_mat_path = string_join_strings(local_arena->arena, dirname, mat_file);
-                        material = read_mtl_file(arena, complete_mat_path);
-                    }
-                } else if (first == 'u') {                                          // usemtl (material name)
-                } else if (first == '\n' || first == '#') {                         // new lines or comments
-                }
-            }
-
-            start_line = i+1;
-        }
-    }
-    arena_alloc_restore(local_arena->arena, checkpoint);
-
-    Model* model = (Model*)arena_alloc_push(arena, sizeof(Model));
-    model->material = material;
-    model->faces = vector_alloc_copy_to_arena(arena, faces);
-    model->vertices = vector_alloc_copy_to_arena(arena, vertices);
-    model->vertex_attrs = vector_alloc_copy_to_arena(arena, vertex_attrs);
-    // model->normals = vector_alloc_copy_to_arena(arena, normals);
-    // model->tex_coords = vector_alloc_copy_to_arena(arena, tex_coords);
-
-    arena_alloc_free(vertices_arena);
-    arena_alloc_free(vertex_attrs_arena);
-    arena_alloc_free(tex_coords_arena);
-    arena_alloc_free(normals_arena);
-    arena_alloc_free(faces_arena);
-
-    local_arena_alloc_reset(local_arena);
-    return model;
-}
 
 static float
 absf32(float a) {
@@ -358,23 +108,23 @@ void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
 */
 
 
-void draw_model_wireframe(Model* model, u32 w, u32 h, u32* framebuffer) {
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
+    for (u64 i=0; i<model->n_faces; ++i) {
+        ObjFace f = model->faces[i];
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        Vertex a = *((Vertex*)model->vertices + f.v_indices[0]);
+        Vertex b = *((Vertex*)model->vertices + f.v_indices[1]);
+        Vertex c = *((Vertex*)model->vertices + f.v_indices[2]);
 
         // Scale to center of the screen
-        a.x = (a.x * 0.2f + 0.5f) * w;
-        a.y = (a.y * 0.2f + 0.5f) * h;
-        b.x = (b.x * 0.2f + 0.5f) * w;
-        b.y = (b.y * 0.2f + 0.5f) * h;
-        c.x = (c.x * 0.2f + 0.5f) * w;
-        c.y = (c.y * 0.2f + 0.5f) * h;
+        a.x *= w;
+        a.y *= h;
+        b.x *= w;
+        b.y *= h;
+        c.x *= w;
+        c.y *= h;
 
         draw_line(framebuffer, w, h, &a, &b, 0xFFA500);
         draw_line(framebuffer, w, h, &b, &c, 0xFFA500);
@@ -448,10 +198,12 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
     // printf("[%d,%d]\n", miny, maxy);
 }
 
+#define EPS (1e-6)
 f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
     f32x3 v1 = {.x = C->x-A->x, .y = B->x-A->x, .z = A->x-P.x};
     f32x3 v2 = {.x = C->y-A->y, .y = B->y-A->y, .z = A->y-P.y};
     f32x3 u = cross(v1, v2);
+
     if (absf32(u.z) <= EPS) {
         return {.x = -1, .y = -1, .z = -1};
     }
@@ -498,20 +250,6 @@ void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u3
     }
 }
 
-u32 random_color(u64 v) {
-    u32 c = 0xFFFFFF * (v / (f64)RAND_MAX);
-    return c;
-}
-
-static f32 ceilf32(f32 d) {
-    f32 trunc = (f32)((s32)d);
-    if (trunc < d) {
-        return trunc+1.0f;
-    } else {
-        return trunc;
-    }
-}
-
 void shader_frag_color(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer) {
@@ -528,23 +266,22 @@ void shader_frag_depth(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
 void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex*c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 width, u32 height, f32* zbuffer, u32* framebuffer) {
-    // TextureContext* texture_context = ((TextureContex*)shader_ctx);
-    // Check if ARGB ...
-    // u32 color = texture_context[texture_x*texture_w + texture_y];
-    // u32 color = 0xFF773377;
+    // va->u,v,w => are the texture coordinates
+    // w0, w1, w2 => barycentric coords
+
+    TextureContext* ctx = (TextureContext*)shader_ctx;
+    Texture* texture = ctx->texture;
+
     f32 u = w0*va->u + w1*vb->u + w2*vc->u;
     f32 v = w0*va->v + w1*vb->v + w2*vc->v;
     f32 w = w0*va->w + w1*vb->w + w2*vc->w;
-    // u32 color = (0xFF << 24) | ((u8)(255*u) << 16) | ((u8)(255*v) << 8) | ((u8)(255*w) << 0);
 
-    Image* texture = ((TextureContext*)(shader_ctx))->texture;
     // TODO: NEAREST or BILINEAR INTERP
     //  LoD?
     u32 texture_x = (u32)(u * texture->width);
     u32 texture_y = (u32)(v * texture->height);
 
     framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
-    // framebuffer[y*width+x] = color;
 }
 
 inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
@@ -580,8 +317,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_left_slope  = (bz - az) * y_delta_inv;
     z_right_slope = (cz - az) * y_delta_inv;
 
-    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = by>h ? h : (u32)ceilf32(by);
+    u32 ys = ay<0 ? 0 : (u32)f32_ceil(ay);
+    u32 ye = by>h ? h : (u32)f32_ceil(by < 0 ? 0 : by);
 
     f32 xs = ax + (ys - ay) * ad_inv_slope;
     f32 xe = ax + (ys - ay) * ae_inv_slope;
@@ -593,8 +330,8 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
-        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+        u32 x_start = xs<0 ? 0 : (u32)f32_ceil(xs);
+        u32 x_end   = xe>w ? w : (u32)f32_ceil( xe<0? 0 : xe );
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -665,8 +402,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
     z_left_slope  = (cz - az) * y_delta_inv;
     z_right_slope = (cz - bz) * y_delta_inv;
 
-    u32 ys = ay<0 ? 0 : (u32)ceilf32(ay);
-    u32 ye = cy>h ? h : (u32)ceilf32(cy);
+    u32 ys = ay<0 ? 0 : (u32)f32_ceil(ay);
+    u32 ye = cy>h ? h : (u32)f32_ceil(cy < 0 ? 0 : cy);
 
     f32 xs = dx + (ys - ay) * dc_inv_slope;
     f32 xe = ex + (ys - ay) * ec_inv_slope;
@@ -678,8 +415,8 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
     f32 triangle_area = compute_triangle_area(ax, ay, cx, cy, bx, by);
 
     for (u32 y=ys; y<ye; y++) {
-        u32 x_start = xs<0 ? 0 : (u32)ceilf32(xs);
-        u32 x_end   = xe>w ? w : (u32)ceilf32(xe);
+        u32 x_start = xs<0 ? 0 : (u32)f32_ceil(xs);
+        u32 x_end   = xe>w ? w : (u32)f32_ceil(xe<0 ? 0 : xe);
 
         f32 z_scanline_slope = 0.0f;
         f32 x_width = (xe-xs);
@@ -855,73 +592,58 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     }
 }
 
-void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-#if 1
-    f32 minx =  10000;
-    f32 maxx = -10000;
-    f32 miny =  10000;
-    f32 maxy = -10000;
-    f32 minz =  10000;
-    f32 maxz = -10000;
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    for (u64 i=0; i<model->n_faces; ++i) {
+        ObjFace* f = model->faces + i;
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        f32x3 _a = *(f32x3*)(model->vertices + f->v_indices[0]);
+        f32x3 _b = *(f32x3*)(model->vertices + f->v_indices[1]);
+        f32x3 _c = *(f32x3*)(model->vertices + f->v_indices[2]);
 
-        minx = minx < a.x ? minx : a.x;
-        minx = minx < b.x ? minx : b.x;
-        minx = minx < c.x ? minx : c.x;
-        maxx = maxx > a.x ? maxx : a.x;
-        maxx = maxx > b.x ? maxx : b.x;
-        maxx = maxx > c.x ? maxx : c.x;
+        VertexAttrs va = {
+            .u = (model->texcoords + f->vt_indices[0])->x,
+            .v = (model->texcoords + f->vt_indices[0])->y,
+            .w = (model->texcoords + f->vt_indices[0])->z,
+            .nx = (model->normals  + f->vn_indices[0])->x,
+            .ny = (model->normals  + f->vn_indices[0])->y,
+            .nz = (model->normals  + f->vn_indices[0])->z,
+        };
+        VertexAttrs vb = {
+            .u = (model->texcoords + f->vt_indices[1])->x,
+            .v = (model->texcoords + f->vt_indices[1])->y,
+            .w = (model->texcoords + f->vt_indices[1])->z,
+            .nx = (model->normals  + f->vn_indices[1])->x,
+            .ny = (model->normals  + f->vn_indices[1])->y,
+            .nz = (model->normals  + f->vn_indices[1])->z,
+        };
+        VertexAttrs vc = {
+            .u = (model->texcoords + f->vt_indices[2])->x,
+            .v = (model->texcoords + f->vt_indices[2])->y,
+            .w = (model->texcoords + f->vt_indices[2])->z,
+            .nx = (model->normals  + f->vn_indices[2])->x,
+            .ny = (model->normals  + f->vn_indices[2])->y,
+            .nz = (model->normals  + f->vn_indices[2])->z,
+        };
 
-        miny = miny < a.y ? minx : a.y;
-        miny = miny < b.y ? minx : b.y;
-        miny = miny < c.y ? minx : c.y;
-        maxy = maxy > a.y ? maxx : a.y;
-        maxy = maxy > b.y ? maxx : b.y;
-        maxy = maxy > c.y ? maxx : c.y;
+        TextureContext* tc = (TextureContext*)shader_context;
+        _a = f32x3_transform_point(*tc->world, _a);
+        _b = f32x3_transform_point(*tc->world, _b);
+        _c = f32x3_transform_point(*tc->world, _c);
 
-        minz = minz < a.z ? minz : a.z;
-        minz = minz < b.z ? minz : b.z;
-        minz = minz < c.z ? minz : c.z;
-        maxz = maxz > a.z ? maxz : a.z;
-        maxz = maxz > b.z ? maxz : b.z;
-        maxz = maxz > c.z ? maxz : c.z;
-    }
-#endif
+        Vertex a = *(Vertex*)(&_a);
+        Vertex b = *(Vertex*)(&_b);
+        Vertex c = *(Vertex*)(&_c);
 
-    for (u64 i=0; i<vector_alloc_count(model->faces); ++i) {
-        Face* f = (Face*)vector_alloc_get(model->faces, i);
+        a.x *= w;
+        a.y *= h;
 
-        // Only use the x y components atm
-        // Can work with perspective and camera later
-        Vertex a = *(Vertex*)vector_alloc_get(model->vertices, f->v[0]-1);
-        Vertex b = *(Vertex*)vector_alloc_get(model->vertices, f->v[1]-1);
-        Vertex c = *(Vertex*)vector_alloc_get(model->vertices, f->v[2]-1);
+        b.x *= w;
+        b.y *= h;
 
-        VertexAttrs va = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[0]-1);
-        VertexAttrs vb = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[1]-1);
-        VertexAttrs vc = *(VertexAttrs*)vector_alloc_get(model->vertex_attrs, f->v[2]-1);
-
-        // Scale to center of the screen
-#if 1
-        a.x = (a.x - minx) * h / (maxy-miny);
-        b.x = (b.x - minx) * h / (maxy-miny);
-        c.x = (c.x - minx) * h / (maxy-miny);
-
-        a.y = (a.y - 0.5f*miny) * h / (maxy-miny);
-        b.y = (b.y - 0.5f*miny) * h / (maxy-miny);
-        c.y = (c.y - 0.5f*miny) * h / (maxy-miny);
-
-        a.z = (a.z - minz) / (maxz-minz);
-        b.z = (b.z - minz) / (maxz-minz);
-        c.z = (c.z - minz) / (maxz-minz);
-#endif
+        c.x *= w;
+        c.y *= h;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
     }

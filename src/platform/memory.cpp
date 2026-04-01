@@ -1,4 +1,4 @@
-#if defined(_LINUX)
+#if defined(ADS_LINUX)
 #include "platform/linux/memory.cpp"
-#elif defined(_WINDOW)
+#elif defined(ADS_WINDOW)
 #endif
