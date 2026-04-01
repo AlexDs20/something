@@ -4,7 +4,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include "base/base.h"
-
 #include "memory/allocators.h"
 
 //============

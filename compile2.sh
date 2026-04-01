@@ -2,19 +2,21 @@
 CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
 
-DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE"
+DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE -DADS_USE_EXTERNAL"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
+
+CCOMP=clang
+CPPCOMP=clang++
 
 BUILD_DIR="./build"
 
 mkdir -p "$BUILD_DIR"
 
 function compile_file () {
-    local filepath="$1"              # e.g. libs/foo.cpp
-    local src_path="$filepath"   # actual path
+    local filepath="$1"
+    local src_path="$filepath"
     local obj_path="$BUILD_DIR/${filepath#src/}.o"
-    echo $src_path
 
     mkdir -p "$(dirname "$obj_path")"
 
@@ -23,10 +25,10 @@ function compile_file () {
     local FLAGS=""
 
     if [[ "$extension" == "c" ]]; then
-        COMPILER=clang
+        COMPILER=$CCOMP
         FLAGS="$CFLAGS"
     elif [[ "$extension" == "cpp" ]]; then
-        COMPILER=clang++
+        COMPILER=$CPPCOMP
         FLAGS="$CPPFLAGS"
     else
         echo "Skipping unsupported file: $filepath"
@@ -41,17 +43,16 @@ function compile_file () {
 
     echo "Compiling: $filepath"
     "$COMPILER" $FLAGS $DEFINES $INCLUDES -c "$src_path" -o "$obj_path"
+    echo "Done: $filepath"
 }
 
-echo "---- Compiling libraries ----"
-
-# Safer than ls (handles spaces properly)
 find src/* -type f \( -name "*.c" -o -name "*.cpp" \) | while read -r file; do
     compile_file "$file"
 done
 
 rm -r "$BUILD_DIR"/platform/*/
 
-
-find "$BUILD_DIR" -name "*.o" -print0 | xargs -0 clang++ $LINKS -o "$BUILD_DIR/app"
+echo "Compiling:"
+OBJ_FILES=$(find "$BUILD_DIR" -name "*.o")
+$CPPCOMP $OBJ_FILES -o "$BUILD_DIR/app" $LINKS
 echo "Build complete: $BUILD_DIR/app"

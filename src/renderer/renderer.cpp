@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "libs/ads_model_loader.h"
 #include "renderer/renderer.h"
 #include "libs/ads_math.h"
 

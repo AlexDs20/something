@@ -2,13 +2,7 @@
 #define ADS_RENDERER_H
 
 #include "base/base.h"
-
-//#include "libs/ads_model_loader.h"
-struct ObjModel;
-struct Texture;
-// #include "memory/allocators.h"
-struct Arena;
-
+#include "libs/ads_model_loader.h"
 
 typedef f32x3 Vertex;
 
