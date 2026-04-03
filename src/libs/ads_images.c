@@ -1,9 +1,8 @@
 #include <stdio.h>
-#include "libs/ads_string.h"
-#include "memory/allocators.h"
+
 #include "libs/ads_images.h"
-#include "libs/ads_jpeg.h"
 #include "platform/io.h"
+#include "libs/ads_jpeg.h"
 
 #ifdef ADS_USE_EXTERNAL
 #define STB_IMAGE_IMPLEMENTATION
@@ -61,22 +60,30 @@ bool read_image_info(filename, &width, &height, &components){
 }
 */
 
-Image read_image_file(Arena* persist_arena, StringView filename) {
+Image image_read_file(Arena* persist_arena, StringView filename) {
     Image out;
     LocalArena* local_arena = local_arena_alloc_create();
     u64 checkpoint = arena_alloc_checkpoint(persist_arena);
-    ImageParsingResult result = {IMAGE_SUCCESS, 0};
+    ImageParsingResult result = {IMAGE_FAIL, 0};
 
 #ifdef ADS_USE_EXTERNAL
-    // TODO: Handle varying number of components
+    int w, h, c, ok;
     const char* f = sv_as_cstr(local_arena->arena, filename);
-    int w, h, c;
-    out.data = stbi_load(f, &w, &h, &c, 4);
-    out.width = w;
-    out.height = h;
-    out.components = c;
-    if (out.data == NULL) {
-        result.status = IMAGE_FAIL;
+    ok = stbi_info(f, &w, &h, &c);
+    if (ok == 1) {
+        if (c == 1) {
+            out.data = stbi_load(f, &w, &h, &c, 0);
+        }
+        else {
+            out.data = stbi_load(f, &w, &h, &c, 4);
+        }
+        out.width = w;
+        out.height = h;
+        out.components = c;
+
+        if (out.data != NULL) {
+            result.status = IMAGE_SUCCESS;
+        }
     }
 #else
     String data_str = read_complete_file(local_arena->arena, filename);

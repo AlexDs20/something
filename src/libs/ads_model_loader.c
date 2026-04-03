@@ -2,7 +2,6 @@
 #include "libs/ads_model_loader.h"
 #include "platform/io.h"
 #include "base/base.h"
-#include "memory/allocators.h"
 #include "libs/ads_images.h"
 
 // TODO: Hash map of currently loaded textures which contains a count of how many times its used
@@ -127,7 +126,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Ka = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Ka);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Ka);
             current_mats->map_Ka.data       = (u32*)img.data;
             current_mats->map_Ka.width      = img.width;
             current_mats->map_Ka.height     = img.height;
@@ -142,7 +141,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Kd = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Kd);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Kd);
             current_mats->map_Kd.data       = (u32*)img.data;
             current_mats->map_Kd.width      = img.width;
             current_mats->map_Kd.height     = img.height;
@@ -157,7 +156,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Ks = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Ks);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Ks);
             current_mats->map_Ks.data       = (u32*)img.data;
             current_mats->map_Ks.width      = img.width;
             current_mats->map_Ks.height     = img.height;
@@ -174,7 +173,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_d = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_d);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_d);
             current_mats->map_d.data       = (u32*)img.data;
             current_mats->map_d.width      = img.width;
             current_mats->map_d.height     = img.height;
@@ -189,7 +188,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
             current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;
@@ -204,7 +203,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
             current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;
@@ -219,7 +218,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
 
             current_mats->sv_map_Bump = sv_from_string(fp);
 
-            Image img = read_image_file(persist_arena, current_mats->sv_map_Bump);
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
             current_mats->map_Bump.data       = (u32*)img.data;
             current_mats->map_Bump.width      = img.width;
             current_mats->map_Bump.height     = img.height;

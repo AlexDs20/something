@@ -1,10 +1,10 @@
 #ifndef ADS_IMAGE_H
 #define ADS_IMAGE_H
 
-#include "libs/ads_string.h"
 #include "base/base.h"
-
+#include "libs/ads_string.h"
 #include "memory/allocators.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,9 +32,9 @@ struct ImageParsingResult {
 };
 
 // /* bs*, jpeg*? as void* */void read_image_info(filename, &width, &height, &components, &precision);
-// void read_image_file(filename, &width, &height, &components);
+// void image_read_file(filename, &width, &height, &components);
 
-Image read_image_file(Arena* arena, StringView filename);
+Image image_read_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
 

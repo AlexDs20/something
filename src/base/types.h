@@ -22,6 +22,18 @@ typedef int64_t s64;
 typedef float  f32;
 typedef double f64;
 
+typedef struct {
+    bool x, y;
+} bool2;
+
+typedef struct {
+    bool x, y, z;
+} bool3;
+
+typedef struct {
+    bool x, y, z, w;
+} bool4;
+
 typedef union {
     f32 f;
     u32 u;

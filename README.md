@@ -7,6 +7,8 @@
 - *ADS_USE_EXTERNAL*: To be set if wanting to use external libraries instead of ADS implementations
 - *ADS_DEBUG*:
 - *ADS_SSE*:
+- *ADS_LOCAL_ARENA_POOL_COUNT*:
+- *ADS_LOCAL_ARENA_CAPACITY*:
 
 
 

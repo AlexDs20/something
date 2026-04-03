@@ -15,6 +15,28 @@ extern "C" {
 #define F32_EPSILON         1e-6f
 #define F32_ABS_EPSILON     1e-8f
 
+// bool
+static inline bool  bool2_any(bool2 a)                          { return a.x || a.y; }
+static inline bool  bool2_all(bool2 a)                          { return a.x && a.y; }
+static inline bool2 bool2_not(bool2 a)                          { bool2 r; r.x = !a.x; r.y = !a.y; return r; }
+static inline bool2 bool2_and(bool2 a, bool2 b)                 { bool2 r; r.x =  a.x && b.x; r.y = a.y && b.y; return r; }
+static inline bool2 bool2_or(bool2 a, bool2 b)                  { bool2 r; r.x =  a.x || b.x; r.y = a.y || b.y; return r; }
+static inline bool2 bool2_xor(bool2 a, bool2 b)                 { bool2 r; r.x =  a.x != b.x; r.y = a.y != b.y; return r; }
+
+static inline bool  bool3_any(bool3 a)                          { return a.x || a.y || a.z; }
+static inline bool  bool3_all(bool3 a)                          { return a.x && a.y && a.z; }
+static inline bool3 bool3_not(bool3 a)                          { bool3 r; r.x = !a.x; r.y = !a.y; r.z = !a.z; return r; }
+static inline bool3 bool3_and(bool3 a, bool3 b)                 { bool3 r; r.x =  a.x && b.x; r.y = a.y && b.y; r.z = a.z && b.z; return r; }
+static inline bool3 bool3_or(bool3 a, bool3 b)                  { bool3 r; r.x =  a.x || b.x; r.y = a.y || b.y; r.z = a.z || b.z; return r; }
+static inline bool3 bool3_xor(bool3 a, bool3 b)                 { bool3 r; r.x =  a.x != b.x; r.y = a.y != b.y; r.z = a.z != b.z; return r; }
+
+static inline bool  bool4_any(bool4 a)                          { return a.x || a.y || a.z || a.w; }
+static inline bool  bool4_all(bool4 a)                          { return a.x && a.y && a.z && a.w; }
+static inline bool4 bool4_not(bool4 a)                          { bool4 r; r.x = !a.x; r.y = !a.y; r.z = !a.z; r.w = !a.w; return r; }
+static inline bool4 bool4_and(bool4 a, bool4 b)                 { bool4 r; r.x =  a.x && b.x; r.y = a.y && b.y; r.z = a.z && b.z; r.w = a.w && b.w; return r; }
+static inline bool4 bool4_or(bool4 a, bool4 b)                  { bool4 r; r.x =  a.x || b.x; r.y = a.y || b.y; r.z = a.z || b.z; r.w = a.w || b.w; return r; }
+static inline bool4 bool4_xor(bool4 a, bool4 b)                 { bool4 r; r.x =  a.x != b.x; r.y = a.y != b.y; r.z = a.z != b.z; r.w = a.w != b.w; return r; }
+
 // f32
 static inline f32   f32_ninf(void)                              { f32Bits t; t.u = 0xFF800000; return t.f; }
 static inline f32   f32_inf(void)                               { f32Bits t; t.u = 0x7F800000; return t.f; }
@@ -32,7 +54,6 @@ static inline f32   f32_lerp(f32 a, f32 b, f32 t)               { return a * (1.
 static inline bool  f32_inrange(f32 x, f32 a, f32 b)            { return (x >= a) && (x < b);}
 static inline f32   f32_deg_to_rad(f32 d)                       { return d * F32_PI * (1.0f / 180.0f); }
 static inline f32   f32_rad_to_deg(f32 r)                       { return r * 180.0f * (1.0f / F32_PI); }
-// static inline f32   f32_sign(f32 a)                             { return (a > 0.0f) ? 1.0f : (a < 0.0f ? -1.0f : 0.0f); }
 static inline f32   f32_sign(f32 a)                             { return (f32)((a > 0.0f) - (a < 0.0f)); }
 
 
@@ -70,6 +91,7 @@ static inline f32x2 f32x2_lerp_fast(f32x2 a, f32x2 b, f32 t)    { return f32x2_m
 static inline f32x2 f32x2_lerp(f32x2 a, f32x2 b, f32 t)         { return f32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
 // static inline bool  f32x2_interval_overlap(f32x2 a, f32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
 static inline f32   f32x2_angle(f32x2 a, f32x2 b)               { return acosf(f32_clamp(f32x2_dot(a, b) * f32_rsqrt(f32x2_length2(a) * f32x2_length2(b)), -1.0f, 1.0f)); }
+static inline f32x2 f32x2_mask_select(bool2 mask, f32x2 a, f32x2 b) { f32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
 
 
 // f32x3
@@ -124,6 +146,7 @@ static inline f32x3 f32x3_transform_point(const f32x4x4* m, f32x3 p) {
     return result;
 }
 // static inline f32x3 f32x3_transform_vector(const f32x4x4* m, f32x3 p);
+static inline f32x3 f32x3_mask_select(bool3 mask, f32x3 a, f32x3 b) { f32x3 r; r.x = mask.y ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; return r; }
 
 
 // f32x4
@@ -154,6 +177,7 @@ static inline f32   f32x4_dot(f32x4 a, f32x4 b)                 { return a.x * b
 static inline f32   f32x4_length2(f32x4 a)                      { return a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w; }
 static inline f32   f32x4_length (f32x4 a)                      { return f32_sqrt(f32x4_length2(a)); }
 static inline f32x4 f32x4_normalize(f32x4 a)                    { f32 len2 = f32x4_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x4_mulr_f32(a, inv); }
+static inline f32x4 f32x4_mask_select(bool4 mask, f32x4 a, f32x4 b) { f32x4 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; r.w = mask.w ? a.w : b.w; return r; }
 
 // static inline f32x3 f32x4_perspective_divide(f32x4 a);
 

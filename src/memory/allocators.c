@@ -1,7 +1,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "base/base.h"
 #include "memory/allocators.h"
 #include "platform/memory.h"
 
@@ -303,13 +302,13 @@ void arena_debug_map(Arena* arena, u64 width) {
 #if !defined(ADS_LOCAL_ARENA_POOL_COUNT)
 #define ADS_LOCAL_ARENA_POOL_COUNT 10
 #endif
-#define LOCAL_ARENA_CAPACITY (1*GiB)
+#define ADS_LOCAL_ARENA_CAPACITY (1*GiB)
 global LocalArena local_arena_pool[ADS_LOCAL_ARENA_POOL_COUNT] = {0};
 
 void local_arena_pool_init(void) {
     for (u64 i=0; i<ADS_LOCAL_ARENA_POOL_COUNT; ++i) {
         if (local_arena_pool[i].arena == 0) {
-            local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
+            local_arena_pool[i].arena = arena_alloc_create(ADS_LOCAL_ARENA_CAPACITY);
             local_arena_pool[i].used = 0;
         }
     }
@@ -321,7 +320,7 @@ LocalArena* local_arena_alloc_create(void) {
     for (u64 i=0; i<ADS_LOCAL_ARENA_POOL_COUNT; i++) {
         // Initialize the local arena if it hasn't been done yet
         if (local_arena_pool[i].arena == 0) {
-            local_arena_pool[i].arena = arena_alloc_create(LOCAL_ARENA_CAPACITY);
+            local_arena_pool[i].arena = arena_alloc_create(ADS_LOCAL_ARENA_CAPACITY);
         }
         if (!local_arena_pool[i].used) {
             out = &local_arena_pool[i];

@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include "libs/ads_jpeg.h"
 #include "platform/io.h"
-#include "libs/ads_images.h"
 #include "memory/allocators.h"
+
 /*  ==================
  *  JPEG Documentation
  *  ==================
