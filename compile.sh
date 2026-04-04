@@ -3,12 +3,13 @@ CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
 EXTRAFLAGS="-fsanitize=address,undefined,leak"
 
-DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE" # -DADS_USE_EXTERNAL"
+DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE -DADS_USE_EXTERNAL"
+DEFINES+=" -DADS_DEBUG"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
-CCOMP=gcc
-CPPCOMP=g++
+CCOMP=clang
+CPPCOMP=clang++
 
 BUILD_DIR="./build"
 EXE="${BUILD_DIR}/main"

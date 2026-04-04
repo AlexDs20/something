@@ -30,7 +30,11 @@ f32x4x4 f32x4x4_from_transform(const Transform& t) {
     return T * R * S;
 }
 
-int main(int /*argc*/, char** argv) {
+int main(int argc, char** argv) {
+    const char* usage = "   \
+        Usage: \
+        ./main [path-to-obj] \
+    \n";
     //
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
@@ -41,22 +45,19 @@ int main(int /*argc*/, char** argv) {
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-    StringView selection = sv_from_cstr(argv[1]);
 
     StringView fp;
-    // TODO: Have platform filesystem support
-    if ( sv_equal(selection, sv_from_cstr("1")) ) {
+    int args = argc - 1;
+    if (args == 0) {
         fp = sv_from_cstr("assets/backpack/backpack.obj");
-    } else if ( sv_equal(selection, sv_from_cstr("2")) ) {
-        fp = sv_from_cstr("ignore/assets/sponza/sponza.obj");
-    } else if ( sv_equal(selection, sv_from_cstr("3")) ) {
-        fp = sv_from_cstr("ignore/assets/fireplace/fireplace_room.obj");
-    } else if  ( sv_equal(selection, sv_from_cstr("4")) ) {
-        fp = sv_from_cstr("ignore/assets/dragon/dragon.obj");
-    } else if  ( sv_equal(selection, sv_from_cstr("5")) ) {
-        fp = sv_from_cstr("ignore/assets/gallery/gallery.obj");
-    } else {
-        fp = sv_from_cstr("assets/backpack/backpack.obj");
+    }
+    else if (args == 1) {
+        fp = sv_from_cstr(argv[1]);
+    }
+    else {
+        fprintf(stderr, "\nToo many input arguments.");
+        fprintf(stderr, "\n%s", usage);
+        return -1;
     }
 
     ObjModel* model = model_read(scene_arena, fp);
@@ -67,7 +68,6 @@ int main(int /*argc*/, char** argv) {
     t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f);
 
     f32x4x4 world = f32x4x4_from_transform(t);
-    debug_print_f32x4x4(world);
 
     // u32* win_buffer = model->material->map_Kd.buffer;
     // u32 canvas_w = model->material->map_Kd.width;
@@ -135,4 +135,6 @@ int main(int /*argc*/, char** argv) {
         arena_alloc_free(frame_arena);
         arena_alloc_free(scene_arena);
     }
+
+    return 0;
 }

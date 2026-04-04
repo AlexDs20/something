@@ -29,13 +29,13 @@
 #define GiB (1024*1024*1024)     // GiB
 
 #if defined(ADS_DEBUG)
-#define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
+#define ASSERT(x)       do { if (x) {} else { *(volatile char*) 0 = 0; } } while (0)
 #else
 #define ASSERT(x)       do { } while (0)
 #endif
 
 #if defined(ADS_DEBUG)
-#define PANIC           do { *(volatile char*) 0 = __LINE__; } while (0)
+#define PANIC           do { *(volatile char*) 0 = 0; } while (0)
 #else
 #define PANIC
 #endif

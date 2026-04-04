@@ -1,0 +1,6 @@
+0 ObjModel
+    filepath: assets/backpack/backpack.obj
+    shader: shader_frag_texture
+    position: 0.5 0.4 0.0
+    scale: 0.15 0.15 0.15
+    rotation: 0.0 1.0 0.0 0.0
