@@ -571,57 +571,67 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 }
 
 void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
-    for (u64 i=0; i<model->n_faces; ++i) {
-        ObjFace* f = model->faces + i;
 
-        // Only use the x y components atm
-        // Can work with perspective and camera later
-        f32x3 _a = *(f32x3*)(model->vertices + f->v_indices[0]);
-        f32x3 _b = *(f32x3*)(model->vertices + f->v_indices[1]);
-        f32x3 _c = *(f32x3*)(model->vertices + f->v_indices[2]);
+    TextureContext* frag_context = (TextureContext*)shader_context;
+    for (u64 g=0; g<model->n_groups; ++g) {
+        ObjGroup* group = model->groups + g;
+        int mat_index = group->material_index;
 
-        VertexAttrs va;
-        va.u = (model->texcoords + f->vt_indices[0])->x;
-        va.v = (model->texcoords + f->vt_indices[0])->y;
-        va.w = (model->texcoords + f->vt_indices[0])->z;
-        va.nx = (model->normals  + f->vn_indices[0])->x;
-        va.ny = (model->normals  + f->vn_indices[0])->y;
-        va.nz = (model->normals  + f->vn_indices[0])->z;
+        frag_context->texture = &(model->materials[mat_index].map_Kd);
 
-        VertexAttrs vb;
-        vb.u = (model->texcoords + f->vt_indices[1])->x;
-        vb.v = (model->texcoords + f->vt_indices[1])->y;
-        vb.w = (model->texcoords + f->vt_indices[1])->z;
-        vb.nx = (model->normals  + f->vn_indices[1])->x;
-        vb.ny = (model->normals  + f->vn_indices[1])->y;
-        vb.nz = (model->normals  + f->vn_indices[1])->z;
+        u64 opl = group->first_face_index + group->face_count;;
+        for (u64 i=group->first_face_index; i<opl; ++i) {
+            ObjFace* f = model->faces + i;
 
-        VertexAttrs vc;
-        vc.u = (model->texcoords + f->vt_indices[2])->x;
-        vc.v = (model->texcoords + f->vt_indices[2])->y;
-        vc.w = (model->texcoords + f->vt_indices[2])->z;
-        vc.nx = (model->normals  + f->vn_indices[2])->x;
-        vc.ny = (model->normals  + f->vn_indices[2])->y;
-        vc.nz = (model->normals  + f->vn_indices[2])->z;
+            // Only use the x y components atm
+            // Can work with perspective and camera later
+            f32x3 _a = *(f32x3*)(model->vertices + f->v_indices[0]);
+            f32x3 _b = *(f32x3*)(model->vertices + f->v_indices[1]);
+            f32x3 _c = *(f32x3*)(model->vertices + f->v_indices[2]);
 
-        TextureContext* tc = (TextureContext*)shader_context;
-        _a = f32x3_transform_point(tc->world, _a);
-        _b = f32x3_transform_point(tc->world, _b);
-        _c = f32x3_transform_point(tc->world, _c);
+            VertexAttrs va;
+            va.u = (model->texcoords + f->vt_indices[0])->x;
+            va.v = (model->texcoords + f->vt_indices[0])->y;
+            va.w = (model->texcoords + f->vt_indices[0])->z;
+            va.nx = (model->normals  + f->vn_indices[0])->x;
+            va.ny = (model->normals  + f->vn_indices[0])->y;
+            va.nz = (model->normals  + f->vn_indices[0])->z;
 
-        Vertex a = *(Vertex*)(&_a);
-        Vertex b = *(Vertex*)(&_b);
-        Vertex c = *(Vertex*)(&_c);
+            VertexAttrs vb;
+            vb.u = (model->texcoords + f->vt_indices[1])->x;
+            vb.v = (model->texcoords + f->vt_indices[1])->y;
+            vb.w = (model->texcoords + f->vt_indices[1])->z;
+            vb.nx = (model->normals  + f->vn_indices[1])->x;
+            vb.ny = (model->normals  + f->vn_indices[1])->y;
+            vb.nz = (model->normals  + f->vn_indices[1])->z;
 
-        a.x *= w;
-        a.y *= h;
+            VertexAttrs vc;
+            vc.u = (model->texcoords + f->vt_indices[2])->x;
+            vc.v = (model->texcoords + f->vt_indices[2])->y;
+            vc.w = (model->texcoords + f->vt_indices[2])->z;
+            vc.nx = (model->normals  + f->vn_indices[2])->x;
+            vc.ny = (model->normals  + f->vn_indices[2])->y;
+            vc.nz = (model->normals  + f->vn_indices[2])->z;
 
-        b.x *= w;
-        b.y *= h;
+            TextureContext* tc = (TextureContext*)shader_context;
+            _a = f32x3_transform_point(tc->world, _a);
+            _b = f32x3_transform_point(tc->world, _b);
+            _c = f32x3_transform_point(tc->world, _c);
 
-        c.x *= w;
-        c.y *= h;
+            Vertex a = *(Vertex*)(&_a);
+            Vertex b = *(Vertex*)(&_b);
+            Vertex c = *(Vertex*)(&_c);
 
-        fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
+            a.x *= w;
+            a.y *= h;
+
+            b.x *= w;
+            b.y *= h;
+
+            c.x *= w;
+            c.y *= h;
+
+            fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
+        }
     }
 }

@@ -11,14 +11,15 @@
 void read_n_bytes(char* filepath, unsigned int n, char* buffer) {
     int fd = open(filepath, O_RDONLY);
     if (fd == -1) {
-      perror("open");
-      exit(1);
+        fprintf(stderr, "\nfile: %s\n", filepath);
+        perror("open");
+        exit(1);
     }
 
     struct stat sb;
     if (fstat(fd, &sb) == -1) {
-      perror("fstat");
-      exit(2);
+        perror("fstat");
+        exit(2);
     }
 
     if (sb.st_size < n) {
@@ -29,11 +30,12 @@ void read_n_bytes(char* filepath, unsigned int n, char* buffer) {
 
     int r = read(fd, buffer, n);
     if (r < 0) {
+        fprintf(stderr, "\nFile: %s\n", filepath);
         perror("read");
         exit(4);
     }
     if ((unsigned int)r != n) {
-        fprintf(stderr, "Short read.\n");
+        fprintf(stderr, "\nShort read.\n");
         exit(5);
     }
 
@@ -44,22 +46,23 @@ String read_complete_file(Arena* arena, StringView filepath) {
     String fp = string_init_sv(arena, filepath);
     int fd = open(string_as_cstr(&fp), O_RDONLY);
     if (fd == -1) {
-      perror("open");
-      exit(1);
+        fprintf(stderr, "\nfile: %s\n", fp.buffer);
+        perror("open");
+        exit(1);
     }
 
     struct stat sb;
     if (fstat(fd, &sb) == -1) {
-      perror("fstat");
-      exit(2);
+        perror("fstat");
+        exit(2);
     }
 
     char* data = (char*)mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 
     if(data == MAP_FAILED) {
-      close(fd);
-      perror("mmap");
-      exit(3);
+        close(fd);
+        perror("mmap");
+        exit(3);
     }
 
     String out = string_init_empty(arena, sb.st_size+1);

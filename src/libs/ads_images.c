@@ -69,14 +69,17 @@ Image image_read_file(Arena* persist_arena, StringView filename) {
 #ifdef ADS_USE_EXTERNAL
     int w, h, c, ok;
     const char* f = sv_as_cstr(local_arena->arena, filename);
+    printf("\nSTB implementaiton");
     ok = stbi_info(f, &w, &h, &c);
-    if (ok == 1) {
+    printf(" Status: ok: %d, (%d,%d,%d)", ok, w,h,c);
+    if (1 /*ok == 1*/) {
         if (c == 1) {
             out.data = stbi_load(f, &w, &h, &c, 0);
         }
         else {
             out.data = stbi_load(f, &w, &h, &c, 4);
         }
+        printf(" Status: ok: %d, (%d,%d,%d)", ok, w,h,c);
         out.width = w;
         out.height = h;
         out.components = c;
@@ -90,7 +93,8 @@ Image image_read_file(Arena* persist_arena, StringView filename) {
     StringView data = sv_from_string(data_str);
     StringView extension = sv_file_extension(filename);
 
-    if (sv_equal(extension, sv_from_cstr(".jpg")) || sv_equal(extension, sv_from_cstr(".jpeg"))) {
+    if (sv_equal(extension, sv_from_cstr(".jpg")) || sv_equal(extension, sv_from_cstr(".jpeg")) || sv_equal(extension, sv_from_cstr(".JPG"))) {
+        printf("\nOWN implementation!");
         result = decode_jpeg(persist_arena, data, &out);
     }
     else {
