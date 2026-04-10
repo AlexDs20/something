@@ -65,8 +65,7 @@ typedef struct {
     int material_index;
 } ObjGroup;
 
-typedef struct ObjModel ObjModel;
-struct ObjModel {
+typedef struct {
     Vec3f* vertices;
     Vec3f* texcoords;
     Vec3f* normals;
@@ -83,12 +82,53 @@ struct ObjModel {
 
     // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;
-};
+} ObjModel;
+
+/*
+typedef Vec3f       Vertex;
+typedef ObjMaterial Material;
+typedef f32x3       AABB;
+
+typedef struct {
+    uint32_t index_start;
+    uint32_t index_count;
+    Material* mat;              // uint32_t material_index;
+} Group;
+
+typedef struct {
+    Vertex* vertices;
+    uint32_t n_vertices;
+
+    uint32_t* indices;
+    uint32_t n_indices;
+
+    Group* groups;
+    uint32_t n_groups;
+} Mesh;
+
+typedef struct {
+    Mesh* mesh;
+    f32x4x4 transform;
+    AABB bbox;
+} Object;
+
+typedef struct {
+    Mesh* meshes;
+    uint32_t n_meshes;
+
+    Material* materials;
+    uint32_t n_materials;
+
+    Object* objects;
+    uint32_t n_objects;
+} Scene;
+*/
 
 typedef ObjModel Model;
-
 // typedef struct {
 // } Model;
+
+
 
 Model*   model_read(Arena* arena, StringView filepath);
 #ifdef __cplusplus
