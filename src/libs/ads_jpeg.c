@@ -309,7 +309,7 @@ void print_ci(ComponentInfo* ci) {
     printf("  yi: %d\n", ci->yi);
     printf("  Hi: %d\n", ci->Hi);
     printf("  Vi: %d\n", ci->Vi);
-    printf("  QT: %p\n", ci->QT);
+    printf("  QT: %p\n", (void*)ci->QT);
     printf("  DC: %p\n", (void*)ci->DCHuffmanTable);
     printf("  AC: %p\n", (void*)ci->ACHuffmanTable);
 }
@@ -408,7 +408,7 @@ struct BitStream {
 void print_bs(BitStream* bs) {
     printf("BitStream: \n");
     printf("---------\n");
-    printf("  data*: %p\n", bs->data);
+    printf("  data*: %p\n", (void*)bs->data);
     printf("  size: %ld\n", bs->size);
     printf("  byte: %ld\n", bs->byte_pos);
     printf("  bit: %d\n", bs->bit_pos);

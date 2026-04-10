@@ -272,11 +272,11 @@ void* arena_alloc_align(Arena* arena) {
 void arena_debug_print(Arena* arena) {
     if (!arena) return;
     printf("Arena Debug Info:\n");
-    printf("  buffer:     %p\n", arena->buffer);
-    printf("  capacity:   %lu bytes   %p\n", arena->capacity, arena->buffer+arena->capacity);
-    printf("  committed:  %lu bytes   %p\n", arena->committed, arena->buffer+arena->committed);
-    printf("  used:       %lu bytes   %p\n", arena->top, arena->buffer+arena->top);
-    printf("  free:       %lu bytes\n", arena->capacity - arena->top);
+    printf("  buffer:     %p\n",             (void*)arena->buffer);
+    printf("  capacity:   %lu bytes   %p\n", arena->capacity,  (void*)(arena->buffer+arena->capacity));
+    printf("  committed:  %lu bytes   %p\n", arena->committed, (void*)(arena->buffer+arena->committed));
+    printf("  used:       %lu bytes   %p\n", arena->top,       (void*)(arena->buffer+arena->top));
+    printf("  free:       %lu bytes\n",      arena->capacity - arena->top);
 }
 
 void arena_debug_map(Arena* arena, u64 width) {

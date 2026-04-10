@@ -903,9 +903,9 @@ void string_debug_print(const String* s) {
     printf(" String:      %p\n",      (void*)s);
     if (s == NULL) return;
     if (s->buffer != NULL) {
-    printf("  buffer:     %p\n",             s->buffer);
-    printf("  size:       %zu bytes   %p\n", s->size, s->buffer+s->size+1);
-    printf("  capacity:   %zu bytes   %p\n", s->capacity, s->buffer+s->capacity);
+    printf("  buffer:     %p\n",             (void*)s->buffer);
+    printf("  size:       %zu bytes   %p\n", s->size, (void*)(s->buffer+s->size+1));
+    printf("  capacity:   %zu bytes   %p\n", s->capacity, (void*)(s->buffer+s->capacity));
     printf("  free:       %zu bytes\n",      s->capacity - s->size - 1);
     } else {
     printf("  buffer:     NULL\n");
@@ -1569,6 +1569,6 @@ void sv_print(StringView sv) {
 
 void sv_debug_print(StringView sv) {
     printf("StringView Debug Info:\n");
-    printf("  buffer:     %p\n",             sv.buffer);
-    printf("  size:       %zu bytes   %p\n", sv.size, sv.buffer+sv.size);
+    printf("  buffer:     %p\n",             (void*)sv.buffer);
+    printf("  size:       %zu bytes   %p\n", sv.size, (void*)(sv.buffer+sv.size));
 }
