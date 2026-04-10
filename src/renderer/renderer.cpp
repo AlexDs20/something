@@ -570,7 +570,23 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     }
 }
 
-void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+    /*
+    for (u64 i_obj=0; i_obj<scene.n_objects; i_obj++) {
+        Object* o = &scene.objects[i_obj];
+        if (!is_visible(o->bouds, camera)) {
+            continue;
+        }
+        f32x4x4 model = compute_object_transform(o);
+
+        for (u64 i_grp=0; i_grp<o->n_groups; i_grp++) {
+            Material* mat = o->groups[i_group].materials;
+
+            draw()
+
+        }
+    }
+    */
 
     TextureContext* frag_context = (TextureContext*)shader_context;
     for (u64 g=0; g<model->n_groups; ++g) {

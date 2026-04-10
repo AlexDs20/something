@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    ObjModel* model = model_read(scene_arena, fp);
+    Model* model = model_read(scene_arena, fp);
 
     Transform t;
     t.position = f32x3_make(0.5f, 0.4f, 0.0f);

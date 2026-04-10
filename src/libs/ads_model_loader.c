@@ -542,15 +542,15 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     return obj_model;
 }
 
-ObjModel* model_convert_from_obj(/*Arena* arena, */ObjModel* obj_model) {
-    return obj_model;
+Model* model_convert_from_obj(/*Arena* arena, */ObjModel* obj_model) {
+    return (Model*)obj_model;
 }
 
 ObjModel* model_create_default_model(void /*Arena* arena*/) {
     return NULL;
 }
 
-ObjModel* model_read(Arena* arena, StringView filepath) {
+Model* model_read(Arena* arena, StringView filepath) {
     ObjModel* model = NULL;
 
     StringView ext = sv_file_extension(filepath);

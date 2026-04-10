@@ -46,7 +46,7 @@ function compile_file () {
     fi
 
     echo "Compiling: $filepath"
-    "$COMPILER" $FLAGS $DEFINES $INCLUDES -c "$src_path" -o "$obj_path"
+    "$COMPILER" $FLAGS $EXTRAFLAGS $DEFINES $INCLUDES -c "$src_path" -o "$obj_path"
     echo "Done: $filepath"
 }
 
@@ -58,5 +58,5 @@ rm -r "$BUILD_DIR"/platform/*/
 
 echo "Compiling:"
 OBJ_FILES=$(find "$BUILD_DIR" -name "*.o")
-$CPPCOMP $OBJ_FILES -o $EXE $LINKS
+$CPPCOMP $EXTRAFLAGS $OBJ_FILES -o $EXE $LINKS
 echo "Build complete: $EXE"

@@ -85,14 +85,12 @@ struct ObjModel {
     StringView mtllib_name;
 };
 
+typedef ObjModel Model;
+
 // typedef struct {
 // } Model;
 
-ObjModel*   model_read(Arena* arena, StringView filepath);
-// ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
-// ObjModel*   model_create_default_model(Arena* arena);
-// ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
-
+Model*   model_read(Arena* arena, StringView filepath);
 #ifdef __cplusplus
 }
 #endif
