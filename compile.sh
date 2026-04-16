@@ -1,7 +1,7 @@
 #!/bin/bash
 CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
-EXTRAFLAGS="-fsanitize=address,undefined,leak"
+EXTRAFLAGS=" -fsanitize=address,undefined,leak -fno-sanitize-recover"
 
 DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE -DADS_USE_EXTERNAL"
 DEFINES+=" -DADS_DEBUG -g -ggdb"
@@ -47,6 +47,12 @@ function compile_file () {
 
     echo "Compiling: $filepath"
     "$COMPILER" $FLAGS $EXTRAFLAGS $DEFINES $INCLUDES -c "$src_path" -o "$obj_path"
+
+    if [[ $? -ne 0 ]]; then
+        echo "Failed on: $filepath"
+        exit 1
+    fi
+
     echo "Done: $filepath"
 }
 

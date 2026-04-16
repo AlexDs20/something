@@ -4,8 +4,6 @@
 #include "base/base.h"
 #include "libs/ads_model_loader.h"
 
-typedef f32x3 Vertex;
-
 typedef struct {
     float u, v, w;
     float nx, ny, nz;
@@ -13,14 +11,14 @@ typedef struct {
 } VertexAttrs;
 
 // tmp?
-void print(Vertex* v);
+void print(f32x3* v);
 void print(VertexAttrs* va);
 
 typedef void (*FragmentShader)(
     void* shader_ctx,
-    Vertex* a,
-    Vertex* b,
-    Vertex* c,
+    f32x3* a,
+    f32x3* b,
+    f32x3* c,
     VertexAttrs* va,
     VertexAttrs* vb,
     VertexAttrs* vc,
@@ -45,15 +43,15 @@ typedef struct {
 } TextureContext;
 
 void shader_frag_color  (void* shader_ctx,
-        Vertex* a, Vertex* b, Vertex* c,
+        f32x3* a, f32x3* b, f32x3* c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2,
         u32 x, u32 y,
         u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_depth  (void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
+void shader_frag_depth  (void* shader_ctx, f32x3* a, f32x3* b, f32x3* c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
+void shader_frag_texture(void* shader_ctx, f32x3* a, f32x3* b, f32x3* c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
 

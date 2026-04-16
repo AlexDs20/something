@@ -84,50 +84,89 @@ typedef struct {
     StringView mtllib_name;
 } ObjModel;
 
+
 /*
-typedef Vec3f       Vertex;
-typedef ObjMaterial Material;
-typedef f32x3       AABB;
+struct Material {
+    StringView name;        // newmtl
 
-typedef struct {
-    uint32_t index_start;
-    uint32_t index_count;
-    Material* mat;              // uint32_t material_index;
-} Group;
+    Vec3f Ka;               // ambiant color
+    Vec3f Kd;               // diffuse color
+    Vec3f Ks;               // specular color
+    Vec3f Ke;               // emissive color
 
-typedef struct {
-    Vertex* vertices;
+    float Ns;               // specular exponent
+    float Ni;               // index of refraction
+    // float d;                // dissolve: Transparency = 1-d
+    float Tr;               // Transparency
+    float Tf;               // Transmission filter
+    uint32_t illum;         // illumination
+
+    // Textures
+    StringView sv_map_Ka;      // ambient color
+    StringView sv_map_Kd;      // diffuse texture
+    StringView sv_map_Ks;      // specular texture
+    StringView sv_map_Bump;    // normal map
+    StringView sv_map_d;       // alpha texture map
+
+    Texture map_Ka;
+    Texture map_Kd;
+    Texture map_Ks;
+    Texture map_Bump;
+    Texture map_d;
+};
+
+struct SubMesh {
+    uint32_t start_index;
+    uint32_t count;
+
+    struct Material* mat;
+};
+
+struct Vertex {
+    f32x3 position;
+    f32x3 texcoords;        // f32x2 ?
+    f32x3 normals;
+};
+
+struct Mesh {
+    struct Vertex* vertices;
     uint32_t n_vertices;
 
     uint32_t* indices;
     uint32_t n_indices;
 
-    Group* groups;
-    uint32_t n_groups;
-} Mesh;
+    struct SubMesh* submeshes;
+    uint32_t n_submeshes;
+};
 
-typedef struct {
-    Mesh* mesh;
+struct AABB {
+    f32x3 bb_min;
+    f32x3 bb_max;
+};
+
+struct Object {
+    struct Mesh* mesh;
     f32x4x4 transform;
-    AABB bbox;
-} Object;
+    struct AABB bbox;
+};
 
-typedef struct {
-    Mesh* meshes;
+
+struct Scene {
+    struct Mesh* meshes;
     uint32_t n_meshes;
 
-    Material* materials;
-    uint32_t n_materials;
+    struct Material* mats;
+    uint32_t n_mats;
 
-    Object* objects;
+    // Texture* textures;
+    // uint32_t n_textures;
+
+    struct Object* objects;
     uint32_t n_objects;
-} Scene;
+};
 */
 
 typedef ObjModel Model;
-// typedef struct {
-// } Model;
-
 
 
 Model*   model_read(Arena* arena, StringView filepath);

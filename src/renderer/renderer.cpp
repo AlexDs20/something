@@ -6,8 +6,8 @@
 #include "renderer/renderer.h"
 #include "libs/ads_math.h"
 
-void print(Vertex* v) {
-    printf("Vertex: (%f,%f,%f)\n", v->x, v->y, v->z);
+void print(f32x3* v) {
+    printf("f32x3: (%f,%f,%f)\n", v->x, v->y, v->z);
 }
 
 void print(VertexAttrs* va) {
@@ -15,7 +15,7 @@ void print(VertexAttrs* va) {
 }
 
 
-void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
+void draw_line(u32* framebuffer, u32 w, u32 h, f32x3* a, f32x3* b, u32 c) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
 
@@ -24,7 +24,7 @@ void draw_line(u32* framebuffer, u32 w, u32 h, Vertex* a, Vertex* b, u32 c) {
     float step_size_x = dx/steps;
     float step_size_y = dy/steps;
 
-    Vertex tmp = *a;
+    f32x3 tmp = *a;
     for (u32 s=0; s<steps; s++) {
         tmp.x += step_size_x;
         tmp.y += step_size_y;
@@ -80,9 +80,9 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
 
         // Only use the x y components atm
         // Can work with perspective and camera later
-        Vertex a = *((Vertex*)model->vertices + f.v_indices[0]);
-        Vertex b = *((Vertex*)model->vertices + f.v_indices[1]);
-        Vertex c = *((Vertex*)model->vertices + f.v_indices[2]);
+        f32x3 a = *((f32x3*)model->vertices + f.v_indices[0]);
+        f32x3 b = *((f32x3*)model->vertices + f.v_indices[1]);
+        f32x3 c = *((f32x3*)model->vertices + f.v_indices[2]);
 
         // Scale to center of the screen
         a.x *= w;
@@ -102,13 +102,13 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
     }
 }
 
-void swap_vertices(Vertex* a, Vertex* b) {
-    Vertex tmp = *b;
+void swap_vertices(f32x3* a, f32x3* b) {
+    f32x3 tmp = *b;
     *b = *a;
     *a = tmp;
 }
 
-void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
     if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
     if (a->y>b->y) swap_vertices(a, b);
     if (a->y>c->y) swap_vertices(a, c);
@@ -186,7 +186,7 @@ typedef union {
     f32 data[4];
 } Bboxf32;
 
-void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* a, Vertex* b, Vertex* c, u32 color) {
+void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
     Bboxf32 bbox = {};
     bbox.edge.left    = f32_min(a->x, f32_min(b->x, c->x));
     bbox.edge.right   = f32_max(a->x, f32_max(b->x, c->x));
@@ -221,7 +221,7 @@ void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u3
 
 void shader_frag_color(
         void* shader_ctx,
-        Vertex* /*a*/,        Vertex* /*b*/,       Vertex* /*c*/,
+        f32x3* /*a*/,        f32x3* /*b*/,       f32x3* /*c*/,
         VertexAttrs* /*va*/,  VertexAttrs* /*vb*/, VertexAttrs* /*vc*/,
         f32 /*w0*/,           f32 /*w1*/,          f32 /*w2*/,
         u32 x,            u32 y,           u32 w,           u32 /*h*/,
@@ -231,7 +231,7 @@ void shader_frag_color(
 
 void shader_frag_depth(
         void* /*shader_ctx*/,
-        Vertex* a, Vertex* b, Vertex*c,
+        f32x3* a, f32x3* b, f32x3*c,
         VertexAttrs* /*va*/, VertexAttrs* /*vb*/, VertexAttrs* /*vc*/,
         f32 w0, f32 w1, f32 w2,
         u32 x, u32 y, u32 w, u32 /*h*/,
@@ -243,7 +243,7 @@ void shader_frag_depth(
 
 void shader_frag_texture(
         void* shader_ctx,
-        Vertex* /*a*/, Vertex* /*b*/, Vertex* /*c*/,
+        f32x3* /*a*/, f32x3* /*b*/, f32x3* /*c*/,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         f32 w0, f32 w1, f32 w2,
         u32 x, u32 y, u32 width, u32 /*height*/,
@@ -271,7 +271,7 @@ inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy)
 }
 
 
-void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
+void fill_flat_top_triangle(f32x3* a, f32x3* b, f32x3* c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
     /*
@@ -346,7 +346,7 @@ void fill_flat_top_triangle(Vertex* a, Vertex* b, Vertex* c,
     }
 }
 
-void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
+void fill_flat_bottom_triangle(f32x3* a, f32x3* b, f32x3* c,
         VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
         u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
     /*
@@ -428,7 +428,7 @@ void fill_flat_bottom_triangle(Vertex* a, Vertex* b, Vertex* c,
 }
 
 void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
-        Vertex* v1, Vertex* v2, Vertex* v3,
+        f32x3* v1, f32x3* v2, f32x3* v3,
         VertexAttrs* va1, VertexAttrs* va2, VertexAttrs* va3,
         void* shader_context, FragmentShader frag_shader) {
     /*
@@ -474,15 +474,15 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
 
     // TODO: Change so that A, B and C are counter clock-wise instead
 
-    Vertex* a = v1;
-    Vertex* b = v2;
-    Vertex* c = v3;
+    f32x3* a = v1;
+    f32x3* b = v2;
+    f32x3* c = v3;
     VertexAttrs* va = va1;
     VertexAttrs* vb = va2;
     VertexAttrs* vc = va3;
 
     // Sort in order of ascending y: a.y<b.y<c.y
-    Vertex* t;
+    f32x3* t;
     VertexAttrs* ta;
     if (b->y < a->y) { t = a; a = b; b = t; ta = va; va = vb; vb = ta;}
     if (c->y < a->y) { t = a; a = c; c = t; ta = va; va = vc; vc = ta;}
@@ -525,7 +525,7 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
         f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
-        Vertex extra;
+        f32x3 extra;
         extra.x = extra_x;
         extra.y = b->y;
         extra.z = extra_z;
@@ -634,9 +634,9 @@ void draw_model(Model* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void
             _b = f32x3_transform_point(tc->world, _b);
             _c = f32x3_transform_point(tc->world, _c);
 
-            Vertex a = *(Vertex*)(&_a);
-            Vertex b = *(Vertex*)(&_b);
-            Vertex c = *(Vertex*)(&_c);
+            f32x3 a = *(f32x3*)(&_a);
+            f32x3 b = *(f32x3*)(&_b);
+            f32x3 c = *(f32x3*)(&_c);
 
             a.x *= w;
             a.y *= h;
