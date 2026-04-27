@@ -3,6 +3,15 @@
 #include "platform/io.h"
 #include "base/base.h"
 #include "libs/ads_images.h"
+#include "libs/ads_math.h"
+
+typedef struct Scene Scene;
+typedef struct Object Object;
+typedef struct AABB AABB;
+typedef struct Mesh Mesh;
+typedef struct SubMesh SubMesh;
+typedef struct Vertex Vertex;
+typedef struct Material Material;
 
 // TODO: Hash map of currently loaded textures which contains a count of how many times its used
 //  So when free we free only when the count is down to 0
@@ -542,16 +551,158 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     return obj_model;
 }
 
-Model* model_convert_from_obj(/*Arena* arena, */ObjModel* obj_model) {
-    return (Model*)obj_model;
+Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
+    // TEXTURES
+    int n_tex = 0;
+    for (uint32_t i=0; i<obj_model->n_materials; i++) {
+        ObjMaterial obj_mat = obj_model->materials[i];
+        if (obj_mat.map_Ka.data != NULL) n_tex++;
+        if (obj_mat.map_Kd.data != NULL) n_tex++;
+        if (obj_mat.map_Ks.data != NULL) n_tex++;
+        if (obj_mat.map_Bump.data != NULL) n_tex++;
+        if (obj_mat.map_d.data != NULL) n_tex++;
+    }
+    Texture* textures = (Texture*)arena_alloc_push(arena, n_tex*sizeof(Texture));
+    Texture* curr_tex = textures;
+    for (uint32_t i=0; i<obj_model->n_materials; i++) {
+        ObjMaterial obj_mat = obj_model->materials[i];
+        if (obj_mat.map_Ka.data != NULL)   {Texture t = obj_mat.map_Ka;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Kd.data != NULL)   {Texture t = obj_mat.map_Kd;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Ks.data != NULL)   {Texture t = obj_mat.map_Ks;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Bump.data != NULL) {Texture t = obj_mat.map_Bump;   curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_d.data != NULL)    {Texture t = obj_mat.map_d;      curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+    }
+
+    // MATERIALS
+    uint32_t n_mats = obj_model->n_materials;
+    Material* mats = (Material*)arena_alloc_push(arena, n_mats*sizeof(Material));
+    for (uint32_t i=0; i<n_mats; i++, mats++) {
+        ObjMaterial* obj_mat = &obj_model->materials[i];
+        mats->name  = obj_mat->name     ;             // newmtl
+        mats->Ka    = obj_mat->Ka       ;               // ambiant color
+        mats->Kd    = obj_mat->Kd       ;               // diffuse color
+        mats->Ks    = obj_mat->Ks       ;               // specular color
+        mats->Ke    = obj_mat->Ke       ;               // emissive color
+        mats->Ns    = obj_mat->Ns       ;               // specular exponent
+        mats->Ni    = obj_mat->Ni       ;               // index of refraction
+        mats->Tr    = obj_mat->Tr       ;               // Transparency
+        mats->Tf    = obj_mat->Tf       ;               // Transmission filter
+        mats->illum = obj_mat->illum    ;            // illumination
+
+        // Textures
+        // Find the correct one in the Texture array
+        // TODO: Hashmap!
+        mats->map_Ka = NULL;
+        mats->map_Kd = NULL;
+        mats->map_Ks = NULL;
+        mats->map_Bump = NULL;
+        mats->map_d = NULL;
+        for (Texture* t = textures; t<textures+n_tex; t++) {
+            if (t->data == obj_mat->map_Ka.data) {
+                mats->map_Ka = t;
+            }
+            else if (t->data == obj_mat->map_Kd.data) {
+                mats->map_Kd = t;
+            }
+            else if (t->data == obj_mat->map_Ks.data) {
+                mats->map_Ks = t;
+            }
+            else if (t->data == obj_mat->map_Bump.data) {
+                mats->map_Bump = t;
+            }
+            else if (t->data == obj_mat->map_d.data) {
+                mats->map_d = t;
+            }
+        }
+    }
+
+    // VERTICES and indices
+    int n_vertices = 3*obj_model->n_faces;
+    Vertex* vertices = (Vertex*)arena_alloc_push(arena, n_vertices*sizeof(Vertex));
+    Vertex* curr_ver = vertices;
+
+    int n_indices = n_vertices;
+    uint32_t* indices = (uint32_t*)arena_alloc_push(arena, n_indices*sizeof(uint32_t));
+    uint32_t* curr_ind = indices;
+    for (uint32_t i=0; i<obj_model->n_faces; i++){
+        ObjFace f = obj_model->faces[i];
+        // Vertices
+        curr_ver->position = obj_model->vertices[f.v_indices[0]];
+        if (obj_model->n_texcoords) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
+        }
+        if (obj_model->n_normals) {
+            curr_ver->normals = obj_model->normals[f.vn_indices[0]];
+        }
+        curr_ver++;
+        curr_ver->position = obj_model->vertices[f.v_indices[1]];
+        if (obj_model->n_texcoords) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
+        }
+        if (obj_model->n_normals) {
+            curr_ver->normals = obj_model->normals[f.vn_indices[1]];
+        }
+        curr_ver++;
+        curr_ver->position = obj_model->vertices[f.v_indices[2]];
+        if (obj_model->n_texcoords) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
+        }
+        if (obj_model->n_normals) {
+            curr_ver->normals = obj_model->normals[f.vn_indices[2]];
+        }
+        curr_ver++;
+
+        // Indices
+        *curr_ind = f.v_indices[0];
+        curr_ind++;
+        *curr_ind = f.v_indices[1];
+        curr_ind++;
+        *curr_ind = f.v_indices[2];
+        curr_ind++;
+    }
+
+    int n_submeshes = obj_model->n_groups;
+    SubMesh* submeshes = (SubMesh*)arena_alloc_push(arena, n_submeshes*sizeof(SubMesh));
+    SubMesh* curr_sub = submeshes++;
+    for (int i=0; i<n_submeshes; i++, curr_sub++) {
+        ObjGroup obj_grp = obj_model->groups[i];
+
+        curr_sub->start_index = 3*obj_grp.first_face_index;
+        curr_sub->count = 3*obj_grp.face_count;
+        submeshes->mat = &mats[obj_grp.material_index];
+    }
+
+    int n_meshes = 1;
+    Mesh* mesh = (Mesh*)arena_alloc_push(arena, n_meshes*sizeof(Mesh));
+    mesh->vertices = vertices;
+    mesh->n_vertices = n_vertices;
+    mesh->indices = indices;
+    mesh->n_indices = n_indices;
+    mesh->submeshes = NULL;
+    mesh->n_submeshes = 0;
+
+    Object* object = (Object*)arena_alloc_push(arena, 1 * sizeof(Object));
+    object->mesh = mesh;
+    object->transform = f32x4x4_identity();
+
+    Scene* scene = (Scene*)arena_alloc_push(arena, 1*sizeof(Scene));
+    scene->meshes     = mesh;
+    scene->n_meshes   = 1;
+    scene->mats       = mats;
+    scene->n_mats     = n_mats;
+    scene->textures   = textures;
+    scene->n_textures = n_tex;
+    scene->objects    = object;
+    scene->n_objects  = 1;
+    return scene;
 }
 
 ObjModel* model_create_default_model(void /*Arena* arena*/) {
     return NULL;
 }
 
-Model* model_read(Arena* arena, StringView filepath) {
-    ObjModel* model = NULL;
+Scene* model_read(Arena* arena, StringView filepath) {
+    Scene* scene = NULL;
 
     StringView ext = sv_file_extension(filepath);
 
@@ -560,7 +711,7 @@ Model* model_read(Arena* arena, StringView filepath) {
         StringView file_content = sv_from_string(file);
         StringView base_dir = sv_directory_name(filepath);
         ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
-        model = model_convert_from_obj(/*arena, */obj_model);
+        scene = model_convert_from_obj(arena, obj_model);
     }
     // else if (sv_equal(ext, sv_from_cstr(".gltf"))) {
     //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
@@ -569,7 +720,7 @@ Model* model_read(Arena* arena, StringView filepath) {
     // }
     else {
         PANIC;
-        model = model_create_default_model(/*arena*/);
+        // model = model_create_default_model(/*arena*/);
     }
-    return model;
+    return scene;
 }

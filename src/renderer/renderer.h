@@ -38,7 +38,6 @@ typedef struct {
 } ColorContext;
 
 typedef struct {
-    Texture* texture;
     f32x4x4* world;
 } TextureContext;
 
@@ -58,6 +57,6 @@ void shader_frag_texture(void* shader_ctx, f32x3* a, f32x3* b, f32x3* c,
 
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
 
-void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
+void draw_model(Scene* scene, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
 
 #endif // ADS_RENDERER_H

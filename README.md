@@ -10,6 +10,10 @@
 - *ADS_LOCAL_ARENA_POOL_COUNT*:
 - *ADS_LOCAL_ARENA_CAPACITY*:
 
+[ 1 0 0 0 ] [ x ]
+[ 0 1 0 0 ] [ y ]
+[ 0 0 1 0 ] [ z ]
+[ 0 0 0 1 ] [ w ]
 
 
 # TODO

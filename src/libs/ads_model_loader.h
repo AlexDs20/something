@@ -65,7 +65,8 @@ typedef struct {
     int material_index;
 } ObjGroup;
 
-typedef struct {
+typedef struct ObjModel ObjModel;
+struct ObjModel {
     Vec3f* vertices;
     Vec3f* texcoords;
     Vec3f* normals;
@@ -82,10 +83,9 @@ typedef struct {
 
     // TODO(alex): There can be several mtllib => fix
     StringView mtllib_name;
-} ObjModel;
+};
 
 
-/*
 struct Material {
     StringView name;        // newmtl
 
@@ -102,17 +102,11 @@ struct Material {
     uint32_t illum;         // illumination
 
     // Textures
-    StringView sv_map_Ka;      // ambient color
-    StringView sv_map_Kd;      // diffuse texture
-    StringView sv_map_Ks;      // specular texture
-    StringView sv_map_Bump;    // normal map
-    StringView sv_map_d;       // alpha texture map
-
-    Texture map_Ka;
-    Texture map_Kd;
-    Texture map_Ks;
-    Texture map_Bump;
-    Texture map_d;
+    Texture* map_Ka;
+    Texture* map_Kd;
+    Texture* map_Ks;
+    Texture* map_Bump;
+    Texture* map_d;
 };
 
 struct SubMesh {
@@ -150,7 +144,6 @@ struct Object {
     struct AABB bbox;
 };
 
-
 struct Scene {
     struct Mesh* meshes;
     uint32_t n_meshes;
@@ -158,18 +151,14 @@ struct Scene {
     struct Material* mats;
     uint32_t n_mats;
 
-    // Texture* textures;
-    // uint32_t n_textures;
+    struct Texture* textures;
+    uint32_t n_textures;
 
     struct Object* objects;
     uint32_t n_objects;
 };
-*/
 
-typedef ObjModel Model;
-
-
-Model*   model_read(Arena* arena, StringView filepath);
+struct Scene* model_read(Arena* arena, StringView filepath);
 #ifdef __cplusplus
 }
 #endif

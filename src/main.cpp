@@ -60,7 +60,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    Model* model = model_read(scene_arena, fp);
+    // Model* model = model_read(scene_arena, fp);
+    Scene* scene = model_read(scene_arena, fp);
 
     Transform t;
     t.position = f32x3_make(0.5f, 0.4f, 0.0f);
@@ -88,7 +89,6 @@ int main(int argc, char** argv) {
     // };
 
     TextureContext frag_context;
-    frag_context.texture = &(model->materials[0].map_Kd);
     frag_context.world = &world;
 
     f32 theta = 0.0f;
@@ -96,7 +96,6 @@ int main(int argc, char** argv) {
         t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), theta);
         theta += (F32_TAU / 120.0f);
         world = f32x4x4_from_transform(t);
-        // frag_context.world = &wor
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
@@ -118,7 +117,7 @@ int main(int argc, char** argv) {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        draw_model(scene, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
