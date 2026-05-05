@@ -1,7 +1,7 @@
 #!/bin/bash
 CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
-EXTRAFLAGS=" -fsanitize=address,undefined,leak -fno-sanitize-recover"
+EXTRAFLAGS=""       #" -fsanitize=address,undefined,leak -fno-sanitize-recover"
 
 DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE -DADS_USE_EXTERNAL"
 DEFINES+=" -DADS_DEBUG -g -ggdb"

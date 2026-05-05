@@ -10,11 +10,6 @@ void print(f32x3* v) {
     printf("f32x3: (%f,%f,%f)\n", v->x, v->y, v->z);
 }
 
-void print(VertexAttrs* va) {
-    printf("VertexAttrs: uvw=(%f,%f,%f) n=(%f,%f,%f)\n", va->u, va->v, va->w, va->nx, va->ny, va->nz);
-}
-
-
 void draw_line(u32* framebuffer, u32 w, u32 h, f32x3* a, f32x3* b, u32 c) {
     float dx = b->x-a->x;
     float dy = b->y-a->y;
@@ -219,6 +214,7 @@ void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u3
     }
 }
 
+#if 0
 void shader_frag_color(
         void* shader_ctx,
         f32x3* /*a*/,        f32x3* /*b*/,       f32x3* /*c*/,
@@ -240,22 +236,43 @@ void shader_frag_depth(
     f32 depth = w0*a->z + w1*b->z + w2*c->z;
     framebuffer[y*w+x] = (u32)(depth*128);
 }
+#endif
+
+void shader_frag_color(
+        u32* framebuffer , f32* /*zbuffer*/,
+        u32 width, u32 /*height*/,
+        Material* /*mat*/,
+        u32 x, u32 y,
+        Vertex* a, Vertex* b, Vertex* /*c*/,
+        f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
+        ) {
+
+    f32x3 n = f32x3_clamp(255.0f * f32x3_cross(a->position, b->position), f32x3_splat(0.0f), f32x3_splat(255.0f));
+    f32 color = ((uint8_t)n.x << 16) | ((uint8_t)n.y << 8) | (uint8_t)n.x;
+    framebuffer[y*width+x] = color;
+
+    // framebuffer[y*width+x] = 0xFFA500;
+    return;
+}
 
 void shader_frag_texture(
-        void* shader_ctx,
-        f32x3* /*a*/, f32x3* /*b*/, f32x3* /*c*/,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        f32 w0, f32 w1, f32 w2,
-        u32 x, u32 y, u32 width, u32 /*height*/,
-        f32* /*zbuffer*/, u32* framebuffer) {
+        u32* framebuffer , f32* /*zbuffer*/,
+        u32 width, u32 /*height*/,
+        Material* mat,
+        u32 x, u32 y,
+        Vertex* a, Vertex* b, Vertex* c,
+        f32 w0, f32 w1, f32 w2
+        ) {
     // va->u,v,w => are the texture coordinates
     // w0, w1, w2 => barycentric coords
 
-    TextureContext* ctx = (TextureContext*)shader_ctx;
-    Texture* texture = ctx->texture;
+    Texture* texture = mat->map_Kd;
+    f32x3* at = &a->texcoords;
+    f32x3* bt = &b->texcoords;
+    f32x3* ct = &c->texcoords;
 
-    f32 u = w0*va->u + w1*vb->u + w2*vc->u;
-    f32 v = w0*va->v + w1*vb->v + w2*vc->v;
+    f32 u = w0*at->x + w1*bt->x + w2*ct->x;
+    f32 v = w0*at->y + w1*bt->y + w2*ct->y;
     // f32 w = w0*va->w + w1*vb->w + w2*vc->w;
 
     // TODO: NEAREST or BILINEAR INTERP
@@ -264,6 +281,7 @@ void shader_frag_texture(
     u32 texture_y = (u32)(v * texture->height);
 
     framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
+    return;
 }
 
 inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
@@ -271,21 +289,24 @@ inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy)
 }
 
 
-void fill_flat_top_triangle(f32x3* a, f32x3* b, f32x3* c,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
     /*
      * assert b->x <= c->x;
      */
-    f32 ay = a->y;
-    f32 by = b->y;
-    f32 cy = c->y;
-    f32 ax = a->x;
-    f32 bx = b->x;
-    f32 cx = c->x;
-    f32 az = a->z;
-    f32 bz = b->z;
-    f32 cz = c->z;
+
+    f32x3 a = v1->position;
+    f32x3 b = v2->position;
+    f32x3 c = v3->position;
+
+    f32 ay = a.y;
+    f32 by = b.y;
+    f32 cy = c.y;
+    f32 ax = a.x;
+    f32 bx = b.x;
+    f32 cx = c.x;
+    f32 az = a.z;
+    f32 bz = b.z;
+    f32 cz = c.z;
 
     f32 y_delta_inv = 1.0f / (by - ay);
     f32 ad_inv_slope;
@@ -335,7 +356,8 @@ void fill_flat_top_triangle(f32x3* a, f32x3* b, f32x3* c,
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
+                // frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
+                shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
             }
             z += z_scanline_slope;
         }
@@ -346,21 +368,23 @@ void fill_flat_top_triangle(f32x3* a, f32x3* b, f32x3* c,
     }
 }
 
-void fill_flat_bottom_triangle(f32x3* a, f32x3* b, f32x3* c,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
     /*
      * assert a->x <= b->x
      */
-    f32 ay = a->y;
-    f32 by = b->y;
-    f32 cy = c->y;
-    f32 ax = a->x;
-    f32 bx = b->x;
-    f32 cx = c->x;
-    f32 az = a->z;
-    f32 bz = b->z;
-    f32 cz = c->z;
+    f32x3 a = v1->position;
+    f32x3 b = v2->position;
+    f32x3 c = v3->position;
+
+    f32 ay = a.y;
+    f32 by = b.y;
+    f32 cy = c.y;
+    f32 ax = a.x;
+    f32 bx = b.x;
+    f32 cx = c.x;
+    f32 az = a.z;
+    f32 bz = b.z;
+    f32 cz = c.z;
 
     f32 dc_inv_slope;
     f32 ec_inv_slope;
@@ -416,7 +440,7 @@ void fill_flat_bottom_triangle(f32x3* a, f32x3* b, f32x3* c,
                 f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
-                frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
+                shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
             }
             z += z_scanline_slope;
         }
@@ -427,11 +451,8 @@ void fill_flat_bottom_triangle(f32x3* a, f32x3* b, f32x3* c,
     }
 }
 
-void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
-        f32x3* v1, f32x3* v2, f32x3* v3,
-        VertexAttrs* va1, VertexAttrs* va2, VertexAttrs* va3,
-        void* shader_context, FragmentShader frag_shader) {
-    /*
+void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
+/*
      * f(t) = A + t * AB            t in [0, 1]
      *
      * x = A_x + t * AB_x
@@ -470,23 +491,20 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
      *       = A_z + (y-A_y) * (C_z - A_z)/(C_y-A_y)
      *       = A_z + (x-A_x) * (C_z-A_z)/(C_x-A_x)
      *
-     */
+*/
 
     // TODO: Change so that A, B and C are counter clock-wise instead
 
-    f32x3* a = v1;
-    f32x3* b = v2;
-    f32x3* c = v3;
-    VertexAttrs* va = va1;
-    VertexAttrs* vb = va2;
-    VertexAttrs* vc = va3;
+    f32x3* a = &v1->position;
+    f32x3* b = &v2->position;
+    f32x3* c = &v3->position;
 
     // Sort in order of ascending y: a.y<b.y<c.y
     f32x3* t;
-    VertexAttrs* ta;
-    if (b->y < a->y) { t = a; a = b; b = t; ta = va; va = vb; vb = ta;}
-    if (c->y < a->y) { t = a; a = c; c = t; ta = va; va = vc; vc = ta;}
-    if (c->y < b->y) { t = b; b = c; c = t; ta = vb; vb = vc; vc = ta;}
+    Vertex* tv;
+    if (b->y < a->y) { t = a; a = b; b = t;     tv = v1; v1 = v2; v2 = tv;}
+    if (c->y < a->y) { t = a; a = c; c = t;     tv = v1; v1 = v3; v3 = tv;}
+    if (c->y < b->y) { t = b; b = c; c = t;     tv = v2; v2 = v3; v3 = tv;}
 
     // Fast terminate
     if (c->y < 0) return;
@@ -506,17 +524,17 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
     // Lower half triangle
     if (b->y == c->y) {
         if (b->x <= c->x) {
-            fill_flat_top_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            fill_flat_top_triangle(framebuffer, zbuffer, w, h, mat , v1, v2, v3);
         } else {
-            fill_flat_top_triangle(a, c, b, va, vc, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            fill_flat_top_triangle(framebuffer, zbuffer, w, h, mat , v1, v3, v2);
         }
     }
     // Upper half triangle
     else if (a->y == b->y) {
         if (a->x <= b->x) {
-            fill_flat_bottom_triangle(a, b, c, va, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            fill_flat_bottom_triangle(framebuffer, zbuffer, w, h, mat, v1, v2, v3);
         } else {
-            fill_flat_bottom_triangle(b, a, c, vb, va, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            fill_flat_bottom_triangle(framebuffer, zbuffer, w, h, mat, v2, v1, v3);
         }
     }
     else {
@@ -525,138 +543,138 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h,
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
         f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
-        f32x3 extra;
-        extra.x = extra_x;
-        extra.y = b->y;
-        extra.z = extra_z;
+        Vertex extra;
+        extra.position.x = extra_x;
+        extra.position.y = b->y;
+        extra.position.z = extra_z;
 
-        f32 ac_u_inv_slope = (vc->u - va->u) / (c->y - a->y);
-        f32 ac_v_inv_slope = (vc->v - va->v) / (c->y - a->y);
-        f32 ac_w_inv_slope = (vc->w - va->w) / (c->y - a->y);
-        f32 extra_u = va->u + (b->y - a->y) * ac_u_inv_slope;
-        f32 extra_v = va->v + (b->y - a->y) * ac_v_inv_slope;
-        f32 extra_w = va->w + (b->y - a->y) * ac_w_inv_slope;
+        // Handling of the other vertex attributes...
+        f32 ac_u_inv_slope = (v3->texcoords.x - v1->texcoords.x) / (v3->position.y - v1->position.y);
+        f32 ac_v_inv_slope = (v3->texcoords.y - v1->texcoords.y) / (v3->position.y - v1->position.y);
+        f32 ac_w_inv_slope = (v3->texcoords.z - v1->texcoords.z) / (v3->position.y - v1->position.y);
+        f32 extra_u = v1->texcoords.x + (v2->position.y - v1->position.y) * ac_u_inv_slope;
+        f32 extra_v = v1->texcoords.y + (v2->position.y - v1->position.y) * ac_v_inv_slope;
+        f32 extra_w = v1->texcoords.z + (v2->position.y - v1->position.y) * ac_w_inv_slope;
 
-        // f32 ac_nx_inv_slope = (vc->nx - va->nx) / (c->y - a->y);
-        // f32 ac_ny_inv_slope = (vc->ny - va->ny) / (c->y - a->y);
-        // f32 ac_nz_inv_slope = (vc->nz - va->nz) / (c->y - a->y);
-        f32 extra_nx = va->nx + (b->y - a->y) * ac_u_inv_slope;
-        f32 extra_ny = va->ny + (b->y - a->y) * ac_v_inv_slope;
-        f32 extra_nz = va->nz + (b->y - a->y) * ac_w_inv_slope;
-
-        VertexAttrs ve;
-        ve.u = extra_u;
-        ve.v = extra_v;
-        ve.w = extra_w;
-        ve.nx = extra_nx;
-        ve.ny = extra_ny;
-        ve.nz = extra_nz;
-
+        // TODO: Interpolate the normal as well
+        extra.texcoords.x = extra_u;
+        extra.texcoords.y = extra_v;
+        extra.texcoords.z = extra_w;
 
         if (b->y > 0) {
-            if (b->x <= extra.x) {
-                fill_flat_top_triangle(a, b, &extra, va, vb, &ve, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            if (b->x <= extra.position.x) {
+                fill_flat_top_triangle(framebuffer, zbuffer, w, h, mat, v1, v2, &extra);
             } else {
-                fill_flat_top_triangle(a, &extra, b, va, &ve, vb, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+                fill_flat_top_triangle(framebuffer, zbuffer, w, h, mat, v1, &extra, v2);
             }
         }
         if (b->y < h) {
-            if (extra.x <= b->x) {
-                fill_flat_bottom_triangle(&extra, b, c, &ve, vb, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+            if (extra.position.x <= b->x) {
+                fill_flat_bottom_triangle(framebuffer, zbuffer, w, h, mat, &extra, v2, v3);
             } else {
-                fill_flat_bottom_triangle(b, &extra, c, vb, &ve, vc, w, h, framebuffer, zbuffer, shader_context, frag_shader);
+                fill_flat_bottom_triangle(framebuffer, zbuffer, w, h, mat, v2, &extra, v3);
             }
         }
     }
 }
 
-void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v, uint32_t* indices, uint32_t n_indices, Material* mat, f32x4x4 transformation);
+void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 /*transformation*/, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
+    for (u32 i=0; i<n_indices; i+=3) {
+        Vertex* a_ = &vertices[indices[i+0]];
+        Vertex* b_ = &vertices[indices[i+1]];
+        Vertex* c_ = &vertices[indices[i+2]];
 
-void draw_model(Scene* scene, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader) {
+        // vertex shader
+        Vertex a, b, c;
+        // a.position = f32x3_transform_point(&transformation, a_->position);
+        a.position = a_->position;
+        a.texcoords = a_->texcoords;
+        a.normals   = a_->normals;
+
+        // b.position = f32x3_transform_point(&transformation, b_->position);
+        b.position = b_->position;
+        b.texcoords = b_->texcoords;
+        b.normals   = b_->normals;
+
+        // c.position = f32x3_transform_point(&transformation, c_->position);
+        c.position = c_->position;
+        c.texcoords = c_->texcoords;
+        c.normals   = c_->normals;
+
+        a.position.x *= w;
+        a.position.y *= h;
+
+        b.position.x *= w;
+        b.position.y *= h;
+
+        c.position.x *= w;
+        c.position.y *= h;
+
+        fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a, &b, &c);
+    }
+}
+
+// TODO: Add perspective transformation due to camera
+void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
         // if (frustum_cull(obj->bbox)) {}
 
+#if 1
         Mesh* mesh = obj->mesh;
-        f32x4x4 world = obj->transform;
 
-        Vertex* v     = mesh->vertices;
-        uint32_t* ind = mesh->indices;
+        f32x4x4 s = f32x4x4_scale_f32(500);
+        f32x3 t = {900, 200, -1500};
+        f32x4x4 translate = f32x4x4_translate(t);
+        f32x4x4 scaled = f32x4x4_mul(&s, &obj->transform);
+        f32x4x4 transformation = f32x4x4_mul(&translate, &scaled);
+
+        uint32_t* ind    = mesh->indices;
 
         for (u32 j=0; j<mesh->n_submeshes; j++) {
             SubMesh* sm = &mesh->submeshes[j];
-            Material* mat = sm->mat;
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
 
-            draw_submesh(framebuffer, zbuffer, w, h, v, sm_indices, ind_count, mat, world);
+            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
         }
+
+// They both seem to give the same result when we have just one material! :)
+// However it's broken in both cases
+#else
+        uint32_t* indices = obj->mesh->indices;
+        uint32_t n_indices = obj->mesh->n_indices;
+        Vertex* vertices = obj->mesh->vertices;
+        Material* mat = scene->mats;
+
+        f32x4x4 s = f32x4x4_scale_f32(500);
+        f32x3 t = {900, 200, -1500};
+        f32x4x4 translate = f32x4x4_translate(t);
+        f32x4x4 scaled = f32x4x4_mul(&s, &obj->transform);
+        f32x4x4 transformation = f32x4x4_mul(&translate, &scaled);
+
+        for (u32 i=0; i<n_indices; i+=3) {
+            Vertex* a_ = &vertices[indices[i+0]];
+            Vertex* b_ = &vertices[indices[i+1]];
+            Vertex* c_ = &vertices[indices[i+2]];
+
+            // vertex shader
+            Vertex a, b, c;
+            a.position = f32x3_transform_point(&transformation, a_->position);
+            a.texcoords = a_->texcoords;
+            a.normals   = a_->normals;
+
+            b.position = f32x3_transform_point(&transformation, b_->position);
+            b.texcoords = b_->texcoords;
+            b.normals   = b_->normals;
+
+            c.position = f32x3_transform_point(&transformation, c_->position);
+            c.texcoords = c_->texcoords;
+            c.normals   = c_->normals;
+
+            fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a, &b, &c);
+        }
+#endif
     }
 }
-
-
-// void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Vertex* v, uint32_t* indices, uint32_t n_indices, Material* mat, f32x4x4 transformation) {
-//     TextureContext* frag_context = (TextureContext*)shader_context;
-//     for (u64 g=0; g<model->n_groups; ++g) {
-//         ObjGroup* group = model->groups + g;
-//         int mat_index = group->material_index;
-//
-//         frag_context->texture = &(model->materials[mat_index].map_Kd);
-//
-//         u64 opl = group->first_face_index + group->face_count;;
-//         for (u64 i=group->first_face_index; i<opl; ++i) {
-//             ObjFace* f = model->faces + i;
-//
-//             // Only use the x y components atm
-//             // Can work with perspective and camera later
-//             f32x3 _a = *(f32x3*)(model->vertices + f->v_indices[0]);
-//             f32x3 _b = *(f32x3*)(model->vertices + f->v_indices[1]);
-//             f32x3 _c = *(f32x3*)(model->vertices + f->v_indices[2]);
-//
-//             VertexAttrs va;
-//             va.u = (model->texcoords + f->vt_indices[0])->x;
-//             va.v = (model->texcoords + f->vt_indices[0])->y;
-//             va.w = (model->texcoords + f->vt_indices[0])->z;
-//             va.nx = (model->normals  + f->vn_indices[0])->x;
-//             va.ny = (model->normals  + f->vn_indices[0])->y;
-//             va.nz = (model->normals  + f->vn_indices[0])->z;
-//
-//             VertexAttrs vb;
-//             vb.u = (model->texcoords + f->vt_indices[1])->x;
-//             vb.v = (model->texcoords + f->vt_indices[1])->y;
-//             vb.w = (model->texcoords + f->vt_indices[1])->z;
-//             vb.nx = (model->normals  + f->vn_indices[1])->x;
-//             vb.ny = (model->normals  + f->vn_indices[1])->y;
-//             vb.nz = (model->normals  + f->vn_indices[1])->z;
-//
-//             VertexAttrs vc;
-//             vc.u = (model->texcoords + f->vt_indices[2])->x;
-//             vc.v = (model->texcoords + f->vt_indices[2])->y;
-//             vc.w = (model->texcoords + f->vt_indices[2])->z;
-//             vc.nx = (model->normals  + f->vn_indices[2])->x;
-//             vc.ny = (model->normals  + f->vn_indices[2])->y;
-//             vc.nz = (model->normals  + f->vn_indices[2])->z;
-//
-//             TextureContext* tc = (TextureContext*)shader_context;
-//             _a = f32x3_transform_point(tc->world, _a);
-//             _b = f32x3_transform_point(tc->world, _b);
-//             _c = f32x3_transform_point(tc->world, _c);
-//
-//             f32x3 a = *(f32x3*)(&_a);
-//             f32x3 b = *(f32x3*)(&_b);
-//             f32x3 c = *(f32x3*)(&_c);
-//
-//             a.x *= w;
-//             a.y *= h;
-//
-//             b.x *= w;
-//             b.y *= h;
-//
-//             c.x *= w;
-//             c.y *= h;
-//
-//             fill_triangle_scanline(framebuffer, zbuffer, w, h, &a, &b, &c, &va, &vb, &vc, shader_context, frag_shader);
-//         }
-//     }
-// }

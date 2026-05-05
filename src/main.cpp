@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
         Usage: \
         ./main [path-to-obj] \
     \n";
-    //
+
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
     char msg[] = "Handmade something starts!\n";
@@ -76,20 +76,14 @@ int main(int argc, char** argv) {
 
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
-    const u32 bg_color = 0x18181B;
+    // const u32 bg_color = 0x18181B;
+    const u32 bg_color = 0x0000182B;
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
 
     const f32 ninf = f32_ninf();
 
     u32 running = 1;
-
-    // ColorContext frag_context = {
-    //     0xFFFFA500,
-    // };
-
-    TextureContext frag_context;
-    frag_context.world = &world;
 
     f32 theta = 0.0f;
     while (running) {
@@ -117,7 +111,7 @@ int main(int argc, char** argv) {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_model(scene, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        draw_scene(scene, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 

@@ -53,6 +53,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
     String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
 
+    printf("\n read_mtl: mats=%p", (void*)mats);
     ObjMaterial* current_mats = NULL;
 
     StringView new_line = sv_from_cstr("\n");
@@ -69,6 +70,7 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             else {
                 current_mats++;
             }
+            printf("\n read_mtl: mats=%p  current:%p", (void*) mats, (void*)current_mats);
 
             current_mats->name = sv_from_string(
                     string_init_sv(persist_arena, sv_trim_front(line))
@@ -300,7 +302,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0, n_mats = 0;
     file = sv_trim_front(file);
     while (file.size != 0) {
-        // Backing it
         if (file.buffer[0] == 'v') {
             switch (file.buffer[1]) {
                 case ' ': {
@@ -345,9 +346,9 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     // Second pass => the actual parsing
     ObjModel* obj_model = (ObjModel*)arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
 
-    Vec3f* vec_vertex          = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_v);
-    Vec3f* vec_texcoords       = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_vt);
-    Vec3f* vec_normals         = (Vec3f*)      arena_alloc_push_zero(persist_arena, sizeof(Vec3f)       * n_vn);
+    f32x3* vec_vertex          = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
+    f32x3* vec_texcoords       = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
+    f32x3* vec_normals         = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
     ObjFace* vec_faces         = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
     ObjGroup* vec_groups       = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
     ObjMaterial* vec_materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
@@ -367,9 +368,9 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     obj_model->n_groups = n_g;
     obj_model->n_materials = n_mats;
 
-    Vec3f* current_vertex     = vec_vertex;
-    Vec3f* current_texcoord   = vec_texcoords;
-    Vec3f* current_normal     = vec_normals;
+    f32x3* current_vertex     = vec_vertex;
+    f32x3* current_texcoord   = vec_texcoords;
+    f32x3* current_normal     = vec_normals;
     ObjFace* current_face     = vec_faces;
     ObjGroup* current_group   = vec_groups;
     ObjMaterial* current_mats = vec_materials;
@@ -384,7 +385,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     while (file.size != 0) {
         StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
         if (sv_starts_with_char(line, 'v')) {
-            Vec3f* v = NULL;
+            f32x3* v = NULL;
 
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
@@ -516,6 +517,9 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             ObjMaterial* mat = current_mats++;
             read_mtl_file(persist_arena, mat, mtl_file);
+            printf("\nMat name: ");
+            sv_print(mat->name);
+            printf("\n\t %p, (%u,%u,%u)", (void*)mat->map_Kd.data, mat->map_Kd.width, mat->map_Kd.height, mat->map_Kd.components);
 
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
@@ -576,42 +580,43 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
     // MATERIALS
     uint32_t n_mats = obj_model->n_materials;
     Material* mats = (Material*)arena_alloc_push(arena, n_mats*sizeof(Material));
-    for (uint32_t i=0; i<n_mats; i++, mats++) {
+    Material* mat = mats;
+    for (uint32_t i=0; i<n_mats; i++, mat++) {
         ObjMaterial* obj_mat = &obj_model->materials[i];
-        mats->name  = obj_mat->name     ;             // newmtl
-        mats->Ka    = obj_mat->Ka       ;               // ambiant color
-        mats->Kd    = obj_mat->Kd       ;               // diffuse color
-        mats->Ks    = obj_mat->Ks       ;               // specular color
-        mats->Ke    = obj_mat->Ke       ;               // emissive color
-        mats->Ns    = obj_mat->Ns       ;               // specular exponent
-        mats->Ni    = obj_mat->Ni       ;               // index of refraction
-        mats->Tr    = obj_mat->Tr       ;               // Transparency
-        mats->Tf    = obj_mat->Tf       ;               // Transmission filter
-        mats->illum = obj_mat->illum    ;            // illumination
+        mat->name  = obj_mat->name;                     // newmtl
+        mat->Ka    = obj_mat->Ka;                       // ambiant color
+        mat->Kd    = obj_mat->Kd;                       // diffuse color
+        mat->Ks    = obj_mat->Ks;                       // specular color
+        mat->Ke    = obj_mat->Ke;                       // emissive color
+        mat->Ns    = obj_mat->Ns;                       // specular exponent
+        mat->Ni    = obj_mat->Ni;                       // index of refraction
+        mat->Tr    = obj_mat->Tr;                       // Transparency
+        mat->Tf    = obj_mat->Tf;                       // Transmission filter
+        mat->illum = obj_mat->illum;                    // illumination
 
         // Textures
         // Find the correct one in the Texture array
         // TODO: Hashmap!
-        mats->map_Ka = NULL;
-        mats->map_Kd = NULL;
-        mats->map_Ks = NULL;
-        mats->map_Bump = NULL;
-        mats->map_d = NULL;
+        mat->map_Ka = NULL;
+        mat->map_Kd = NULL;
+        mat->map_Ks = NULL;
+        mat->map_Bump = NULL;
+        mat->map_d = NULL;
         for (Texture* t = textures; t<textures+n_tex; t++) {
             if (t->data == obj_mat->map_Ka.data) {
-                mats->map_Ka = t;
+                mat->map_Ka = t;
             }
             else if (t->data == obj_mat->map_Kd.data) {
-                mats->map_Kd = t;
+                mat->map_Kd = t;
             }
             else if (t->data == obj_mat->map_Ks.data) {
-                mats->map_Ks = t;
+                mat->map_Ks = t;
             }
             else if (t->data == obj_mat->map_Bump.data) {
-                mats->map_Bump = t;
+                mat->map_Bump = t;
             }
             else if (t->data == obj_mat->map_d.data) {
-                mats->map_d = t;
+                mat->map_d = t;
             }
         }
     }
@@ -623,53 +628,39 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
 
     int n_indices = n_vertices;
     uint32_t* indices = (uint32_t*)arena_alloc_push(arena, n_indices*sizeof(uint32_t));
-    uint32_t* curr_ind = indices;
     for (uint32_t i=0; i<obj_model->n_faces; i++){
         ObjFace f = obj_model->faces[i];
         // Vertices
-        curr_ver->position = obj_model->vertices[f.v_indices[0]];
-        if (obj_model->n_texcoords) {
-            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
-        }
-        if (obj_model->n_normals) {
-            curr_ver->normals = obj_model->normals[f.vn_indices[0]];
-        }
+        curr_ver->position  = obj_model->vertices[f.v_indices[0]];
+        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
+        curr_ver->normals   = obj_model->normals[f.vn_indices[0]];
         curr_ver++;
-        curr_ver->position = obj_model->vertices[f.v_indices[1]];
-        if (obj_model->n_texcoords) {
-            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
-        }
-        if (obj_model->n_normals) {
-            curr_ver->normals = obj_model->normals[f.vn_indices[1]];
-        }
+
+        curr_ver->position  = obj_model->vertices[f.v_indices[1]];
+        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
+        curr_ver->normals   = obj_model->normals[f.vn_indices[1]];
         curr_ver++;
-        curr_ver->position = obj_model->vertices[f.v_indices[2]];
-        if (obj_model->n_texcoords) {
-            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
-        }
-        if (obj_model->n_normals) {
-            curr_ver->normals = obj_model->normals[f.vn_indices[2]];
-        }
+
+        curr_ver->position  = obj_model->vertices[f.v_indices[2]];
+        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
+        curr_ver->normals   = obj_model->normals[f.vn_indices[2]];
         curr_ver++;
 
         // Indices
-        *curr_ind = f.v_indices[0];
-        curr_ind++;
-        *curr_ind = f.v_indices[1];
-        curr_ind++;
-        *curr_ind = f.v_indices[2];
-        curr_ind++;
+        indices[3*i + 0] = 3*i + 0;
+        indices[3*i + 1] = 3*i + 1;
+        indices[3*i + 2] = 3*i + 2;
     }
 
     int n_submeshes = obj_model->n_groups;
     SubMesh* submeshes = (SubMesh*)arena_alloc_push(arena, n_submeshes*sizeof(SubMesh));
-    SubMesh* curr_sub = submeshes++;
+    SubMesh* curr_sub = submeshes;
     for (int i=0; i<n_submeshes; i++, curr_sub++) {
         ObjGroup obj_grp = obj_model->groups[i];
 
         curr_sub->start_index = 3*obj_grp.first_face_index;
         curr_sub->count = 3*obj_grp.face_count;
-        submeshes->mat = &mats[obj_grp.material_index];
+        curr_sub->mat = &mats[obj_grp.material_index];
     }
 
     int n_meshes = 1;
@@ -678,10 +669,11 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
     mesh->n_vertices = n_vertices;
     mesh->indices = indices;
     mesh->n_indices = n_indices;
-    mesh->submeshes = NULL;
-    mesh->n_submeshes = 0;
+    mesh->submeshes = submeshes;
+    mesh->n_submeshes = n_submeshes;
 
     Object* object = (Object*)arena_alloc_push(arena, 1 * sizeof(Object));
+    // TODO: Somehow this is misaligned??
     object->mesh = mesh;
     object->transform = f32x4x4_identity();
 
@@ -711,7 +703,15 @@ Scene* model_read(Arena* arena, StringView filepath) {
         StringView file_content = sv_from_string(file);
         StringView base_dir = sv_directory_name(filepath);
         ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
+        printf("\nNumber of materials: %u", obj_model->n_materials);
+        for (uint32_t i=0; i<obj_model->n_materials; i++) {
+            printf("\n\t map_Kd: ");
+            sv_print(obj_model->materials[i].sv_map_Kd);
+            Texture t = obj_model->materials[i].map_Kd;
+            printf("\n\t\t %p (%u,%u,%u)", (void*)t.data, t.width, t.height, t.components);
+        }
         scene = model_convert_from_obj(arena, obj_model);
+
     }
     // else if (sv_equal(ext, sv_from_cstr(".gltf"))) {
     //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html

@@ -1,14 +1,13 @@
 #ifndef ADS_MODEL_LOADER_H
 #define ADS_MODEL_LOADER_H
 
+#include "base/types.h"
 #include "libs/ads_string.h"
 #include "memory/allocators.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef f32x3 Vec3f;
 
 typedef struct Texture Texture;
 struct Texture {
@@ -18,13 +17,14 @@ struct Texture {
     unsigned char components;
 };
 
+
 typedef struct {
     StringView name;        // newmtl
 
-    Vec3f Ka;               // ambiant color
-    Vec3f Kd;               // diffuse color
-    Vec3f Ks;               // specular color
-    Vec3f Ke;               // emissive color
+    f32x3 Ka;               // ambiant color
+    f32x3 Kd;               // diffuse color
+    f32x3 Ks;               // specular color
+    f32x3 Ke;               // emissive color
 
     float Ns;               // specular exponent
     float Ni;               // index of refraction
@@ -67,9 +67,9 @@ typedef struct {
 
 typedef struct ObjModel ObjModel;
 struct ObjModel {
-    Vec3f* vertices;
-    Vec3f* texcoords;
-    Vec3f* normals;
+    f32x3* vertices;
+    f32x3* texcoords;
+    f32x3* normals;
     ObjFace* faces;
     ObjGroup* groups;
     ObjMaterial* materials;
@@ -85,14 +85,19 @@ struct ObjModel {
     StringView mtllib_name;
 };
 
+enum ShaderID {
+    SHADER_ID_NIL,
+    SHADER_ID_TEXTURE,
+    SHADER_ID_COUNT,
+};
 
 struct Material {
     StringView name;        // newmtl
 
-    Vec3f Ka;               // ambiant color
-    Vec3f Kd;               // diffuse color
-    Vec3f Ks;               // specular color
-    Vec3f Ke;               // emissive color
+    f32x3 Ka;               // ambiant color
+    f32x3 Kd;               // diffuse color
+    f32x3 Ks;               // specular color
+    f32x3 Ke;               // emissive color
 
     float Ns;               // specular exponent
     float Ni;               // index of refraction
@@ -107,6 +112,8 @@ struct Material {
     Texture* map_Ks;
     Texture* map_Bump;
     Texture* map_d;
+
+    enum ShaderID shader;
 };
 
 struct SubMesh {
