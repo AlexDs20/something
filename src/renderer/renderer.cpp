@@ -578,7 +578,7 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
     }
 }
 
-void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 /*transformation*/, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
+void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 transformation, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
     for (u32 i=0; i<n_indices; i+=3) {
         Vertex* a_ = &vertices[indices[i+0]];
         Vertex* b_ = &vertices[indices[i+1]];
@@ -586,29 +586,17 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 
         // vertex shader
         Vertex a, b, c;
-        // a.position = f32x3_transform_point(&transformation, a_->position);
-        a.position = a_->position;
+        a.position = f32x3_transform_point(&transformation, a_->position);
         a.texcoords = a_->texcoords;
         a.normals   = a_->normals;
 
-        // b.position = f32x3_transform_point(&transformation, b_->position);
-        b.position = b_->position;
+        b.position = f32x3_transform_point(&transformation, b_->position);
         b.texcoords = b_->texcoords;
         b.normals   = b_->normals;
 
-        // c.position = f32x3_transform_point(&transformation, c_->position);
-        c.position = c_->position;
+        c.position = f32x3_transform_point(&transformation, c_->position);
         c.texcoords = c_->texcoords;
         c.normals   = c_->normals;
-
-        a.position.x *= w;
-        a.position.y *= h;
-
-        b.position.x *= w;
-        b.position.y *= h;
-
-        c.position.x *= w;
-        c.position.y *= h;
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a, &b, &c);
     }
@@ -621,14 +609,15 @@ void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
 
         // if (frustum_cull(obj->bbox)) {}
 
-#if 1
         Mesh* mesh = obj->mesh;
 
-        f32x4x4 s = f32x4x4_scale_f32(500);
-        f32x3 t = {900, 200, -1500};
+        f32x4x4 s = f32x4x4_scale_f32(200);
+        f32x3 t = {900, 400, -1500};
+        Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0);
+        f32x4x4 rotation = f32x4x4_from_quat(q_rot);
         f32x4x4 translate = f32x4x4_translate(t);
-        f32x4x4 scaled = f32x4x4_mul(&s, &obj->transform);
-        f32x4x4 transformation = f32x4x4_mul(&translate, &scaled);
+
+        f32x4x4 transformation = translate * rotation * s * obj->transform;
 
         uint32_t* ind    = mesh->indices;
 
@@ -640,41 +629,5 @@ void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
             draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
         }
 
-// They both seem to give the same result when we have just one material! :)
-// However it's broken in both cases
-#else
-        uint32_t* indices = obj->mesh->indices;
-        uint32_t n_indices = obj->mesh->n_indices;
-        Vertex* vertices = obj->mesh->vertices;
-        Material* mat = scene->mats;
-
-        f32x4x4 s = f32x4x4_scale_f32(500);
-        f32x3 t = {900, 200, -1500};
-        f32x4x4 translate = f32x4x4_translate(t);
-        f32x4x4 scaled = f32x4x4_mul(&s, &obj->transform);
-        f32x4x4 transformation = f32x4x4_mul(&translate, &scaled);
-
-        for (u32 i=0; i<n_indices; i+=3) {
-            Vertex* a_ = &vertices[indices[i+0]];
-            Vertex* b_ = &vertices[indices[i+1]];
-            Vertex* c_ = &vertices[indices[i+2]];
-
-            // vertex shader
-            Vertex a, b, c;
-            a.position = f32x3_transform_point(&transformation, a_->position);
-            a.texcoords = a_->texcoords;
-            a.normals   = a_->normals;
-
-            b.position = f32x3_transform_point(&transformation, b_->position);
-            b.texcoords = b_->texcoords;
-            b.normals   = b_->normals;
-
-            c.position = f32x3_transform_point(&transformation, c_->position);
-            c.texcoords = c_->texcoords;
-            c.normals   = c_->normals;
-
-            fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a, &b, &c);
-        }
-#endif
     }
 }

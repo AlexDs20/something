@@ -26,13 +26,11 @@ static uint32_t count_mtl_mats(StringView filepath) {
     StringView new_line = sv_from_cstr("\n");
     StringView newmtl   = sv_from_cstr("newmtl ");
 
-    StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
-    while (file.size != 0) {
+    while (file.size > 0) {
+        StringView line = sv_trim_front(sv_chop_by_delim_sv(&file, new_line));
         if (sv_starts_with(line, newmtl)) {
             n++;
         }
-
-        line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
     local_arena_alloc_reset(local_arena);
@@ -53,14 +51,13 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
     String content = read_complete_file(local_arena->arena, filepath);
     StringView file = sv_from_string(content);
 
-    printf("\n read_mtl: mats=%p", (void*)mats);
     ObjMaterial* current_mats = NULL;
 
     StringView new_line = sv_from_cstr("\n");
     StringView newmtl   = sv_from_cstr("newmtl ");
 
-    StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
-    while (file.size != 0) {
+    while (file.size > 0) {
+        StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
         if (sv_starts_with(line, newmtl)) {
             line = sv_truncate_front(line, newmtl.size);
 
@@ -70,7 +67,6 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             else {
                 current_mats++;
             }
-            printf("\n read_mtl: mats=%p  current:%p", (void*) mats, (void*)current_mats);
 
             current_mats->name = sv_from_string(
                     string_init_sv(persist_arena, sv_trim_front(line))
@@ -280,8 +276,6 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
             printf("\n=====\n");
             PANIC;
         }
-
-        line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
     }
 
     local_arena_alloc_reset(local_arena);
@@ -382,7 +376,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     int current_material_index = 0;
 
     // TODO: Handle the materials properly by also creating a default material
-    while (file.size != 0) {
+    while (file.size > 0) {
         StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
         if (sv_starts_with_char(line, 'v')) {
             f32x3* v = NULL;
@@ -515,11 +509,8 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             string_append_sv(local_arena->arena, &fp, line);
             StringView mtl_file = sv_from_string(fp);
 
-            ObjMaterial* mat = current_mats++;
-            read_mtl_file(persist_arena, mat, mtl_file);
-            printf("\nMat name: ");
-            sv_print(mat->name);
-            printf("\n\t %p, (%u,%u,%u)", (void*)mat->map_Kd.data, mat->map_Kd.width, mat->map_Kd.height, mat->map_Kd.components);
+            read_mtl_file(persist_arena, current_mats, mtl_file);
+            current_mats += count_mtl_mats(mtl_file);
 
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
