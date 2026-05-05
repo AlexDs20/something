@@ -25,12 +25,12 @@ typedef struct {
     f32x3 Kd;               // diffuse color
     f32x3 Ks;               // specular color
     f32x3 Ke;               // emissive color
+    f32x3 Tf;               // Transmission filter
 
     float Ns;               // specular exponent
     float Ni;               // index of refraction
     // float d;                // dissolve: Transparency = 1-d
     float Tr;               // Transparency
-    float Tf;               // Transmission filter
     uint32_t illum;         // illumination
 
     // Textures
@@ -98,12 +98,12 @@ struct Material {
     f32x3 Kd;               // diffuse color
     f32x3 Ks;               // specular color
     f32x3 Ke;               // emissive color
+    f32x3 Tf;               // Transmission filter
 
     float Ns;               // specular exponent
     float Ni;               // index of refraction
     // float d;                // dissolve: Transparency = 1-d
     float Tr;               // Transparency
-    float Tf;               // Transmission filter
     uint32_t illum;         // illumination
 
     // Textures

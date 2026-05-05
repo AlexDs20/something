@@ -120,7 +120,9 @@ static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView fi
         }
         else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
             line = sv_truncate_front(line, 3);
-            sv_parse_f32(&line, &current_mats->Tf);
+            sv_parse_f32(&line, &current_mats->Tf.x);
+            sv_parse_f32(&line, &current_mats->Tf.y);
+            sv_parse_f32(&line, &current_mats->Tf.z);
         }
         // else if (sv_starts_with_cstr(line, "sharpness ")) {
         // }
