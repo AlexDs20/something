@@ -69,9 +69,10 @@ Image image_read_file(Arena* persist_arena, StringView filename) {
 #ifdef ADS_USE_EXTERNAL
     int w, h, c, ok;
     const char* f = sv_as_cstr(local_arena->arena, filename);
-    printf("\nSTB implementaiton");
+    printf("\nSTB implementation");
     ok = stbi_info(f, &w, &h, &c);
     printf(" Status: ok: %d, (%d,%d,%d)", ok, w,h,c);
+    stbi_set_flip_vertically_on_load(1);
     if (1 /*ok == 1*/) {
         if (c == 1) {
             out.data = stbi_load(f, &w, &h, &c, 0);

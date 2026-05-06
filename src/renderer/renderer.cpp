@@ -603,28 +603,36 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 }
 
 // TODO: Add perspective transformation due to camera
+#include "libs/ads_string.h"
 void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
+    f32x4x4 s = f32x4x4_scale_f32(20);
+    f32x3 t = {900, 400, -1500};
+    Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0);
+    f32x4x4 rotation = f32x4x4_from_quat(q_rot);
+    f32x4x4 translate = f32x4x4_translate(t);
+    f32x4x4 world = translate * rotation * s;
+
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
+
+        f32x4x4 transformation = world * obj->transform;
 
         // if (frustum_cull(obj->bbox)) {}
 
         Mesh* mesh = obj->mesh;
 
-        f32x4x4 s = f32x4x4_scale_f32(200);
-        f32x3 t = {900, 400, -1500};
-        Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0);
-        f32x4x4 rotation = f32x4x4_from_quat(q_rot);
-        f32x4x4 translate = f32x4x4_translate(t);
-
-        f32x4x4 transformation = translate * rotation * s * obj->transform;
-
-        uint32_t* ind    = mesh->indices;
+        uint32_t* ind = mesh->indices;
 
         for (u32 j=0; j<mesh->n_submeshes; j++) {
             SubMesh* sm = &mesh->submeshes[j];
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
+
+            if (j == 377) {
+                printf("\nSubmesh: %u", j);
+                printf(" Material: ");
+                sv_print(sm->mat->name);
+            }
 
             draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
         }
