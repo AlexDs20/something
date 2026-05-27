@@ -9,7 +9,6 @@
 extern "C" {
 #endif
 
-typedef struct Texture Texture;
 struct Texture {
     unsigned int* data;
     unsigned short width;
@@ -17,8 +16,7 @@ struct Texture {
     unsigned char components;
 };
 
-
-typedef struct {
+struct ObjMaterial {
     StringView name;        // newmtl
 
     f32x3 Ka;               // ambiant color
@@ -40,39 +38,38 @@ typedef struct {
     StringView sv_map_Bump;    // normal map
     StringView sv_map_d;       // alpha texture map
 
-    Texture map_Ka;
-    Texture map_Kd;
-    Texture map_Ks;
-    Texture map_Bump;
-    Texture map_d;
-} ObjMaterial;
+    struct Texture map_Ka;
+    struct Texture map_Kd;
+    struct Texture map_Ks;
+    struct Texture map_Bump;
+    struct Texture map_d;
+};
 
-typedef struct {
+struct ObjFace {
     uint32_t v_indices[3];
     uint32_t vt_indices[3];
     uint32_t vn_indices[3];
 
     int material_index;
-    int shading_group;
-} ObjFace;
+    int smooth_shading;
+};
 
-typedef struct {
+struct ObjGroup {
     String name;
     int first_face_index;
     int face_count;
 
     // Easier to mark material for each group than for each face
     int material_index;
-} ObjGroup;
+};
 
-typedef struct ObjModel ObjModel;
 struct ObjModel {
     f32x3* vertices;
     f32x3* texcoords;
     f32x3* normals;
-    ObjFace* faces;
-    ObjGroup* groups;
-    ObjMaterial* materials;
+    struct ObjFace* faces;
+    struct ObjGroup* groups;
+    struct ObjMaterial* materials;
 
     uint32_t n_vertices;
     uint32_t n_texcoords;
@@ -107,11 +104,11 @@ struct Material {
     uint32_t illum;         // illumination
 
     // Textures
-    Texture* map_Ka;
-    Texture* map_Kd;
-    Texture* map_Ks;
-    Texture* map_Bump;
-    Texture* map_d;
+    struct Texture* map_Ka;
+    struct Texture* map_Kd;
+    struct Texture* map_Ks;
+    struct Texture* map_Bump;
+    struct Texture* map_d;
 
     enum ShaderID shader;
 };

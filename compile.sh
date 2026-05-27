@@ -1,5 +1,5 @@
 #!/bin/bash
-CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
+CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic -masm=intel"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
 EXTRAFLAGS=""       #" -fsanitize=address,undefined,leak -fno-sanitize-recover"
 
@@ -8,8 +8,8 @@ DEFINES+=" -DADS_DEBUG -g -ggdb"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
-CCOMP=clang
-CPPCOMP=clang++
+CCOMP=gcc
+CPPCOMP=g++
 
 BUILD_DIR="./build"
 EXE="${BUILD_DIR}/main"

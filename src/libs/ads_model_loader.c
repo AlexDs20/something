@@ -5,6 +5,8 @@
 #include "libs/ads_images.h"
 #include "libs/ads_math.h"
 
+#include <stdlib.h>
+
 typedef struct Scene Scene;
 typedef struct Object Object;
 typedef struct AABB AABB;
@@ -12,6 +14,12 @@ typedef struct Mesh Mesh;
 typedef struct SubMesh SubMesh;
 typedef struct Vertex Vertex;
 typedef struct Material Material;
+typedef struct Texture Texture;
+typedef struct ObjMaterial ObjMaterial;
+typedef struct ObjFace ObjFace;
+typedef struct ObjGroup ObjGroup;
+typedef struct ObjModel ObjModel;
+
 
 // TODO: Hash map of currently loaded textures which contains a count of how many times its used
 //  So when free we free only when the count is down to 0
@@ -312,10 +320,13 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             }
         }
         else if (file.buffer[0] == 'f') {
-                    n_f++;
+            n_f++;
         }
-        else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
-                    n_g++;
+        // else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
+        //     n_g++;
+        // }
+        else if (sv_starts_with(file, usemtl)) {
+            n_g++;
         }
         else if (sv_starts_with(file, mtllib)) {
             file = sv_truncate_front(file, mtllib.size+1);
@@ -336,18 +347,16 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     }
     // Create a default one
     n_g++;
-    // if (n_mats == 0) n_mats++;
     file = file_copy;
 
     // Second pass => the actual parsing
-    ObjModel* obj_model = (ObjModel*)arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
-
-    f32x3* vec_vertex          = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
-    f32x3* vec_texcoords       = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
-    f32x3* vec_normals         = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
-    ObjFace* vec_faces         = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
-    ObjGroup* vec_groups       = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
-    ObjMaterial* vec_materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
+    ObjModel* obj_model         = (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
+    f32x3* vec_vertex           = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
+    f32x3* vec_texcoords        = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
+    f32x3* vec_normals          = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
+    ObjFace* vec_faces          = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
+    ObjGroup* vec_groups        = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    ObjMaterial* vec_materials  = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
     uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0;
 
     obj_model->vertices = vec_vertex;
@@ -364,18 +373,35 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     obj_model->n_groups = n_g;
     obj_model->n_materials = n_mats;
 
-    f32x3* current_vertex     = vec_vertex;
-    f32x3* current_texcoord   = vec_texcoords;
-    f32x3* current_normal     = vec_normals;
-    ObjFace* current_face     = vec_faces;
-    ObjGroup* current_group   = vec_groups;
-    ObjMaterial* current_mats = vec_materials;
+    struct {
+        f32x3* vertex;
+        f32x3* texcoord;
+        f32x3* normal;
+        ObjFace* face;
+        ObjGroup* group;
+        ObjMaterial* mats;
+        StringView sv_group;
+        StringView usemtl;
+        StringView mtllib;
+        int smooth_shading;
+        int material_index;
+    } current;
+
+    current.vertex   = vec_vertex;
+    current.texcoord = vec_texcoords;
+    current.normal   = vec_normals;
+    current.face     = vec_faces;
+    current.group    = vec_groups;
+    current.mats     = vec_materials;
+    current.sv_group = (StringView){.buffer=NULL,.size=0};
+    current.usemtl   = (StringView){.buffer=NULL,.size=0};
+    current.mtllib   = (StringView){.buffer=NULL,.size=0};
+    current.smooth_shading  = 0;
+    current.material_index = 0;
 
     // Default group in case nothing is given in the obj file
-    *current_group = (ObjGroup){0};
-    current_group->name = string_init_cstr(persist_arena, "default");
-    int current_shading_group = 0;
-    int current_material_index = 0;
+    *current.group = (ObjGroup){0};
+    current.group->name = string_init_cstr(persist_arena, "default");
 
     // TODO: Handle the materials properly by also creating a default material
     while (file.size > 0) {
@@ -386,17 +412,17 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             sv_chop_by(&line, 1);
             if (sv_starts_with_char(line, ' ')) {       // vertex
                 line = sv_truncate_front(line, 1);
-                v = current_vertex++;
+                v = current.vertex++;
                 i_v++;
             }
             else if (sv_starts_with_char(line, 't')) {  // texture coord
                 line = sv_truncate_front(line, 2);
-                v = current_texcoord++;
+                v = current.texcoord++;
                 i_vt++;
             }
             else if (sv_starts_with_char(line, 'n')) {  // vertex normal
                 line = sv_truncate_front(line, 2);
-                v = current_normal++;
+                v = current.normal++;
                 i_vn++;
             }
             // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
@@ -414,16 +440,16 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             //  - Add support for n-gons?
             line = sv_truncate_front(line, 2);
 
-            if (current_group->face_count == 0) {
-                current_group->first_face_index = i_f;
+            if (current.group->face_count == 0) {
+                current.group->first_face_index = i_f;
             }
-            current_group->face_count++;
+            current.group->face_count++;
 
             // Actually parse the face
-            ObjFace* f = current_face++;
+            ObjFace* f = current.face++;
             i_f++;
-            f->material_index = current_material_index;
-            f->shading_group = current_shading_group;
+            f->material_index = current.material_index;
+            f->smooth_shading = current.smooth_shading;
 
             StringView delim = sv_from_cstr("/");
             StringView sep;
@@ -477,10 +503,10 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
             line = sv_truncate_front(line, 2);
             if (sv_starts_with_cstr(line, "0") || sv_starts_with_cstr(line, "off")) {
-                current_shading_group = 0;
+                current.smooth_shading = 0;
             }
             else {
-                sv_parse_s32(&line, &current_shading_group);
+                sv_parse_s32(&line, &current.smooth_shading);
             }
         }
         // else if (sv_starts_with_char(line, 'l')) {      // line element
@@ -489,12 +515,14 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         // }
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
+            current.usemtl = sv_trim_front(sv_trim_back(line));
+
             // int found = 0;
             for (uint32_t i=0; i<n_mats; i++) {
                 ObjMaterial* m = vec_materials + i;
                 if (sv_equal(line, m->name)) {
                     // found = 1;
-                    current_material_index = i;
+                    current.material_index = i;
                     break;
                 }
             }
@@ -506,31 +534,33 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
         else if (sv_starts_with(line, mtllib)) {
             line = sv_truncate_front(line, mtllib.size+1);
+            current.mtllib = sv_trim_front(sv_trim_back(line));
 
             String fp = string_init_sv(local_arena->arena, base_dir);
             string_append_sv(local_arena->arena, &fp, line);
             StringView mtl_file = sv_from_string(fp);
 
-            read_mtl_file(persist_arena, current_mats, mtl_file);
-            current_mats += count_mtl_mats(mtl_file);
+            read_mtl_file(persist_arena, current.mats, mtl_file);
+            current.mats += count_mtl_mats(mtl_file);
 
             // TODO: fix that there can be several mtllib
             obj_model->mtllib_name = sv_from_string(fp);
         }
         else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
             StringView group_name = sv_truncate_front(line, 2);
+            current.sv_group = group_name;
             // sv_print(group_name);
 
-            current_group++;
-            ObjGroup* g = current_group;
+            current.group++;
+            ObjGroup* g = current.group;
             g->name = string_init_sv(persist_arena, group_name);
-            g->material_index = current_material_index;
+            g->material_index = current.material_index;
             g->face_count = 0;
             g->first_face_index = 0;
         }
         else if (sv_starts_with_char(line, '#')) {
         }
-        else if (sv_trim_front(line).size == 0) {           // If there are only spaces
+        else if (sv_is_empty(sv_trim_front(line))) {                            // If there are only spaces
         }
         else {
             String err = string_init_cstr(local_arena->arena, "Parsing of obj file in dir: ");
@@ -665,8 +695,11 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
     mesh->submeshes = submeshes;
     mesh->n_submeshes = n_submeshes;
 
-    Object* object = (Object*)arena_alloc_push(arena, 1 * sizeof(Object));
-    // TODO: Somehow this is misaligned??
+    // Need manual alignment because f32x4x4 is 16 bytes aligned and uses SIMD?
+    // TODO: Automate the alignment using:
+    //  #define ALIGNOF(type)      offsetof(struct {char c; type x;}, x)   // To get the alignment of type
+    // Object* object = (Object*)arena_alloc_push_aligned(arena, 1 * sizeof(Object), ALIGNOF(Object));
+    Object* object = (Object*)malloc(sizeof(Object));
     object->mesh = mesh;
     object->transform = f32x4x4_identity();
 

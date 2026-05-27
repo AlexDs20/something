@@ -10,11 +10,6 @@
 - *ADS_LOCAL_ARENA_POOL_COUNT*:
 - *ADS_LOCAL_ARENA_CAPACITY*:
 
-[ 1 0 0 0 ] [ x ]
-[ 0 1 0 0 ] [ y ]
-[ 0 0 1 0 ] [ z ]
-[ 0 0 0 1 ] [ w ]
-
 
 # TODO
 - JPEG:
@@ -27,6 +22,9 @@
     - [x] Get the info about the jpeg image without decoding
     - [x] Allow flipping along y.
     - [x] Test code on many images
+- OBJ parser:
+    - [ ] n-gons handling
+    - [ ] Several materials in a single 'g' or 'o'
 - Libs:
     - [ ] Image
         - [X] JPEG

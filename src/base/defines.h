@@ -1,5 +1,6 @@
 #ifndef ADS_DEFINES_H
 #define ADS_DEFINES_H
+#include <stddef.h>
 
 #if defined(__clang__)
 #elif defined(__GNUC__)
@@ -18,6 +19,9 @@
 #else
     #error "No alignment support for this compiler"
 #endif
+
+// TODO: Get different implementations depending on C version / extensions / ...
+#define ALIGNOF(type)      offsetof(struct {char c; type x;}, x)                // To get the alignment of type
 
 #define global static
 #define local static
