@@ -345,32 +345,30 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         sv_chop_by_delim_sv(&file, new_line);
         file = sv_trim_front(file);
     }
-    // Create a default one
-    n_g++;
+    // If no group, create default one
+    if (n_g == 0) {
+        n_g = 1;
+    }
     file = file_copy;
 
     // Second pass => the actual parsing
-    ObjModel* obj_model         = (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel));
-    f32x3* vec_vertex           = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
-    f32x3* vec_texcoords        = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
-    f32x3* vec_normals          = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
-    ObjFace* vec_faces          = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
-    ObjGroup* vec_groups        = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
-    ObjMaterial* vec_materials  = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
-    uint32_t i_v = 0, i_vt = 0, i_vn = 0, i_f = 0;
+    ObjModel* obj_model  = (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
+    obj_model->vertices  = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
+    obj_model->texcoords = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
+    obj_model->normals   = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
+    obj_model->faces     = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
+    obj_model->groups    = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    obj_model->materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
 
-    obj_model->vertices = vec_vertex;
-    obj_model->texcoords = vec_texcoords;
-    obj_model->normals = vec_normals;
-    obj_model->faces = vec_faces;
-    obj_model->groups = vec_groups;
-    obj_model->materials = vec_materials;
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
+    uint32_t i_f = 0;
+    uint32_t i_g = 1;
 
-    obj_model->n_vertices = n_v;
+    obj_model->n_vertices  = n_v;
     obj_model->n_texcoords = n_vt;
-    obj_model->n_normals = n_vn;
-    obj_model->n_faces = n_f;
-    obj_model->n_groups = n_g;
+    obj_model->n_normals   = n_vn;
+    obj_model->n_faces     = n_f;
+    obj_model->n_groups    = n_g;
     obj_model->n_materials = n_mats;
 
     struct {
@@ -380,27 +378,26 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         ObjFace* face;
         ObjGroup* group;
         ObjMaterial* mats;
-        StringView sv_group;
+        StringView group_name;
         StringView usemtl;
         StringView mtllib;
         int smooth_shading;
         int material_index;
     } current;
 
-    current.vertex   = vec_vertex;
-    current.texcoord = vec_texcoords;
-    current.normal   = vec_normals;
-    current.face     = vec_faces;
-    current.group    = vec_groups;
-    current.mats     = vec_materials;
-    current.sv_group = (StringView){.buffer=NULL,.size=0};
-    current.usemtl   = (StringView){.buffer=NULL,.size=0};
-    current.mtllib   = (StringView){.buffer=NULL,.size=0};
-    current.smooth_shading  = 0;
+    current.vertex     = obj_model->vertices;
+    current.texcoord   = obj_model->texcoords;
+    current.normal     = obj_model->normals;
+    current.face       = obj_model->faces;
+    current.group      = obj_model->groups;
+    current.mats       = obj_model->materials;
+    current.group_name = (StringView){.buffer=NULL,.size=0};
+    current.usemtl     = (StringView){.buffer=NULL,.size=0};
+    current.mtllib     = (StringView){.buffer=NULL,.size=0};
+    current.smooth_shading = 0;
     current.material_index = 0;
 
     // Default group in case nothing is given in the obj file
-    *current.group = (ObjGroup){0};
     current.group->name = string_init_cstr(persist_arena, "default");
 
     // TODO: Handle the materials properly by also creating a default material
@@ -425,8 +422,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
                 v = current.normal++;
                 i_vn++;
             }
-            // else if (sv_starts_with_char(line, 'p')) {  // parameter space vertices
-            // }
             else {
                 PANIC;
             }
@@ -456,47 +451,20 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             // Parse indices and convert to point to correct elements
             int32_t temp;
-            sv_parse_s32(&line, &temp);
-            f->v_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
-
-            sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
-            if (sv_equal(sep, delim)) {
+            for (uint32_t i=0; i<3; i++) {
                 sv_parse_s32(&line, &temp);
-                f->vt_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
+                f->v_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
 
-                sep = sv_chop_by(&line, 1);
+                sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
                 if (sv_equal(sep, delim)) {
                     sv_parse_s32(&line, &temp);
-                    f->vn_indices[0] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
-                }
-            }
+                    f->vt_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
 
-            sv_parse_s32(&line, &temp);
-            f->v_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
-
-            sep = sv_chop_by(&line, 1);
-            if (sv_equal(sep, delim)) {
-                sv_parse_s32(&line, &temp);
-                f->vt_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
-
-                sep = sv_chop_by(&line, 1);
-                if (sv_equal(sep, delim)) {
-                    sv_parse_s32(&line, &temp);
-                    f->vn_indices[1] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
-                }
-            }
-
-            sv_parse_s32(&line, &temp);
-            f->v_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
-            sep = sv_chop_by(&line, 1);
-            if (sv_equal(sep, delim)) {
-                sv_parse_s32(&line, &temp);
-                f->vt_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
-
-                sep = sv_chop_by(&line, 1);
-                if (sv_equal(sep, delim)) {
-                    sv_parse_s32(&line, &temp);
-                    f->vn_indices[2] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                    sep = sv_chop_by(&line, 1);
+                    if (sv_equal(sep, delim)) {
+                        sv_parse_s32(&line, &temp);
+                        f->vn_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                    }
                 }
             }
         }
@@ -509,28 +477,35 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
                 sv_parse_s32(&line, &current.smooth_shading);
             }
         }
-        // else if (sv_starts_with_char(line, 'l')) {      // line element
-        // }
-        // else if (sv_starts_with_char(line, 'p')) {      // point element
-        // }
         else if (sv_starts_with(line, usemtl)) {
             line = sv_truncate_front(line, usemtl.size+1);
             current.usemtl = sv_trim_front(sv_trim_back(line));
 
-            // int found = 0;
+            // Whenever we see a material being used, we create a new "group"
+            current.group = obj_model->groups + i_g++;
+            if (current.group_name.size != 0) {
+                // Concat groupname with mtllib and usemtl
+                current.group->name = string_init_sv(persist_arena, current.group_name);
+                if (current.mtllib.size != 0) {
+                    string_append_cstr(persist_arena, &current.group->name, "__");
+                    string_append_sv(persist_arena, &current.group->name, current.mtllib);
+                }
+                string_append_cstr(persist_arena, &current.group->name, "__");
+            }
+            string_append_sv(persist_arena, &current.group->name, current.usemtl);
+
+            // Material index
             for (uint32_t i=0; i<n_mats; i++) {
-                ObjMaterial* m = vec_materials + i;
+                ObjMaterial* m = obj_model->materials + i;
                 if (sv_equal(line, m->name)) {
-                    // found = 1;
                     current.material_index = i;
+                    current.group->material_index = i;
                     break;
                 }
             }
-            // If I had a logger, log that we did not find the material
-            //  => use "default"
-            // if (!found) {
-            //     *(volatile char*) 0 = 0;
-            // }
+
+            current.group->face_count = 0;
+            current.group->first_face_index = 0;
         }
         else if (sv_starts_with(line, mtllib)) {
             line = sv_truncate_front(line, mtllib.size+1);
@@ -548,15 +523,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
         else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
             StringView group_name = sv_truncate_front(line, 2);
-            current.sv_group = group_name;
-            // sv_print(group_name);
-
-            current.group++;
-            ObjGroup* g = current.group;
-            g->name = string_init_sv(persist_arena, group_name);
-            g->material_index = current.material_index;
-            g->face_count = 0;
-            g->first_face_index = 0;
+            current.group_name = group_name;
         }
         else if (sv_starts_with_char(line, '#')) {
         }
@@ -731,7 +698,9 @@ Scene* model_read(Arena* arena, StringView filepath) {
         ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
         printf("\nNumber of materials: %u", obj_model->n_materials);
         for (uint32_t i=0; i<obj_model->n_materials; i++) {
-            printf("\n\t map_Kd: ");
+            printf("\n\t");
+            sv_print(obj_model->materials[i].name);
+            printf(" map_Kd: ");
             sv_print(obj_model->materials[i].sv_map_Kd);
             Texture t = obj_model->materials[i].map_Kd;
             printf("\n\t\t %p (%u,%u,%u)", (void*)t.data, t.width, t.height, t.components);

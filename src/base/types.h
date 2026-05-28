@@ -72,4 +72,11 @@ typedef struct ALIGNAS(16) {
     f32x4 d;
 } Quaternion;
 
+#ifdef ADS_DEBUG
+#include <stdio.h>
+static inline void print_f32x3(f32x3* v) {
+    printf("(%.3f,%.3f,%.3f)", v->x, v->y, v->z);
+}
+#endif
+
 #endif  // ADS_TYPES_H

@@ -275,13 +275,15 @@ void shader_frag_texture(
     f32 v = w0*at->y + w1*bt->y + w2*ct->y;
     // f32 w = w0*va->w + w1*vb->w + w2*vc->w;
 
+    u = u - f32_floor(u);
+    v = v - f32_floor(v);
+
     // TODO: NEAREST or BILINEAR INTERP
     //  LoD?
     u32 texture_x = (u32)(u * texture->width);
     u32 texture_y = (u32)(v * texture->height);
 
     framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
-    return;
 }
 
 inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
@@ -355,9 +357,13 @@ void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
                 f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
-                // frag_shader(shader_context, w0, w1, w2, x, y, zbuffer, pixel);
-                // frag_shader(shader_context, a, b, c, va, vb, vc, alpha, beta, gamma, x, y, w, h, zbuffer, framebuffer);
-                shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                // TODO: Fix and use proper function pointer as I once did.
+                if (mat->map_Kd == NULL) {
+                    shader_frag_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                }
+                else {
+                    shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                }
             }
             z += z_scanline_slope;
         }
@@ -440,7 +446,13 @@ void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Mat
                 f32 alpha = compute_triangle_area(x, y, cx, cy, bx, by) / triangle_area;
                 f32 beta = compute_triangle_area(x, y, ax, ay, cx, cy) / triangle_area;
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
-                shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                // TODO: Fix and use proper function pointer as I once did.
+                if (mat->map_Kd == NULL) {
+                    shader_frag_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                }
+                else {
+                    shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                }
             }
             z += z_scanline_slope;
         }
@@ -605,10 +617,11 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 // TODO: Add perspective transformation due to camera
 #include "libs/ads_string.h"
 void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
-    f32x4x4 s = f32x4x4_scale_f32(20);
-    f32x3 t = {900, 400, -1500};
-    Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0);
-    f32x4x4 rotation = f32x4x4_from_quat(q_rot);
+    f32x4x4 s = f32x4x4_scale_f32(50);
+    f32x3 t = {900.0f, 400.0f, 0.0f};
+    Quaternion q_rot1 = quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.1f*F32_PI_HALF);
+    Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.1f*F32_PI_HALF);
+    f32x4x4 rotation = f32x4x4_from_quat(q_rot*q_rot1);
     f32x4x4 translate = f32x4x4_translate(t);
     f32x4x4 world = translate * rotation * s;
 
@@ -627,14 +640,18 @@ void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
             SubMesh* sm = &mesh->submeshes[j];
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
-
-            if (j == 377) {
-                printf("\nSubmesh: %u", j);
-                printf(" Material: ");
-                sv_print(sm->mat->name);
+            printf("material name: ");
+            sv_print(sm->mat->name);
+            printf("\n");
+            if (// (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub_kut")) == sm->mat->name.size)  &&
+                // (sv_find(sm->mat->name, sv_from_cstr("sp_00_stup"    )) == sm->mat->name.size)  &&
+                // (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub"    )) == sm->mat->name.size)  &&
+                (sv_find(sm->mat->name, sv_from_cstr("sp_zid_vani"   )) == sm->mat->name.size)  &&
+                (sv_find(sm->mat->name, sv_from_cstr("sp_00_zid"     )) == sm->mat->name.size)  // &&
+                // (sv_find(sm->mat->name, sv_from_cstr("sp_00_pod"     )) == sm->mat->name.size)
+            ) {
+                draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
             }
-
-            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
         }
 
     }

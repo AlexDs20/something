@@ -14,6 +14,10 @@ extern "C" {
 #define F32_TAU             6.2831853071795864769f
 #define F32_EPSILON         1e-6f
 #define F32_ABS_EPSILON     1e-8f
+#define F32_SQRT2           1.4142135623730951f
+#define F32_RSQRT2          0.7071067811865475f
+#define F32_SQRT3           1.7320508075688772f
+#define F32_RSQRT3          0.5773502691896258f
 
 // bool
 static inline bool  bool2_any(bool2 a)                          { return a.x || a.y; }
