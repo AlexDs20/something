@@ -640,9 +640,9 @@ void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
             SubMesh* sm = &mesh->submeshes[j];
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
-            printf("material name: ");
-            sv_print(sm->mat->name);
-            printf("\n");
+            // printf("%d material name: ", j);
+            // sv_print(sm->mat->name);
+            // printf("\n");
             if (// (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub_kut")) == sm->mat->name.size)  &&
                 // (sv_find(sm->mat->name, sv_from_cstr("sp_00_stup"    )) == sm->mat->name.size)  &&
                 // (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub"    )) == sm->mat->name.size)  &&

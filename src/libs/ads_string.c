@@ -1260,6 +1260,32 @@ size_t sv_rfind(StringView haystack, StringView needle) {
 #endif
 }
 
+StringView sv_split_front(StringView sv, size_t pos) {
+    /*
+     * Returns first *pos* char
+     */
+    if (pos > sv.size) {
+        return (StringView){0};
+    }
+    return (StringView) {
+        .buffer = sv.buffer,
+        .size = pos,
+    };
+}
+
+StringView sv_split_back(StringView sv, size_t pos) {
+    /*
+     * Return all the chars from after the *pos* char
+     */
+    if (pos >= sv.size) {
+        return (StringView){0};
+    }
+    return (StringView) {
+        .buffer = sv.buffer + pos,
+        .size = sv.size - pos
+    };
+}
+
 StringView sv_file_extension(StringView sv) {
     size_t p1 = sv_rfind(sv, sv_from_cstr("/"));
     StringView t = sv;
@@ -1314,7 +1340,7 @@ enum CharType {
     SV_CHAR_EXP   = 0x20,
 };
 
-static uint8_t LUT[256] = {
+static const uint8_t LUT[256] = {
     [' ']  = SV_CHAR_SPACE,
     ['\t'] = SV_CHAR_SPACE,
     ['\n'] = SV_CHAR_SPACE,
@@ -1341,6 +1367,13 @@ static uint8_t LUT[256] = {
     ['E']  = SV_CHAR_EXP,
     // TODO continue when needed
 };
+
+bool sv_is_space(StringView sv) {
+    if (sv.size != 1) {
+        return false;
+    }
+    return (LUT[(uint8_t)sv.buffer[0]] & SV_CHAR_SPACE) != 0;
+}
 
 static void _sv_trim_front(StringView* sv) {
     while ((sv->size>0) && (LUT[(u8)sv->buffer[0]] & SV_CHAR_SPACE)) {

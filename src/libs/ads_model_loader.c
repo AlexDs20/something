@@ -320,7 +320,21 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             }
         }
         else if (file.buffer[0] == 'f') {
-            n_f++;
+            size_t idx = sv_find(file, new_line);
+            // We keep the \n
+            StringView face = sv_split_front(file, idx+1);
+            sv_truncate_front_inplace(&face, 2);
+            face = sv_trim_front(face);
+
+            size_t count = 0;
+            while (face.size) {
+                while (!sv_is_space(sv_chop_by(&face, 1))) {
+                }
+                count++;
+                face = sv_trim_front(face);
+            }
+
+            n_f += (count-2);
         }
         // else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
         //     n_g++;
@@ -483,13 +497,15 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             // Whenever we see a material being used, we create a new "group"
             current.group = obj_model->groups + i_g++;
+
+            // Concat groupname with mtllib and usemtl
+            current.group->name = string_init_empty(persist_arena, current.group_name.size);
             if (current.group_name.size != 0) {
-                // Concat groupname with mtllib and usemtl
-                current.group->name = string_init_sv(persist_arena, current.group_name);
-                if (current.mtllib.size != 0) {
-                    string_append_cstr(persist_arena, &current.group->name, "__");
-                    string_append_sv(persist_arena, &current.group->name, current.mtllib);
-                }
+                string_append_sv(persist_arena, &current.group->name, current.group_name);
+                string_append_cstr(persist_arena, &current.group->name, "__");
+            }
+            if (current.mtllib.size != 0) {
+                string_append_sv(persist_arena, &current.group->name, current.mtllib);
                 string_append_cstr(persist_arena, &current.group->name, "__");
             }
             string_append_sv(persist_arena, &current.group->name, current.usemtl);

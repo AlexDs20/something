@@ -20,6 +20,9 @@
     #error "No alignment support for this compiler"
 #endif
 
+#define FALSE 0
+#define TRUE  1
+
 // TODO: Get different implementations depending on C version / extensions / ...
 #define ALIGNOF(type)      offsetof(struct {char c; type x;}, x)                // To get the alignment of type
 
