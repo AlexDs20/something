@@ -321,20 +321,19 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         }
         else if (file.buffer[0] == 'f') {
             size_t idx = sv_find(file, new_line);
-            // We keep the \n
-            StringView face = sv_split_front(file, idx+1);
+            StringView face = sv_split_front(file, idx);
             sv_truncate_front_inplace(&face, 2);
-            face = sv_trim_front(face);
+            face = sv_trim_back(sv_trim_front(face));
 
             size_t count = 0;
             while (face.size) {
-                while (!sv_is_space(sv_chop_by(&face, 1))) {
+                if (sv_is_space(sv_chop_by(&face, 1))) {
+                    face = sv_trim_front(face);
+                    count++;
                 }
-                count++;
-                face = sv_trim_front(face);
             }
 
-            n_f += (count-2);
+            n_f += (count-1);
         }
         // else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
         //     n_g++;
@@ -445,41 +444,95 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             sv_parse_f32(&line, &v->z);
         }
         else if (sv_starts_with_char(line, 'f')) {      // face
-            // TODO:
-            //  - Add support for n-gons?
             line = sv_truncate_front(line, 2);
 
             if (current.group->face_count == 0) {
                 current.group->first_face_index = i_f;
             }
-            current.group->face_count++;
 
-            // Actually parse the face
-            ObjFace* f = current.face++;
-            i_f++;
-            f->material_index = current.material_index;
-            f->smooth_shading = current.smooth_shading;
+            {
+                StringView delim = sv_from_cstr("/");
+                StringView sep = {0};
 
-            StringView delim = sv_from_cstr("/");
-            StringView sep;
+                size_t idx = 0;
+                int32_t temp = 0;
 
-            // Parse indices and convert to point to correct elements
-            int32_t temp;
-            for (uint32_t i=0; i<3; i++) {
-                sv_parse_s32(&line, &temp);
-                f->v_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
+                uint32_t a[3] = {0,0,0};
+                ObjFace* f = NULL;
+                while(line.size) {
+                    if ((idx == 0) || (idx > 2)) {
+                        f = current.face++;
+                        i_f++;
+                        f->material_index = current.material_index;
+                        f->smooth_shading = current.smooth_shading;
 
-                sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
-                if (sv_equal(sep, delim)) {
+                        current.group->face_count++;
+                    }
+
+
+                    size_t v_order_idx = idx <= 2 ? idx : 2;
+
                     sv_parse_s32(&line, &temp);
-                    f->vt_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
+                    f->v_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
 
-                    sep = sv_chop_by(&line, 1);
+                    sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
                     if (sv_equal(sep, delim)) {
                         sv_parse_s32(&line, &temp);
-                        f->vn_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                       f->vt_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
+
+                        sep = sv_chop_by(&line, 1);
+                        if (sv_equal(sep, delim)) {
+                            sv_parse_s32(&line, &temp);
+                            f->vn_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                        }
                     }
+
+                    if (idx == 1) {
+                        a[0] = f->v_indices[0];
+                        a[1] = f->vt_indices[0];
+                        a[2] = f->vn_indices[0];
+                    }
+
+                    if (idx > 2) {
+                        f->v_indices[0] = a[0];
+                        f->vt_indices[0] = a[1];
+                        f->vn_indices[0] = a[2];
+
+                        f->v_indices[1]  = (f - 1)->v_indices[2];
+                        f->vt_indices[1] = (f - 1)->vt_indices[2];
+                        f->vn_indices[1] = (f - 1)->vn_indices[2];
+                    }
+
+                    idx++;
                 }
+
+                // current.group->face_count++;
+
+                // // Actually parse the face
+                // ObjFace* f = current.face++;
+                // i_f++;
+                // f->material_index = current.material_index;
+                // f->smooth_shading = current.smooth_shading;
+
+
+                // // Parse indices and convert to point to correct elements
+                // for (uint32_t i=0; i<3; i++) {
+                //     sv_parse_s32(&line, &temp);
+                //     f->v_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
+
+                //     sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
+                //     if (sv_equal(sep, delim)) {
+                //         sv_parse_s32(&line, &temp);
+                //         f->vt_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
+
+                //         sep = sv_chop_by(&line, 1);
+                //         if (sv_equal(sep, delim)) {
+                //             sv_parse_s32(&line, &temp);
+                //             f->vn_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                //         }
+                //     }
+                // }
+
             }
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off

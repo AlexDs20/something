@@ -162,6 +162,15 @@ struct Scene {
     uint32_t n_objects;
 };
 
+static inline
+void objface_debug_print(struct ObjFace* f) {
+    printf("\nv  indices = (%u,%u,%u)", f->v_indices[0], f->v_indices[1], f->v_indices[2]);
+    printf("\nvt indices = (%u,%u,%u)", f->vt_indices[0], f->vt_indices[1], f->vt_indices[2]);
+    printf("\nvn indices = (%u,%u,%u)", f->vn_indices[0], f->vn_indices[1], f->vn_indices[2]);
+    printf("\nmaterial index: %d", f->material_index);
+    printf("\nsmooth shading: %d", f->smooth_shading);
+}
+
 struct Scene* model_read(Arena* arena, StringView filepath);
 #ifdef __cplusplus
 }
