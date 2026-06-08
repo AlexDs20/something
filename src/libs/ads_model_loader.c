@@ -365,13 +365,13 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     file = file_copy;
 
     // Second pass => the actual parsing
-    ObjModel* obj_model  = (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
-    obj_model->vertices  = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
-    obj_model->texcoords = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
-    obj_model->normals   = (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
-    obj_model->faces     = (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
-    obj_model->groups    = (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
-    obj_model->materials = (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
+    ObjModel* obj_model  = (ObjModel*) arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
+    obj_model->vertices  = n_v    == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
+    obj_model->texcoords = n_vt   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
+    obj_model->normals   = n_vn   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
+    obj_model->faces     = n_f    == 0 ? NULL : (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
+    obj_model->groups    = n_g    == 0 ? NULL : (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    obj_model->materials = n_mats == 0 ? NULL : (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
 
     uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
     uint32_t i_f = 0;
@@ -505,34 +505,6 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
                     idx++;
                 }
-
-                // current.group->face_count++;
-
-                // // Actually parse the face
-                // ObjFace* f = current.face++;
-                // i_f++;
-                // f->material_index = current.material_index;
-                // f->smooth_shading = current.smooth_shading;
-
-
-                // // Parse indices and convert to point to correct elements
-                // for (uint32_t i=0; i<3; i++) {
-                //     sv_parse_s32(&line, &temp);
-                //     f->v_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
-
-                //     sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
-                //     if (sv_equal(sep, delim)) {
-                //         sv_parse_s32(&line, &temp);
-                //         f->vt_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
-
-                //         sep = sv_chop_by(&line, 1);
-                //         if (sv_equal(sep, delim)) {
-                //             sv_parse_s32(&line, &temp);
-                //             f->vn_indices[i] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
-                //         }
-                //     }
-                // }
-
             }
         }
         else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
@@ -564,6 +536,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             string_append_sv(persist_arena, &current.group->name, current.usemtl);
 
             // Material index
+            current.group->material_index = -1;
             for (uint32_t i=0; i<n_mats; i++) {
                 ObjMaterial* m = obj_model->materials + i;
                 if (sv_equal(line, m->name)) {
@@ -691,18 +664,30 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
         ObjFace f = obj_model->faces[i];
         // Vertices
         curr_ver->position  = obj_model->vertices[f.v_indices[0]];
-        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
-        curr_ver->normals   = obj_model->normals[f.vn_indices[0]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[0]];
+        }
         curr_ver++;
 
         curr_ver->position  = obj_model->vertices[f.v_indices[1]];
-        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
-        curr_ver->normals   = obj_model->normals[f.vn_indices[1]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[1]];
+        }
         curr_ver++;
 
         curr_ver->position  = obj_model->vertices[f.v_indices[2]];
-        curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
-        curr_ver->normals   = obj_model->normals[f.vn_indices[2]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[2]];
+        }
         curr_ver++;
 
         // Indices

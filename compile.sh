@@ -15,7 +15,10 @@ BUILD_DIR="./build"
 EXE="${BUILD_DIR}/main"
 
 mkdir -p "$BUILD_DIR"
-rm $EXE
+
+if [[ -f $EXE ]]; then
+    rm $EXE
+fi
 
 function compile_file () {
     local filepath="$1"
