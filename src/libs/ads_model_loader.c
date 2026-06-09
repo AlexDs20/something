@@ -1,0 +1,775 @@
+#include <stdio.h>
+#include "libs/ads_model_loader.h"
+#include "platform/io.h"
+#include "base/base.h"
+#include "libs/ads_images.h"
+#include "libs/ads_math.h"
+
+#include <stdlib.h>
+
+typedef struct Scene Scene;
+typedef struct Object Object;
+typedef struct AABB AABB;
+typedef struct Mesh Mesh;
+typedef struct SubMesh SubMesh;
+typedef struct Vertex Vertex;
+typedef struct Material Material;
+typedef struct Texture Texture;
+typedef struct ObjMaterial ObjMaterial;
+typedef struct ObjFace ObjFace;
+typedef struct ObjGroup ObjGroup;
+typedef struct ObjModel ObjModel;
+
+
+// TODO: Hash map of currently loaded textures which contains a count of how many times its used
+//  So when free we free only when the count is down to 0
+//  Until I have made this we make it the ugly way by loading the textures several times
+static uint32_t count_mtl_mats(StringView filepath) {
+    LocalArena* local_arena = local_arena_alloc_create();
+    uint32_t n = 0;
+
+    String content = read_complete_file(local_arena->arena, filepath);
+    StringView file = sv_from_string(content);
+
+    StringView new_line = sv_from_cstr("\n");
+    StringView newmtl   = sv_from_cstr("newmtl ");
+
+    while (file.size > 0) {
+        StringView line = sv_trim_front(sv_chop_by_delim_sv(&file, new_line));
+        if (sv_starts_with(line, newmtl)) {
+            n++;
+        }
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return n;
+}
+
+static void read_mtl_file(Arena* persist_arena, ObjMaterial* mats, StringView filepath) {
+    /*
+     * Sources:
+     * https://en.wikipedia.org/wiki/Wavefront_.obj_file
+     * https://www.fileformat.info/format/wavefrontobj/egff.htm
+     * https://paulbourke.net/dataformats/mtl/
+     */
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    StringView basedir = sv_directory_name(filepath);
+
+    String content = read_complete_file(local_arena->arena, filepath);
+    StringView file = sv_from_string(content);
+
+    ObjMaterial* current_mats = NULL;
+
+    StringView new_line = sv_from_cstr("\n");
+    StringView newmtl   = sv_from_cstr("newmtl ");
+
+    while (file.size > 0) {
+        StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
+        if (sv_starts_with(line, newmtl)) {
+            line = sv_truncate_front(line, newmtl.size);
+
+            if (current_mats == NULL) {
+                current_mats = mats;
+            }
+            else {
+                current_mats++;
+            }
+
+            current_mats->name = sv_from_string(
+                    string_init_sv(persist_arena, sv_trim_front(line))
+                    );
+        }
+        else if (sv_starts_with_cstr(line, "Ka ")) {        // ambient color
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Ka.x);
+            sv_parse_f32(&line, &current_mats->Ka.y);
+            sv_parse_f32(&line, &current_mats->Ka.z);
+        }
+        else if (sv_starts_with_cstr(line, "Kd ")) {        // diffuse color
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Kd.x);
+            sv_parse_f32(&line, &current_mats->Kd.y);
+            sv_parse_f32(&line, &current_mats->Kd.z);
+        }
+        else if (sv_starts_with_cstr(line, "Ks ")) {        // specular color
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Ks.x);
+            sv_parse_f32(&line, &current_mats->Ks.y);
+            sv_parse_f32(&line, &current_mats->Ks.z);
+        }
+        else if (sv_starts_with_cstr(line, "Ke ")) {        // emissive color
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Ke.x);
+            sv_parse_f32(&line, &current_mats->Ke.y);
+            sv_parse_f32(&line, &current_mats->Ke.z);
+        }
+        else if (sv_starts_with_cstr(line, "Ns ")) {        // specular exponent
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Ns);
+        }
+        else if (sv_starts_with_cstr(line, "Ni ")) {        // Index of refraction
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Ni);
+        }
+        else if (sv_starts_with_cstr(line, "Tr ")) {        // Transparency
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Tr);
+        }
+        else if (sv_starts_with_cstr(line, "d ")) {         // dissolve: Tr = 1-d
+            line = sv_truncate_front(line, 2);
+            float d;
+            sv_parse_f32(&line, &d);
+            current_mats->Tr = 1.0f-d;
+        }
+        else if (sv_starts_with_cstr(line, "illum ")) {     // Illumination
+            line = sv_truncate_front(line, 6);
+            sv_parse_u32(&line, &current_mats->illum);
+        }
+        else if (sv_starts_with_cstr(line, "Tf ")) {        // Transmission filter color
+            line = sv_truncate_front(line, 3);
+            sv_parse_f32(&line, &current_mats->Tf.x);
+            sv_parse_f32(&line, &current_mats->Tf.y);
+            sv_parse_f32(&line, &current_mats->Tf.z);
+        }
+        // else if (sv_starts_with_cstr(line, "sharpness ")) {
+        // }
+        else if (sv_starts_with_cstr(line, "map_Ka ")) {    // texture map ambient color
+            line = sv_truncate_front(line, 7);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Ka = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Ka);
+            current_mats->map_Ka.data       = (u32*)img.data;
+            current_mats->map_Ka.width      = img.width;
+            current_mats->map_Ka.height     = img.height;
+            current_mats->map_Ka.components = img.components;
+        }
+        else if (sv_starts_with_cstr(line, "map_Kd ")) {    // texture map diffuse color
+            line = sv_truncate_front(line, 7);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Kd = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Kd);
+            current_mats->map_Kd.data       = (u32*)img.data;
+            current_mats->map_Kd.width      = img.width;
+            current_mats->map_Kd.height     = img.height;
+            current_mats->map_Kd.components = img.components;
+        }
+        else if (sv_starts_with_cstr(line, "map_Ks ")) {    // texture map specular color
+            line = sv_truncate_front(line, 7);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Ks = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Ks);
+            current_mats->map_Ks.data       = (u32*)img.data;
+            current_mats->map_Ks.width      = img.width;
+            current_mats->map_Ks.height     = img.height;
+            current_mats->map_Ks.components = img.components;
+        }
+        // else if (sv_starts_with_cstr(line, "map_Ns ")) {    // specular highlight component
+        // }
+        else if (sv_starts_with_cstr(line, "map_d ")) {     // alpha texture map
+            line = sv_truncate_front(line, 6);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_d = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_d);
+            current_mats->map_d.data       = (u32*)img.data;
+            current_mats->map_d.width      = img.width;
+            current_mats->map_d.height     = img.height;
+            current_mats->map_d.components = img.components;
+        }
+        else if (sv_starts_with_cstr(line, "map_bump ")) {  // map_bump and bump: same
+            line = sv_truncate_front(line, 9);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = (u32*)img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
+        }
+        else if (sv_starts_with_cstr(line, "map_Bump ")) {
+            line = sv_truncate_front(line, 9);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = (u32*)img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
+        }
+        else if (sv_starts_with_cstr(line, "bump ")) {
+            line = sv_truncate_front(line, 5);
+
+            String fp = string_init_sv(local_arena->arena, basedir);
+            string_append_sv(local_arena->arena, &fp, sv_trim_front(line));
+            string_replace_all(persist_arena, &fp, sv_from_cstr("\\"), sv_from_cstr("/"));
+
+            current_mats->sv_map_Bump = sv_from_string(fp);
+
+            Image img = image_read_file(persist_arena, current_mats->sv_map_Bump);
+            current_mats->map_Bump.data       = (u32*)img.data;
+            current_mats->map_Bump.width      = img.width;
+            current_mats->map_Bump.height     = img.height;
+            current_mats->map_Bump.components = img.components;
+        }
+        // else if (sv_starts_with_cstr(line, "disp ")) {      // displacement map
+        // }
+        // else if (sv_starts_with_cstr(line, "decal ")) {     // stencial decal texture
+        // }
+        // else if (sv_starts_with_cstr(line, "refl ")) {      // reflection map
+        // }
+        else if (sv_starts_with_cstr(line, "#")) {
+        }
+        else if (sv_trim_front(line).size == 0) {           // If there are only spaces
+        }
+        // Extensions for physically based rendering
+        // else if (sv_starts_with_cstr(line, "Pr ")) {        // roughness
+        // }
+        // else if (sv_starts_with_cstr(line, "map_Pr ")) {    // texture roughness
+        // }
+        // else if (sv_starts_with_cstr(line, "Pm ")) {        // metallic
+        // }
+        // else if (sv_starts_with_cstr(line, "map_Pm ")) {    // texture metallic
+        // }
+        // else if (sv_starts_with_cstr(line, "Ps ")) {        // sheen
+        // }
+        // else if (sv_starts_with_cstr(line, "map_Ps ")) {    // texture sheen
+        // }
+        // else if (sv_starts_with_cstr(line, "Pc ")) {        // clearcoat thickness
+        // }
+        // else if (sv_starts_with_cstr(line, "Pcr ")) {       // clearcoat roughness
+        // }
+        // else if (sv_starts_with_cstr(line, "Ke ")) {        // emissive
+        // }
+        // else if (sv_starts_with_cstr(line, "aniso ")) {     // anisotropy
+        // }
+        // else if (sv_starts_with_cstr(line, "anisor ")) {    // anisotropy rotation
+        // }
+        // else if (sv_starts_with_cstr(line, "norm ")) {      // normal map (RGB components represent XYZ components of the surface normal)
+        // }
+        else {
+            String err = string_init_cstr(local_arena->arena, "Parsing of mtl file ");
+            string_append_sv(local_arena->arena, &err, filepath);
+            string_append_cstr(local_arena->arena, &err, " failed with line: ");
+            string_append_sv(local_arena->arena, &err, line);
+            printf("\n=====\n");
+            string_print(&err);
+            printf("\n=====\n");
+            PANIC;
+        }
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return;
+}
+
+ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base_dir) {
+    LocalArena* local_arena = local_arena_alloc_create();
+
+    // First pass
+    StringView new_line = sv_from_cstr("\n");
+    StringView usemtl = sv_from_cstr("usemtl");
+    StringView mtllib = sv_from_cstr("mtllib");
+
+    StringView file_copy = file;
+
+    // First pass counting the amount of vertex etc
+    uint32_t n_v = 0, n_vt = 0, n_vn = 0, n_f = 0, n_g = 0, n_mats = 0;
+    file = sv_trim_front(file);
+    while (file.size != 0) {
+        if (file.buffer[0] == 'v') {
+            switch (file.buffer[1]) {
+                case ' ': {
+                    n_v++;
+                } break;
+                case 't': {
+                    n_vt++;
+                } break;
+                case 'n': {
+                    n_vn++;
+                } break;
+            }
+        }
+        else if (file.buffer[0] == 'f') {
+            size_t idx = sv_find(file, new_line);
+            StringView face = sv_split_front(file, idx);
+            sv_truncate_front_inplace(&face, 2);
+            face = sv_trim_back(sv_trim_front(face));
+
+            size_t count = 0;
+            while (face.size) {
+                if (sv_is_space(sv_chop_by(&face, 1))) {
+                    face = sv_trim_front(face);
+                    count++;
+                }
+            }
+
+            n_f += (count-1);
+        }
+        // else if (file.buffer[0] == 'g' || file.buffer[0] == 'o') {
+        //     n_g++;
+        // }
+        else if (sv_starts_with(file, usemtl)) {
+            n_g++;
+        }
+        else if (sv_starts_with(file, mtllib)) {
+            file = sv_truncate_front(file, mtllib.size+1);
+
+            StringView backup = file;
+            StringView name = sv_trim_front(sv_trim_back(sv_chop_by_delim_char(&file, '\n')));
+            file = backup;
+
+            String fp = string_init_sv(local_arena->arena, base_dir);
+            string_append_sv(local_arena->arena, &fp, name);
+            StringView mtl_file = sv_from_string(fp);
+
+            n_mats += count_mtl_mats(mtl_file);
+        }
+
+        sv_chop_by_delim_sv(&file, new_line);
+        file = sv_trim_front(file);
+    }
+    // If no group, create default one
+    if (n_g == 0) {
+        n_g = 1;
+    }
+    file = file_copy;
+
+    // Second pass => the actual parsing
+    ObjModel* obj_model  = (ObjModel*) arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
+    obj_model->vertices  = n_v    == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
+    obj_model->texcoords = n_vt   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
+    obj_model->normals   = n_vn   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
+    obj_model->faces     = n_f    == 0 ? NULL : (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
+    obj_model->groups    = n_g    == 0 ? NULL : (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    obj_model->materials = n_mats == 0 ? NULL : (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
+
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
+    uint32_t i_f = 0;
+    uint32_t i_g = 1;
+
+    obj_model->n_vertices  = n_v;
+    obj_model->n_texcoords = n_vt;
+    obj_model->n_normals   = n_vn;
+    obj_model->n_faces     = n_f;
+    obj_model->n_groups    = n_g;
+    obj_model->n_materials = n_mats;
+
+    struct {
+        f32x3* vertex;
+        f32x3* texcoord;
+        f32x3* normal;
+        ObjFace* face;
+        ObjGroup* group;
+        ObjMaterial* mats;
+        StringView group_name;
+        StringView usemtl;
+        StringView mtllib;
+        int smooth_shading;
+        int material_index;
+    } current;
+
+    current.vertex     = obj_model->vertices;
+    current.texcoord   = obj_model->texcoords;
+    current.normal     = obj_model->normals;
+    current.face       = obj_model->faces;
+    current.group      = obj_model->groups;
+    current.mats       = obj_model->materials;
+    current.group_name = (StringView){.buffer=NULL,.size=0};
+    current.usemtl     = (StringView){.buffer=NULL,.size=0};
+    current.mtllib     = (StringView){.buffer=NULL,.size=0};
+    current.smooth_shading = 0;
+    current.material_index = 0;
+
+    // Default group in case nothing is given in the obj file
+    current.group->name = string_init_cstr(persist_arena, "default");
+
+    // TODO: Handle the materials properly by also creating a default material
+    while (file.size > 0) {
+        StringView line = sv_trim_front(sv_trim_back(sv_chop_by_delim_sv(&file, new_line)));
+        if (sv_starts_with_char(line, 'v')) {
+            f32x3* v = NULL;
+
+            sv_chop_by(&line, 1);
+            if (sv_starts_with_char(line, ' ')) {       // vertex
+                line = sv_truncate_front(line, 1);
+                v = current.vertex++;
+                i_v++;
+            }
+            else if (sv_starts_with_char(line, 't')) {  // texture coord
+                line = sv_truncate_front(line, 2);
+                v = current.texcoord++;
+                i_vt++;
+            }
+            else if (sv_starts_with_char(line, 'n')) {  // vertex normal
+                line = sv_truncate_front(line, 2);
+                v = current.normal++;
+                i_vn++;
+            }
+            else {
+                PANIC;
+            }
+
+            sv_parse_f32(&line, &v->x);
+            sv_parse_f32(&line, &v->y);
+            sv_parse_f32(&line, &v->z);
+        }
+        else if (sv_starts_with_char(line, 'f')) {      // face
+            line = sv_truncate_front(line, 2);
+
+            if (current.group->face_count == 0) {
+                current.group->first_face_index = i_f;
+            }
+
+            {
+                StringView delim = sv_from_cstr("/");
+                StringView sep = {0};
+
+                size_t idx = 0;
+                int32_t temp = 0;
+
+                uint32_t a[3] = {0,0,0};
+                ObjFace* f = NULL;
+                while(line.size) {
+                    if ((idx == 0) || (idx > 2)) {
+                        f = current.face++;
+                        i_f++;
+                        f->material_index = current.material_index;
+                        f->smooth_shading = current.smooth_shading;
+
+                        current.group->face_count++;
+                    }
+
+
+                    size_t v_order_idx = idx <= 2 ? idx : 2;
+
+                    sv_parse_s32(&line, &temp);
+                    f->v_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_v);
+
+                    sep = sv_chop_by(&line, 1);                 // sep could be '/' or ' '. if '/' => read vt and vn
+                    if (sv_equal(sep, delim)) {
+                        sv_parse_s32(&line, &temp);
+                       f->vt_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vt);
+
+                        sep = sv_chop_by(&line, 1);
+                        if (sv_equal(sep, delim)) {
+                            sv_parse_s32(&line, &temp);
+                            f->vn_indices[v_order_idx] = temp > 0 ? (uint32_t)temp-1 : (uint32_t)(temp + i_vn);
+                        }
+                    }
+
+                    if (idx == 1) {
+                        a[0] = f->v_indices[0];
+                        a[1] = f->vt_indices[0];
+                        a[2] = f->vn_indices[0];
+                    }
+
+                    if (idx > 2) {
+                        f->v_indices[0] = a[0];
+                        f->vt_indices[0] = a[1];
+                        f->vn_indices[0] = a[2];
+
+                        f->v_indices[1]  = (f - 1)->v_indices[2];
+                        f->vt_indices[1] = (f - 1)->vt_indices[2];
+                        f->vn_indices[1] = (f - 1)->vn_indices[2];
+                    }
+
+                    idx++;
+                }
+            }
+        }
+        else if (sv_starts_with_char(line, 's')) {      // smooth shading s 1  or s off
+            line = sv_truncate_front(line, 2);
+            if (sv_starts_with_cstr(line, "0") || sv_starts_with_cstr(line, "off")) {
+                current.smooth_shading = 0;
+            }
+            else {
+                sv_parse_s32(&line, &current.smooth_shading);
+            }
+        }
+        else if (sv_starts_with(line, usemtl)) {
+            line = sv_truncate_front(line, usemtl.size+1);
+            current.usemtl = sv_trim_front(sv_trim_back(line));
+
+            // Whenever we see a material being used, we create a new "group"
+            current.group = obj_model->groups + i_g++;
+
+            // Concat groupname with mtllib and usemtl
+            current.group->name = string_init_empty(persist_arena, current.group_name.size);
+            if (current.group_name.size != 0) {
+                string_append_sv(persist_arena, &current.group->name, current.group_name);
+                string_append_cstr(persist_arena, &current.group->name, "__");
+            }
+            if (current.mtllib.size != 0) {
+                string_append_sv(persist_arena, &current.group->name, current.mtllib);
+                string_append_cstr(persist_arena, &current.group->name, "__");
+            }
+            string_append_sv(persist_arena, &current.group->name, current.usemtl);
+
+            // Material index
+            current.group->material_index = -1;
+            for (uint32_t i=0; i<n_mats; i++) {
+                ObjMaterial* m = obj_model->materials + i;
+                if (sv_equal(line, m->name)) {
+                    current.material_index = i;
+                    current.group->material_index = i;
+                    break;
+                }
+            }
+
+            current.group->face_count = 0;
+            current.group->first_face_index = 0;
+        }
+        else if (sv_starts_with(line, mtllib)) {
+            line = sv_truncate_front(line, mtllib.size+1);
+            current.mtllib = sv_trim_front(sv_trim_back(line));
+
+            String fp = string_init_sv(local_arena->arena, base_dir);
+            string_append_sv(local_arena->arena, &fp, line);
+            StringView mtl_file = sv_from_string(fp);
+
+            read_mtl_file(persist_arena, current.mats, mtl_file);
+            current.mats += count_mtl_mats(mtl_file);
+
+            // TODO: fix that there can be several mtllib
+            obj_model->mtllib_name = sv_from_string(fp);
+        }
+        else if (sv_starts_with_char(line, 'o') || sv_starts_with_char(line, 'g')) {      // Object or group
+            StringView group_name = sv_truncate_front(line, 2);
+            current.group_name = group_name;
+        }
+        else if (sv_starts_with_char(line, '#')) {
+        }
+        else if (sv_is_empty(sv_trim_front(line))) {                            // If there are only spaces
+        }
+        else {
+            String err = string_init_cstr(local_arena->arena, "Parsing of obj file in dir: ");
+            string_append_sv(local_arena->arena, &err, base_dir);
+            string_append_cstr(local_arena->arena, &err, " failed with line: ");
+            string_append_sv(local_arena->arena, &err, line);
+            printf("\n=====\n");
+            string_print(&err);
+            printf("\n=====\n");
+            PANIC;
+        }
+    }
+
+    local_arena_alloc_reset(local_arena);
+    return obj_model;
+}
+
+Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
+    // TEXTURES
+    int n_tex = 0;
+    for (uint32_t i=0; i<obj_model->n_materials; i++) {
+        ObjMaterial obj_mat = obj_model->materials[i];
+        if (obj_mat.map_Ka.data != NULL) n_tex++;
+        if (obj_mat.map_Kd.data != NULL) n_tex++;
+        if (obj_mat.map_Ks.data != NULL) n_tex++;
+        if (obj_mat.map_Bump.data != NULL) n_tex++;
+        if (obj_mat.map_d.data != NULL) n_tex++;
+    }
+    Texture* textures = (Texture*)arena_alloc_push(arena, n_tex*sizeof(Texture));
+    Texture* curr_tex = textures;
+    for (uint32_t i=0; i<obj_model->n_materials; i++) {
+        ObjMaterial obj_mat = obj_model->materials[i];
+        if (obj_mat.map_Ka.data != NULL)   {Texture t = obj_mat.map_Ka;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Kd.data != NULL)   {Texture t = obj_mat.map_Kd;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Ks.data != NULL)   {Texture t = obj_mat.map_Ks;     curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_Bump.data != NULL) {Texture t = obj_mat.map_Bump;   curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+        if (obj_mat.map_d.data != NULL)    {Texture t = obj_mat.map_d;      curr_tex->data=t.data; curr_tex->width=t.width; curr_tex->height=t.height; curr_tex->components=t.components; curr_tex++;}
+    }
+
+    // MATERIALS
+    uint32_t n_mats = obj_model->n_materials;
+    Material* mats = (Material*)arena_alloc_push(arena, n_mats*sizeof(Material));
+    Material* mat = mats;
+    for (uint32_t i=0; i<n_mats; i++, mat++) {
+        ObjMaterial* obj_mat = &obj_model->materials[i];
+        mat->name  = obj_mat->name;                     // newmtl
+        mat->Ka    = obj_mat->Ka;                       // ambiant color
+        mat->Kd    = obj_mat->Kd;                       // diffuse color
+        mat->Ks    = obj_mat->Ks;                       // specular color
+        mat->Ke    = obj_mat->Ke;                       // emissive color
+        mat->Ns    = obj_mat->Ns;                       // specular exponent
+        mat->Ni    = obj_mat->Ni;                       // index of refraction
+        mat->Tr    = obj_mat->Tr;                       // Transparency
+        mat->Tf    = obj_mat->Tf;                       // Transmission filter
+        mat->illum = obj_mat->illum;                    // illumination
+
+        // Textures
+        // Find the correct one in the Texture array
+        // TODO: Hashmap!
+        mat->map_Ka = NULL;
+        mat->map_Kd = NULL;
+        mat->map_Ks = NULL;
+        mat->map_Bump = NULL;
+        mat->map_d = NULL;
+        for (Texture* t = textures; t<textures+n_tex; t++) {
+            if (t->data == obj_mat->map_Ka.data) {
+                mat->map_Ka = t;
+            }
+            else if (t->data == obj_mat->map_Kd.data) {
+                mat->map_Kd = t;
+            }
+            else if (t->data == obj_mat->map_Ks.data) {
+                mat->map_Ks = t;
+            }
+            else if (t->data == obj_mat->map_Bump.data) {
+                mat->map_Bump = t;
+            }
+            else if (t->data == obj_mat->map_d.data) {
+                mat->map_d = t;
+            }
+        }
+    }
+
+    // VERTICES and indices
+    int n_vertices = 3*obj_model->n_faces;
+    Vertex* vertices = (Vertex*)arena_alloc_push(arena, n_vertices*sizeof(Vertex));
+    Vertex* curr_ver = vertices;
+
+    int n_indices = n_vertices;
+    uint32_t* indices = (uint32_t*)arena_alloc_push(arena, n_indices*sizeof(uint32_t));
+    for (uint32_t i=0; i<obj_model->n_faces; i++){
+        ObjFace f = obj_model->faces[i];
+        // Vertices
+        curr_ver->position  = obj_model->vertices[f.v_indices[0]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[0]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[0]];
+        }
+        curr_ver++;
+
+        curr_ver->position  = obj_model->vertices[f.v_indices[1]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[1]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[1]];
+        }
+        curr_ver++;
+
+        curr_ver->position  = obj_model->vertices[f.v_indices[2]];
+        if (obj_model->texcoords != NULL) {
+            curr_ver->texcoords = obj_model->texcoords[f.vt_indices[2]];
+        }
+        if (obj_model->normals != NULL) {
+            curr_ver->normals   = obj_model->normals[f.vn_indices[2]];
+        }
+        curr_ver++;
+
+        // Indices
+        indices[3*i + 0] = 3*i + 0;
+        indices[3*i + 1] = 3*i + 1;
+        indices[3*i + 2] = 3*i + 2;
+    }
+
+    int n_submeshes = obj_model->n_groups;
+    SubMesh* submeshes = (SubMesh*)arena_alloc_push(arena, n_submeshes*sizeof(SubMesh));
+    SubMesh* curr_sub = submeshes;
+    for (int i=0; i<n_submeshes; i++, curr_sub++) {
+        ObjGroup obj_grp = obj_model->groups[i];
+
+        curr_sub->start_index = 3*obj_grp.first_face_index;
+        curr_sub->count = 3*obj_grp.face_count;
+        curr_sub->mat = &mats[obj_grp.material_index];
+    }
+
+    int n_meshes = 1;
+    Mesh* mesh = (Mesh*)arena_alloc_push(arena, n_meshes*sizeof(Mesh));
+    mesh->vertices = vertices;
+    mesh->n_vertices = n_vertices;
+    mesh->indices = indices;
+    mesh->n_indices = n_indices;
+    mesh->submeshes = submeshes;
+    mesh->n_submeshes = n_submeshes;
+
+    // Need manual alignment because f32x4x4 is 16 bytes aligned and uses SIMD?
+    // TODO: Automate the alignment using:
+    //  #define ALIGNOF(type)      offsetof(struct {char c; type x;}, x)   // To get the alignment of type
+    // Object* object = (Object*)arena_alloc_push_aligned(arena, 1 * sizeof(Object), ALIGNOF(Object));
+    Object* object = (Object*)malloc(sizeof(Object));
+    object->mesh = mesh;
+    object->transform = f32x4x4_identity();
+
+    Scene* scene = (Scene*)arena_alloc_push(arena, 1*sizeof(Scene));
+    scene->meshes     = mesh;
+    scene->n_meshes   = 1;
+    scene->mats       = mats;
+    scene->n_mats     = n_mats;
+    scene->textures   = textures;
+    scene->n_textures = n_tex;
+    scene->objects    = object;
+    scene->n_objects  = 1;
+    return scene;
+}
+
+ObjModel* model_create_default_model(void /*Arena* arena*/) {
+    return NULL;
+}
+
+Scene* model_read(Arena* arena, StringView filepath) {
+    Scene* scene = NULL;
+
+    StringView ext = sv_file_extension(filepath);
+
+    if (sv_equal(ext, sv_from_cstr(".obj"))) {
+        String file = read_complete_file(arena, filepath);
+        StringView file_content = sv_from_string(file);
+        StringView base_dir = sv_directory_name(filepath);
+        ObjModel* obj_model = model_parse_obj(arena, file_content, base_dir);
+        printf("\nNumber of materials: %u", obj_model->n_materials);
+        for (uint32_t i=0; i<obj_model->n_materials; i++) {
+            printf("\n\t");
+            sv_print(obj_model->materials[i].name);
+            printf(" map_Kd: ");
+            sv_print(obj_model->materials[i].sv_map_Kd);
+            Texture t = obj_model->materials[i].map_Kd;
+            printf("\n\t\t %p (%u,%u,%u)", (void*)t.data, t.width, t.height, t.components);
+        }
+        scene = model_convert_from_obj(arena, obj_model);
+
+    }
+    // else if (sv_equal(ext, sv_from_cstr(".gltf"))) {
+    //     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+    // }
+    // else if (sv_equal(ext, sv_from_cstr(".fbx"))) {
+    // }
+    else {
+        PANIC;
+        // model = model_create_default_model(/*arena*/);
+    }
+    return scene;
+}

@@ -27,13 +27,15 @@ f32x4x4 f32x4x4_from_transform(const Transform& t) {
     f32x4x4 S = f32x4x4_scale_f32x3(t.scale);
     f32x4x4 R = f32x4x4_from_quat(t.rotation);
     f32x4x4 T = f32x4x4_translate(t.position);
-    return f32x4x4_mul(T, f32x4x4_mul(R, S));
-    // return f32x4x4_mul(T, S);
     return T * R * S;
 }
 
 int main(int argc, char** argv) {
-    //
+    const char* usage = "   \
+        Usage: \
+        ./main [path-to-obj] \
+    \n";
+
     // syscalls: https://gpages.juszkiewicz.com.pl/syscalls-table/syscalls.html
     // 1 is write on x86_64
     char msg[] = "Handmade something starts!\n";
@@ -43,34 +45,30 @@ int main(int argc, char** argv) {
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-    StringView selection = sv_from_cstr(argv[1]);
 
     StringView fp;
-    // TODO: Have platform filesystem support
-    if ( sv_equal(selection, sv_from_cstr("1")) ) {
-        fp = sv_from_cstr("assets/backpack/backpack.obj");
-    } else if ( sv_equal(selection, sv_from_cstr("2")) ) {
-        fp = sv_from_cstr("ignore/assets/sponza/sponza.obj");
-    } else if ( sv_equal(selection, sv_from_cstr("3")) ) {
-        fp = sv_from_cstr("ignore/assets/fireplace/fireplace_room.obj");
-    } else if  ( sv_equal(selection, sv_from_cstr("4")) ) {
-        fp = sv_from_cstr("ignore/assets/dragon/dragon.obj");
-    } else if  ( sv_equal(selection, sv_from_cstr("5")) ) {
-        fp = sv_from_cstr("ignore/assets/gallery/gallery.obj");
-    } else {
+    int args = argc - 1;
+    if (args == 0) {
         fp = sv_from_cstr("assets/backpack/backpack.obj");
     }
+    else if (args == 1) {
+        fp = sv_from_cstr(argv[1]);
+    }
+    else {
+        fprintf(stderr, "\nToo many input arguments.");
+        fprintf(stderr, "\n%s", usage);
+        return -1;
+    }
 
-    ObjModel* model = model_read(scene_arena, fp);
+    // Model* model = model_read(scene_arena, fp);
+    Scene* scene = model_read(scene_arena, fp);
 
-    Transform t = {
-        .position = f32x3_make(0.5f, 0.4f, 0.0f),
-        .scale    = f32x3_make(0.15f, 0.15f, 0.15f),
-        .rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f),
-    };
+    Transform t;
+    t.position = f32x3_make(0.5f, 0.4f, 0.0f);
+    t.scale    = f32x3_make(0.15f, 0.15f, 0.15f);
+    t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f);
 
     f32x4x4 world = f32x4x4_from_transform(t);
-    debug_print_f32x4x4(world);
 
     // u32* win_buffer = model->material->map_Kd.buffer;
     // u32 canvas_w = model->material->map_Kd.width;
@@ -78,7 +76,8 @@ int main(int argc, char** argv) {
 
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
-    const u32 bg_color = 0x18181B;
+    // const u32 bg_color = 0x18181B;
+    const u32 bg_color = 0x0000182B;
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
 
@@ -86,21 +85,11 @@ int main(int argc, char** argv) {
 
     u32 running = 1;
 
-    // ColorContext frag_context = {
-    //     0xFFFFA500,
-    // };
-
-    TextureContext frag_context = {
-        .texture = &(model->materials[0].map_Kd),
-        .world = &world,
-    };
-
     f32 theta = 0.0f;
     while (running) {
         t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), theta);
         theta += (F32_TAU / 120.0f);
         world = f32x4x4_from_transform(t);
-        // frag_context.world = &wor
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
@@ -116,13 +105,13 @@ int main(int argc, char** argv) {
         // on little-endian: 0xAABBGGRR
         // on big-endian: 0xRRGGBBAA
 
-        for (int i=0; i<canvas_h*canvas_w; i++) {
+        for (u64 i=0; i<canvas_h*canvas_w; i++) {
             win_buffer[i] = bg_color;
             zbuffer[i] = ninf;
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_texture);
+        draw_scene(scene, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
@@ -139,4 +128,6 @@ int main(int argc, char** argv) {
         arena_alloc_free(frame_arena);
         arena_alloc_free(scene_arena);
     }
+
+    return 0;
 }

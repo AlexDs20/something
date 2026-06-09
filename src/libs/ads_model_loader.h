@@ -1,19 +1,14 @@
 #ifndef ADS_MODEL_LOADER_H
 #define ADS_MODEL_LOADER_H
 
+#include "base/types.h"
 #include "libs/ads_string.h"
+#include "memory/allocators.h"
 
-struct Arena;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-typedef struct {
-    float x, y, z;
-} Vec3f;
-
-typedef struct {
-    float u, v;
-} Vec2f;
-
-typedef struct Texture Texture;
 struct Texture {
     unsigned int* data;
     unsigned short width;
@@ -21,19 +16,19 @@ struct Texture {
     unsigned char components;
 };
 
-typedef struct {
+struct ObjMaterial {
     StringView name;        // newmtl
 
-    Vec3f Ka;               // ambiant color
-    Vec3f Kd;               // diffuse color
-    Vec3f Ks;               // specular color
-    Vec3f Ke;               // emissive color
+    f32x3 Ka;               // ambiant color
+    f32x3 Kd;               // diffuse color
+    f32x3 Ks;               // specular color
+    f32x3 Ke;               // emissive color
+    f32x3 Tf;               // Transmission filter
 
     float Ns;               // specular exponent
     float Ni;               // index of refraction
     // float d;                // dissolve: Transparency = 1-d
     float Tr;               // Transparency
-    float Tf;               // Transmission filter
     uint32_t illum;         // illumination
 
     // Textures
@@ -43,39 +38,38 @@ typedef struct {
     StringView sv_map_Bump;    // normal map
     StringView sv_map_d;       // alpha texture map
 
-    Texture map_Ka;
-    Texture map_Kd;
-    Texture map_Ks;
-    Texture map_Bump;
-    Texture map_d;
-} ObjMaterial;
+    struct Texture map_Ka;
+    struct Texture map_Kd;
+    struct Texture map_Ks;
+    struct Texture map_Bump;
+    struct Texture map_d;
+};
 
-typedef struct {
+struct ObjFace {
     uint32_t v_indices[3];
     uint32_t vt_indices[3];
     uint32_t vn_indices[3];
 
     int material_index;
-    int shading_group;
-} ObjFace;
+    int smooth_shading;
+};
 
-typedef struct {
+struct ObjGroup {
     String name;
     int first_face_index;
     int face_count;
 
     // Easier to mark material for each group than for each face
     int material_index;
-} ObjGroup;
+};
 
-typedef struct ObjModel;
 struct ObjModel {
-    Vec3f* vertices;
-    Vec3f* texcoords;
-    Vec3f* normals;
-    ObjFace* faces;
-    ObjGroup* groups;
-    ObjMaterial* materials;
+    f32x3* vertices;
+    f32x3* texcoords;
+    f32x3* normals;
+    struct ObjFace* faces;
+    struct ObjGroup* groups;
+    struct ObjMaterial* materials;
 
     uint32_t n_vertices;
     uint32_t n_texcoords;
@@ -88,12 +82,98 @@ struct ObjModel {
     StringView mtllib_name;
 };
 
-// typedef struct {
-// } Model;
+enum ShaderID {
+    SHADER_ID_NIL,
+    SHADER_ID_TEXTURE,
+    SHADER_ID_COUNT,
+};
 
-ObjModel*   model_read(Arena* arena, StringView filepath);
-// ObjModel*   model_parse_obj(Arena* arena, StringView filepath, StringView base_dir);
-// ObjModel*   model_create_default_model(Arena* arena);
-// ObjModel*   model_convert_from_obj(Arena* arena, ObjModel* obj_model);
+struct Material {
+    StringView name;        // newmtl
+
+    f32x3 Ka;               // ambiant color
+    f32x3 Kd;               // diffuse color
+    f32x3 Ks;               // specular color
+    f32x3 Ke;               // emissive color
+    f32x3 Tf;               // Transmission filter
+
+    float Ns;               // specular exponent
+    float Ni;               // index of refraction
+    // float d;                // dissolve: Transparency = 1-d
+    float Tr;               // Transparency
+    uint32_t illum;         // illumination
+
+    // Textures
+    struct Texture* map_Ka;
+    struct Texture* map_Kd;
+    struct Texture* map_Ks;
+    struct Texture* map_Bump;
+    struct Texture* map_d;
+
+    enum ShaderID shader;
+};
+
+struct SubMesh {
+    uint32_t start_index;
+    uint32_t count;
+
+    struct Material* mat;
+};
+
+struct Vertex {
+    f32x3 position;
+    f32x3 texcoords;        // f32x2 ?
+    f32x3 normals;
+};
+
+struct Mesh {
+    struct Vertex* vertices;
+    uint32_t n_vertices;
+
+    uint32_t* indices;
+    uint32_t n_indices;
+
+    struct SubMesh* submeshes;
+    uint32_t n_submeshes;
+};
+
+struct AABB {
+    f32x3 bb_min;
+    f32x3 bb_max;
+};
+
+struct Object {
+    struct Mesh* mesh;
+    f32x4x4 transform;
+    struct AABB bbox;
+};
+
+struct Scene {
+    struct Mesh* meshes;
+    uint32_t n_meshes;
+
+    struct Material* mats;
+    uint32_t n_mats;
+
+    struct Texture* textures;
+    uint32_t n_textures;
+
+    struct Object* objects;
+    uint32_t n_objects;
+};
+
+static inline
+void objface_debug_print(struct ObjFace* f) {
+    printf("\nv  indices = (%u,%u,%u)", f->v_indices[0], f->v_indices[1], f->v_indices[2]);
+    printf("\nvt indices = (%u,%u,%u)", f->vt_indices[0], f->vt_indices[1], f->vt_indices[2]);
+    printf("\nvn indices = (%u,%u,%u)", f->vn_indices[0], f->vn_indices[1], f->vn_indices[2]);
+    printf("\nmaterial index: %d", f->material_index);
+    printf("\nsmooth shading: %d", f->smooth_shading);
+}
+
+struct Scene* model_read(Arena* arena, StringView filepath);
+#ifdef __cplusplus
+}
+#endif
 
 #endif // ADS_MODEL_LOADER_H

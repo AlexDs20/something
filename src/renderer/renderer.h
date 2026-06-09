@@ -2,36 +2,16 @@
 #define ADS_RENDERER_H
 
 #include "base/base.h"
-
-//#include "libs/ads_model_loader.h"
-struct ObjModel;
-struct Texture;
-// #include "memory/allocators.h"
-struct Arena;
-
-
-typedef struct {
-    float x, y, z;
-} Vertex;
-
-typedef struct {
-    float u, v, w;
-    float nx, ny, nz;
-    // float r, g, b;
-} VertexAttrs;
+#include "libs/ads_model_loader.h"
 
 // tmp?
-void print(Vertex* v);
-void print(VertexAttrs* va);
+void print(f32x3* v);
 
 typedef void (*FragmentShader)(
     void* shader_ctx,
-    Vertex* a,
-    Vertex* b,
-    Vertex* c,
-    VertexAttrs* va,
-    VertexAttrs* vb,
-    VertexAttrs* vc,
+    f32x3* a,
+    f32x3* b,
+    f32x3* c,
     f32 w0,
     f32 w1,
     f32 w2,
@@ -48,26 +28,11 @@ typedef struct {
 } ColorContext;
 
 typedef struct {
-    Texture* texture;
     f32x4x4* world;
 } TextureContext;
 
-void shader_frag_color  (void* shader_ctx,
-        Vertex* a, Vertex* b, Vertex* c,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        f32 w0, f32 w1, f32 w2,
-        u32 x, u32 y,
-        u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_depth  (void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-void shader_frag_texture(void* shader_ctx, Vertex* a, Vertex* b, Vertex* c,
-        VertexAttrs* va, VertexAttrs* vb, VertexAttrs* vc,
-        f32 w0, f32 w1, f32 w2, u32 x, u32 y, u32 w, u32 h, f32* zbuffer, u32* framebuffer);
-
-
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
-
-void draw_model(ObjModel* model, u32 w, u32 h, u32* framebuffer, f32* zbuffer, void* shader_context, FragmentShader frag_shader);
+// draw_model()
+void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
 
 #endif // ADS_RENDERER_H

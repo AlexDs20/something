@@ -3,6 +3,10 @@
 
 #include "base/base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct Arena Arena;
 struct Arena {
     u8* buffer;
@@ -25,7 +29,6 @@ void* arena_alloc_push_zero(Arena* arena, u64 size);
 void* arena_alloc_push_zero_aligned(Arena* arena, u64 size, u64 alignment);
 void* arena_alloc_push_zero_unaligned(Arena* arena, u64 size);
 // TODO: rename push_struct to push_data
-// TODO: Implement push struct zero
 void* arena_alloc_push_struct(Arena* arena, void* data, u64 size);
 void* arena_alloc_push_struct_aligned(Arena* arena, void* data, u64 size, u64 alignment);
 void* arena_alloc_push_struct_unaligned(Arena* arena, void* data, u64 size);
@@ -83,5 +86,9 @@ Vector* vector_alloc_copy_to_arena(Arena* arena, Vector* vector);
 // TODO:
 //  - Get pointer
 //  - Copy only data
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // ADS_ALLOCATORS_H

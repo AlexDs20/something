@@ -1,5 +1,6 @@
 #ifndef ADS_DEFINES_H
 #define ADS_DEFINES_H
+#include <stddef.h>
 
 #if defined(__clang__)
 #elif defined(__GNUC__)
@@ -10,14 +11,20 @@
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
     #include <stdalign.h>
-    #define ALIGN(N) alignas(N)
+    #define ALIGNAS(N) alignas(N)
 #elif defined(_MSC_VER)
-    #define ALIGN(N) __declspec(align(N))
+    #define ALIGNAS(N) __declspec(align(N))
 #elif defined(__GNUC__) || defined(__clang__)
-    #define ALIGN(N) __attribute__((aligned(N)))
+    #define ALIGNAS(N) __attribute__((aligned(N)))
 #else
     #error "No alignment support for this compiler"
 #endif
+
+#define FALSE 0
+#define TRUE  1
+
+// TODO: Get different implementations depending on C version / extensions / ...
+#define ALIGNOF(type)      offsetof(struct {char c; type x;}, x)                // To get the alignment of type
 
 #define global static
 #define local static
@@ -29,15 +36,17 @@
 #define GiB (1024*1024*1024)     // GiB
 
 #if defined(ADS_DEBUG)
-#define ASSERT(x)       do { (x) ? 0 : *(volatile char*) 0 = __LINE__; } while (0)
+#define ASSERT(x)       do { if (x) {} else { *(volatile char*) 0 = 0; } } while (0)
 #else
 #define ASSERT(x)       do { } while (0)
 #endif
 
 #if defined(ADS_DEBUG)
-#define PANIC           do { *(volatile char*) 0 = __LINE__; } while (0)
+#define PANIC           do { *(volatile char*) 0 = 0; } while (0)
 #else
 #define PANIC
 #endif
+
+#define NOT_IMPLEMENTED(x)      do { printf( "\n" #x " not implemented." ); } while(0)
 
 #endif // ADS_DEFINES_H

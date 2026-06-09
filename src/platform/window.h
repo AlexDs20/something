@@ -1,11 +1,9 @@
 #ifndef PLATFORM_WINDOW_H
 #define PLATFORM_WINDOW_H
-#include <X11/X.h>
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include "base/base.h"
 
-struct Arena;
+#include "base/base.h"
+#include "memory/allocators.h"
 
 //============
 // DRAW_METHOD
@@ -13,10 +11,13 @@ struct Arena;
 #define ADSV_NEAREST    1
 #define ADSV_BILINEAR   2
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
-    int w;
-    int h;
+    unsigned int w;
+    unsigned int h;
     Display* display;
     Visual* visual;
     int depth;
@@ -31,9 +32,13 @@ typedef struct {
     Atom wm_delete_window;
 } Win;
 
-Win platform_init_win(unsigned int w, unsigned int h, char* title, int DRAW_METHOD);
+Win platform_init_win(unsigned int w, unsigned int h, const char* title, int DRAW_METHOD);
 bool platform_handle_events(Win* win);
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window);
 void platform_cleanup_window(Win win);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // PLATFORM_WINDOW_H

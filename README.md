@@ -1,3 +1,16 @@
+## Documentation
+### Defines:
+- *ADS_LINUX*: To be set when compiling on linux
+    - No alternatives at the moment
+- *ADS_X11*: To be set when using X11 server on linux
+    - No alternatives currently implemented
+- *ADS_USE_EXTERNAL*: To be set if wanting to use external libraries instead of ADS implementations
+- *ADS_DEBUG*:
+- *ADS_SSE*:
+- *ADS_LOCAL_ARENA_POOL_COUNT*:
+- *ADS_LOCAL_ARENA_CAPACITY*:
+
+
 # TODO
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
@@ -9,6 +22,9 @@
     - [x] Get the info about the jpeg image without decoding
     - [x] Allow flipping along y.
     - [x] Test code on many images
+- OBJ parser:
+    - [ ] n-gons handling
+    - [ ] Several materials in a single 'g' or 'o'
 - Libs:
     - [ ] Image
         - [X] JPEG

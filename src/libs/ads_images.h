@@ -1,21 +1,18 @@
 #ifndef ADS_IMAGE_H
 #define ADS_IMAGE_H
 
-#include "libs/ads_string.h"
 #include "base/base.h"
+#include "libs/ads_string.h"
+#include "memory/allocators.h"
 
-// From "memory/allocators.h"
-struct Arena;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct Image Image;
 struct Image {
-    union {
-        u32* data;
-        u32* buffer;
-        u8* gray;
-        u32* rgb;
-        u32* rgba;
-    };
+    u8* data;
     u32 width;
     u32 height;
     u8 components;
@@ -35,10 +32,14 @@ struct ImageParsingResult {
 };
 
 // /* bs*, jpeg*? as void* */void read_image_info(filename, &width, &height, &components, &precision);
-// void read_image_file(filename, &width, &height, &components);
+// void image_read_file(filename, &width, &height, &components);
 
-Image read_image_file(Arena* arena, StringView filename);
+Image image_read_file(Arena* arena, StringView filename);
 // bool read_image_info(filename, &width, &height, &components);
 // image_flip_vertically(Image* image);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -4,6 +4,11 @@
 #include <stddef.h>     // size_t
 #include <stdarg.h>     // va_list
 #include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Forward def Arena from allocators.h
 struct Arena;
@@ -53,6 +58,7 @@ StringView  sv_trim_back(StringView sv);
 // StringView sv_trim_front_by_chars(StringView sv, StringView chars);
 // StringView sv_trim_back_by_chars(StringView sv, StringView chars);
 static inline bool      sv_is_empty(StringView sv) { return sv.size == 0; }
+bool sv_is_space(StringView sv);
 
 StringView sv_chop_by_delim_sv(StringView* sv, StringView delim);
 #define    sv_chop_by_delim_cstr(sv_ptr, cstr)           sv_chop_by_delim_sv((sv_ptr), sv_from_cstr((cstr)))
@@ -61,6 +67,9 @@ StringView sv_chop_by_delim_sv(StringView* sv, StringView delim);
 static inline StringView sv_chop_by_delim_char(StringView* sv, char c) { return sv_chop_by_delim_sv(sv, sv_from_buffer(&c, 1)); }
 
 StringView sv_chop_by(StringView* sv, size_t pos);
+
+StringView sv_split_front(StringView sv, size_t pos);
+StringView sv_split_back(StringView sv, size_t pos);
 
 StringView sv_file_extension(StringView sv);
 StringView sv_file_name(StringView sv);
@@ -161,5 +170,9 @@ int     string_shrink_to_fit(struct Arena* arena, String* str);
 
 void    string_print(const String* str);
 void    string_debug_print(const String* string);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // ADS_STRING_H
