@@ -12,9 +12,9 @@
 #define ASSERT_EQ_INT(a,b)   do { if ((int)(a)      != (int)(b))        return __LINE__; } while(0)
 #define ASSERT_EQ_UINT(a,b)  do { if ((unsigned)(a) != (unsigned)(b))   return __LINE__; } while(0)
 #define ASSERT_EQ_SIZE(a,b)  do { if ((size_t)(a)   != (size_t)(b))     return __LINE__; } while(0)
-#define ASSERT_NEQ_INT(a,b)  do { if ((int)(a)      != (int)(b))        return __LINE__; } while(0)
-#define ASSERT_NEQ_UINT(a,b) do { if ((unsigned)(a) != (unsigned)(b))   return __LINE__; } while(0)
-#define ASSERT_NEQ_SIZE(a,b) do { if ((size_t)(a)   != (size_t)(b))     return __LINE__; } while(0)
+#define ASSERT_NEQ_INT(a,b)  do { if ((int)(a)      == (int)(b))        return __LINE__; } while(0)
+#define ASSERT_NEQ_UINT(a,b) do { if ((unsigned)(a) == (unsigned)(b))   return __LINE__; } while(0)
+#define ASSERT_NEQ_SIZE(a,b) do { if ((size_t)(a)   == (size_t)(b))     return __LINE__; } while(0)
 
 #define ASSERT_LT(a,b) do { if (!((a) < (b))) return __LINE__; } while(0)
 #define ASSERT_LE(a,b) do { if (!((a) <= (b))) return __LINE__; } while(0)
