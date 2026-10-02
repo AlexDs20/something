@@ -5,6 +5,13 @@
 #include "libs/ads_string.h"
 #include "memory/allocators.h"
 
+/*
+ * The idea here is that the scene contains arrays of the different things it owns: materials, meshes, textures, objects
+ *
+ * Each object (instance) points to a mesh which has vertices and.
+ * Each mesh (contains vertices and indices) is made of submeshes with same material and index range
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif

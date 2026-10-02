@@ -10,14 +10,14 @@
 #endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-    #include <stdalign.h>
-    #define ALIGNAS(N) alignas(N)
+#   include <stdalign.h>
+#   define ALIGNAS(N) alignas(N)
 #elif defined(_MSC_VER)
-    #define ALIGNAS(N) __declspec(align(N))
-#elif defined(__GNUC__) || defined(__clang__)
-    #define ALIGNAS(N) __attribute__((aligned(N)))
+#   define ALIGNAS(N) __declspec(align(N))
+#elif defined(__GNUC__) || defined(__clang__) || defined(__TINYC__)
+#   define ALIGNAS(N) __attribute__((aligned(N)))
 #else
-    #error "No alignment support for this compiler"
+#   error "No alignment support for this compiler"
 #endif
 
 #define FALSE 0

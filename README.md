@@ -32,11 +32,16 @@
     - [ ] DataStructures
         - [X] Vector (to revisit)
         - [ ] HashMap
-    - [ ] LIBC
+    - [ ] Input:
+        - [ ] Keyboard
+        - [ ] Mouse
+        - [ ] Controller
+    - [X] Math
+        - [ ] USE SSE / AVX2
+    - [ ] NO LIBC
     - [ ] IMGUI
-    - [ ] Network
     - [ ] Audio
-    - [ ] Math
+    - [ ] Network
     - [ ] Window
     - [ ] Threads
     - [ ] Text format: true type?

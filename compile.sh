@@ -8,7 +8,7 @@ DEFINES+=" -DADS_DEBUG -g -ggdb"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
-CCOMP=gcc
+CCOMP=tcc
 CPPCOMP=g++
 
 BUILD_DIR="./build"

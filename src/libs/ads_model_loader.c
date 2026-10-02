@@ -365,17 +365,13 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     file = file_copy;
 
     // Second pass => the actual parsing
-    ObjModel* obj_model  = (ObjModel*) arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
+    ObjModel* obj_model  =                      (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
     obj_model->vertices  = n_v    == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
     obj_model->texcoords = n_vt   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
     obj_model->normals   = n_vn   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
     obj_model->faces     = n_f    == 0 ? NULL : (ObjFace*)    arena_alloc_push_zero(persist_arena, sizeof(ObjFace)     * n_f);
-    obj_model->groups    = n_g    == 0 ? NULL : (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
+    obj_model->groups    =                      (ObjGroup*)   arena_alloc_push_zero(persist_arena, sizeof(ObjGroup)    * n_g);
     obj_model->materials = n_mats == 0 ? NULL : (ObjMaterial*)arena_alloc_push_zero(persist_arena, sizeof(ObjMaterial) * n_mats);
-
-    uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
-    uint32_t i_f = 0;
-    uint32_t i_g = 1;
 
     obj_model->n_vertices  = n_v;
     obj_model->n_texcoords = n_vt;
@@ -383,6 +379,12 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     obj_model->n_faces     = n_f;
     obj_model->n_groups    = n_g;
     obj_model->n_materials = n_mats;
+
+    // TODO: If there is no material, create a default one e.g. just a basic ugly color maybe?
+
+    uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
+    uint32_t i_f = 0;
+    uint32_t i_g = 1;
 
     struct {
         f32x3* vertex;

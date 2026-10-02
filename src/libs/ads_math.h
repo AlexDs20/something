@@ -305,6 +305,13 @@ static inline f32x4x4 f32x4x4_scale_f32x3(f32x3 s) {
 // static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
 // static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
 
+// // Camera
+// f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
+//
+// // Projection
+// f32x4x4 f32x4x4_perspective( f32 fov_y_rad, f32 aspect, f32 near_plane, f32 far_plane);
+// f32x4x4 f32x4x4_orthographic( f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
+
 static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
     f32x4x4 m = f32x4x4_identity();
 
