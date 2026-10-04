@@ -1,6 +1,6 @@
 #!/bin/bash
-CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic -masm=intel"
-CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic"
+CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic -Wno-deprecated-declarations -masm=intel"
+CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic -Wno-deprecated"
 EXTRAFLAGS=""       #" -fsanitize=address,undefined,leak -fno-sanitize-recover"
 
 DEFINES="-DADS_LINUX -DADS_X11 -D_GNU_SOURCE -DADS_USE_EXTERNAL"
@@ -8,7 +8,7 @@ DEFINES+=" -DADS_DEBUG -g -ggdb"
 INCLUDES="-I./src/ -I./"
 LINKS="-lX11"
 
-CCOMP=tcc
+CCOMP=gcc
 CPPCOMP=g++
 
 BUILD_DIR="./build"

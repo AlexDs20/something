@@ -13,6 +13,7 @@
 #include "base/base.h"
 #include "platform/window.h"
 #include "memory/allocators.h"
+#include "platform/input.h"
 
 // https://handmade.network/forums/articles/t/2834-tutorial_a_tour_through_xlib_and_related_technologies
 
@@ -113,7 +114,7 @@ Win platform_init_win(unsigned int w, unsigned int h, const char* title, int DRA
     swa.background_pixel = 0;   /* background fill pixel color */
     swa.colormap = XCreateColormap(win.display, root, vis_info.visual, AllocNone);
     swa.bit_gravity = StaticGravity;
-    swa.event_mask  = StructureNotifyMask | ExposureMask | KeyPressMask | KeyReleaseMask;
+    swa.event_mask  = StructureNotifyMask | ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
     /*
     unsigned long valuemask = CWBackPixel | CWEventMask | CWBitGravity;
     swa.background_pixel = 0xFFFFFFFF;
@@ -179,7 +180,6 @@ Win platform_init_win(unsigned int w, unsigned int h, const char* title, int DRA
     return(win);
 }
 
-
 static inline
 int trailing_zero_bits(u32 x) {
     /*
@@ -199,7 +199,6 @@ int trailing_zero_bits(u32 x) {
     }
     return n;
 }
-
 
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     /*
@@ -433,10 +432,14 @@ void print_event_type(int event_type) {
 
 bool platform_handle_events(Win* win) {
     int running = 1;
+
+    _handle_input_pre_events();
+
     XEvent event;
     while(XPending(win->display)>0) {
         XNextEvent(win->display, &event);
         // print_event_type(event.type);
+        input_event_t ev = {0};
         switch (event.type) {
             case Expose: {
                 XPutImage(win->display, win->window, win->gc, win->xim, 0, 0, 0, 0, win->w, win->h);
@@ -447,13 +450,27 @@ bool platform_handle_events(Win* win) {
                 }
             } break;
             case KeyPress: {
-                printf("\nKey pressed!");
+                ev.event_type = ADS_INPUT_KEY;
+                ev.data.key.id = XKeycodeToKeysym(win->display, event.xkey.keycode, event.xkey.state & ShiftMask ? 1 : 0);      // NOTE: It's deprecated
+                ev.data.key.pressed = true;
+
                 if (event.xkey.keycode == XKeysymToKeycode(win->display, XK_f)) {
                     toggle_fullscreen(win->display, win->window);
                 }
             } break;
             case KeyRelease: {
-                printf("\nKey released!");
+                ev.event_type = ADS_INPUT_KEY;
+                ev.data.key.id = XKeycodeToKeysym(win->display, event.xkey.keycode, event.xkey.state & ShiftMask ? 1 : 0);      // NOTE: It's deprecated
+                ev.data.key.released = true;
+            } break;
+            case ButtonPress: {
+                printf("\nButton pressed!");
+            } break;
+            case ButtonRelease: {
+                printf("\nButton released!");
+            } break;
+            case MotionNotify: {
+                printf("\nMotion notified!");
             } break;
             case ConfigureNotify: {
                 // Go through all the ConfigureNotify events in the queue (they get removed from the queue)
@@ -485,7 +502,11 @@ bool platform_handle_events(Win* win) {
                 }
             } break;
         }
+        _handle_event(ev);
     }   // end of while XPending
+
+    _handle_input_post_events();
+
     return(running);
 }
 

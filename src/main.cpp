@@ -11,6 +11,7 @@
 #include "renderer/renderer.h"
 #include "libs/ads_images.h"
 #include "platform/memory.h"
+#include "platform/input.h"
 
 #include "libs/ads_string.h"
 #include "libs/ads_model_loader.h"
@@ -92,6 +93,13 @@ int main(int argc, char** argv) {
         world = f32x4x4_from_transform(t);
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
+
+        Key k = ADS_KEY_CAPSLOCK;
+        printf("\nMAIN a pressed: %d down: %d released %d",
+            ads_input_key_pressed(k),
+            ads_input_key_down(k),
+            ads_input_key_released(k)
+        );
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
