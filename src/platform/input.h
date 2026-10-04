@@ -97,12 +97,23 @@ typedef enum {
 } Key;
 
 typedef enum {
+    ADS_MOUSE_NONE,
+    ADS_MOUSE1,
+    ADS_MOUSE2,
+    ADS_MOUSE3,
+    ADS_MOUSE4,
+    ADS_MOUSE5,
+
+    ADS_MOUSE_BUTTON_COUNT,
+} MouseButton;
+
+typedef enum {
     ADS_INPUT_NONE,
     ADS_INPUT_KEY,
 
     // ADS_INPUT_TEXT,
 
-    // ADS_INPUT_MOUSE_BUTTON,
+    ADS_INPUT_MOUSE_BUTTON,
     // ADS_INPUT_MOUSE_MOVE,
     // ADS_INPUT_MOUSE_WHEEL,
 
@@ -116,7 +127,7 @@ typedef struct {
 
     union {
         struct {
-            uint32_t id;
+            uint32_t id;            // X11 value
             bool pressed;
             bool released;
         } key;
@@ -125,9 +136,11 @@ typedef struct {
         //     uint32_t codepoint;
         // } text;
 
-        // struct {
-        //     uint32_t button;
-        // } mouse_button;
+        struct {
+            uint32_t button;        // X11 values
+            bool pressed;
+            bool released;
+        } mouse_button;
     } data;
 } input_event_t;
 
@@ -135,6 +148,10 @@ typedef struct {
     bool key_down[ADS_KEY_COUNT];
     bool key_pressed[ADS_KEY_COUNT];
     bool key_released[ADS_KEY_COUNT];
+
+    bool button_down[ADS_MOUSE_BUTTON_COUNT];
+    bool button_pressed[ADS_MOUSE_BUTTON_COUNT];
+    bool button_released[ADS_MOUSE_BUTTON_COUNT];
 } Input;
 
 
@@ -145,6 +162,11 @@ extern "C" {
 bool ads_input_key_pressed(Key key);
 bool ads_input_key_down(Key key);
 bool ads_input_key_released(Key key);
+
+bool ads_input_mouse_pressed(MouseButton button);
+bool ads_input_mouse_down(MouseButton button);
+bool ads_input_mouse_released(MouseButton button);
+
 
 void ads_input_debug_print_down(void);
 void _handle_event(input_event_t ev);

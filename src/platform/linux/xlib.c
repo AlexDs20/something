@@ -464,10 +464,14 @@ bool platform_handle_events(Win* win) {
                 ev.data.key.released = true;
             } break;
             case ButtonPress: {
-                printf("\nButton pressed!");
+                ev.event_type = ADS_INPUT_MOUSE_BUTTON;
+                ev.data.mouse_button.pressed = true;
+                ev.data.mouse_button.button = event.xbutton.button;
             } break;
             case ButtonRelease: {
-                printf("\nButton released!");
+                ev.event_type = ADS_INPUT_MOUSE_BUTTON;
+                ev.data.mouse_button.released = true;
+                ev.data.mouse_button.button = event.xbutton.button;
             } break;
             case MotionNotify: {
                 printf("\nMotion notified!");

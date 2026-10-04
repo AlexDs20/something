@@ -94,11 +94,18 @@ int main(int argc, char** argv) {
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
-        Key k = ADS_KEY_CAPSLOCK;
-        printf("\nMAIN a pressed: %d down: %d released %d",
-            ads_input_key_pressed(k),
-            ads_input_key_down(k),
-            ads_input_key_released(k)
+        // Key k = ADS_KEY_CAPSLOCK;
+        // printf("\nMAIN a pressed: %d down: %d released %d",
+        //     ads_input_key_pressed(k),
+        //     ads_input_key_down(k),
+        //     ads_input_key_released(k)
+        // );
+
+        MouseButton b = ADS_MOUSE3;
+        printf("\nMAIN Button pressed: %d down: %d released %d",
+            ads_input_mouse_pressed(b),
+            ads_input_mouse_down(b),
+            ads_input_mouse_released(b)
         );
 
         // Allocate the canvas size we want to draw onto
