@@ -54,6 +54,14 @@ bool ads_input_mouse_released(MouseButton b) {
     return input.button_released[b];
 }
 
+int32_t ads_input_mouse_x() {
+    return input.mouse_x;
+}
+
+int32_t ads_input_mouse_y() {
+    return input.mouse_y;
+}
+
 #ifdef ADS_X11
 #include <X11/Xutil.h>
 void _handle_event(input_event_t ev) {
@@ -189,6 +197,10 @@ void _handle_event(input_event_t ev) {
             input.button_pressed[button] = false;
         }
 
+    }
+    else if (ev.event_type == ADS_INPUT_MOUSE_MOTION) {
+        input.mouse_x = ev.data.mouse_motion.x;
+        input.mouse_y = ev.data.mouse_motion.y;
     }
     else {
         fprintf(stderr, "NotImplemented!\n");

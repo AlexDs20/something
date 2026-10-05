@@ -114,7 +114,7 @@ typedef enum {
     // ADS_INPUT_TEXT,
 
     ADS_INPUT_MOUSE_BUTTON,
-    // ADS_INPUT_MOUSE_MOVE,
+    ADS_INPUT_MOUSE_MOTION,
     // ADS_INPUT_MOUSE_WHEEL,
 
     // ADS_INPUT_GAMEPAD_BUTTON,
@@ -141,6 +141,11 @@ typedef struct {
             bool pressed;
             bool released;
         } mouse_button;
+
+        struct {
+            int32_t x;
+            int32_t y;
+        } mouse_motion;
     } data;
 } input_event_t;
 
@@ -152,6 +157,9 @@ typedef struct {
     bool button_down[ADS_MOUSE_BUTTON_COUNT];
     bool button_pressed[ADS_MOUSE_BUTTON_COUNT];
     bool button_released[ADS_MOUSE_BUTTON_COUNT];
+
+    int32_t mouse_x;
+    int32_t mouse_y;
 } Input;
 
 
@@ -166,6 +174,9 @@ bool ads_input_key_released(Key key);
 bool ads_input_mouse_pressed(MouseButton button);
 bool ads_input_mouse_down(MouseButton button);
 bool ads_input_mouse_released(MouseButton button);
+
+int32_t ads_input_mouse_x();
+int32_t ads_input_mouse_y();
 
 
 void ads_input_debug_print_down(void);

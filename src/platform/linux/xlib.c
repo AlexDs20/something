@@ -474,7 +474,9 @@ bool platform_handle_events(Win* win) {
                 ev.data.mouse_button.button = event.xbutton.button;
             } break;
             case MotionNotify: {
-                printf("\nMotion notified!");
+                ev.event_type = ADS_INPUT_MOUSE_MOTION;
+                ev.data.mouse_motion.x = event.xmotion.x;
+                ev.data.mouse_motion.y = event.xmotion.y;
             } break;
             case ConfigureNotify: {
                 // Go through all the ConfigureNotify events in the queue (they get removed from the queue)

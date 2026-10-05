@@ -34,6 +34,14 @@ typedef struct {
     bool x, y, z, w;
 } bool4;
 
+typedef struct {
+    int32_t x, y;
+} i32x2;
+
+typedef struct {
+    int32_t x, y, z;
+} i32x3;
+
 typedef union {
     f32 f;
     u32 u;

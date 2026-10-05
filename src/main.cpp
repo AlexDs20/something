@@ -101,12 +101,17 @@ int main(int argc, char** argv) {
         //     ads_input_key_released(k)
         // );
 
-        MouseButton b = ADS_MOUSE3;
-        printf("\nMAIN Button pressed: %d down: %d released %d",
-            ads_input_mouse_pressed(b),
-            ads_input_mouse_down(b),
-            ads_input_mouse_released(b)
-        );
+        // MouseButton b = ADS_MOUSE1;
+        // printf("\nMAIN Button pressed: %d down: %d released %d",
+        //     ads_input_mouse_pressed(b),
+        //     ads_input_mouse_down(b),
+        //     ads_input_mouse_released(b)
+        // );
+
+        i32x2 pos = {0, 0};
+        pos.x = ads_input_mouse_x();
+        pos.y = ads_input_mouse_y();
+        printf("\nMAIN Mouse pos: %d %d", pos.x, pos.y);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
