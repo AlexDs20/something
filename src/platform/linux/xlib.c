@@ -433,12 +433,11 @@ void print_event_type(int event_type) {
 bool platform_handle_events(Win* win) {
     int running = 1;
 
-    _handle_input_pre_events();
+    _handle_x11_input_pre_events();
 
     XEvent event;
     while(XPending(win->display)>0) {
         XNextEvent(win->display, &event);
-        // print_event_type(event.type);
         input_event_t ev = {0};
         switch (event.type) {
             case Expose: {
@@ -508,10 +507,10 @@ bool platform_handle_events(Win* win) {
                 }
             } break;
         }
-        _handle_event(ev);
+        _handle_x11_event(ev);
     }   // end of while XPending
 
-    _handle_input_post_events();
+    _handle_x11_input_post_events();
 
     return(running);
 }

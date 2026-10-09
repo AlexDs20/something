@@ -36,11 +36,11 @@ typedef struct {
 
 typedef struct {
     int32_t x, y;
-} i32x2;
+} s32x2;
 
 typedef struct {
     int32_t x, y, z;
-} i32x3;
+} s32x3;
 
 typedef union {
     f32 f;

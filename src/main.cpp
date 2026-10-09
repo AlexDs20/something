@@ -65,9 +65,10 @@ int main(int argc, char** argv) {
     Scene* scene = model_read(scene_arena, fp);
 
     Transform t;
-    t.position = f32x3_make(0.5f, 0.4f, 0.0f);
-    t.scale    = f32x3_make(0.15f, 0.15f, 0.15f);
-    t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), 0.0f);
+    t.scale = f32x3_splat(50.0f);
+    t.position = f32x3_make(900.0f, 400.0f, 0.0f);
+    t.rotation = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI)
+        * quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
 
     f32x4x4 world = f32x4x4_from_transform(t);
 
@@ -77,8 +78,8 @@ int main(int argc, char** argv) {
 
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
-    // const u32 bg_color = 0x18181B;
     const u32 bg_color = 0x0000182B;
+
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
 
@@ -86,32 +87,38 @@ int main(int argc, char** argv) {
 
     u32 running = 1;
 
-    f32 theta = 0.0f;
+    s32x2 mouse_pos = {0, 0};
     while (running) {
-        t.rotation = quat_make_rotation(f32x3_make(0.0f, 1.0f, 0.0f), theta);
-        theta += (F32_TAU / 120.0f);
         world = f32x4x4_from_transform(t);
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
-        // Key k = ADS_KEY_CAPSLOCK;
-        // printf("\nMAIN a pressed: %d down: %d released %d",
-        //     ads_input_key_pressed(k),
-        //     ads_input_key_down(k),
-        //     ads_input_key_released(k)
-        // );
+        if (ads_input_key_pressed(ADS_KEY_W) || ads_input_key_down(ADS_KEY_W)) {
+            t.position = f32x3_add(t.position, f32x3_make(0.0f, 10.0f, 0.0f));
+        }
+        if (ads_input_key_pressed(ADS_KEY_S) || ads_input_key_down(ADS_KEY_S)) {
+            t.position = f32x3_sub(t.position, f32x3_make(0.0f, 10.0f, 0.0f));
+        }
+        if (ads_input_key_pressed(ADS_KEY_A) || ads_input_key_down(ADS_KEY_A)) {
+            t.position = f32x3_sub(t.position, f32x3_make(10.0f, 0.0f, 0.0f));
+        }
+        if (ads_input_key_pressed(ADS_KEY_D) || ads_input_key_down(ADS_KEY_D)) {
+            t.position = f32x3_add(t.position, f32x3_make(10.0f, 0.0f, 0.0f));
+        }
 
-        // MouseButton b = ADS_MOUSE1;
-        // printf("\nMAIN Button pressed: %d down: %d released %d",
-        //     ads_input_mouse_pressed(b),
-        //     ads_input_mouse_down(b),
-        //     ads_input_mouse_released(b)
-        // );
+        if (ads_input_mouse_released(ADS_MOUSE4)) {
+            t.scale = f32x3_add(t.scale, f32x3_splat(1.0f));
+        }
+        else if (ads_input_mouse_released(ADS_MOUSE5)) {
+            t.scale = f32x3_sub(t.scale, f32x3_splat(1.0f));
+        }
 
-        i32x2 pos = {0, 0};
-        pos.x = ads_input_mouse_x();
-        pos.y = ads_input_mouse_y();
-        printf("\nMAIN Mouse pos: %d %d", pos.x, pos.y);
+        s32x2 new_mouse_pos = {0, 0};
+        new_mouse_pos.x = ads_input_mouse_x();
+        new_mouse_pos.y = ads_input_mouse_y();
+        // s32x2 dx = {new_mouse_pos.x - mouse_pos.x, new_mouse_pos.y - mouse_pos.y };
+        // t.rotation = quat_mul(t.rotation, quat_make(0.0f, 0.0f, 1.0f, dx.x / 10.0f));
+        mouse_pos = new_mouse_pos;
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
@@ -131,7 +138,7 @@ int main(int argc, char** argv) {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_scene(scene, win_buffer, zbuffer, canvas_w, canvas_h);
+        draw_scene(scene, world, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 

@@ -615,20 +615,12 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 }
 
 // TODO: Add perspective transformation due to camera
-#include "libs/ads_string.h"
-void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
-    f32x4x4 s = f32x4x4_scale_f32(50.0f);
-    f32x3 t = {900.0f, 400.0f, 0.0f};
-    Quaternion q_rot = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI);
-    Quaternion q_rot1 = quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
-    f32x4x4 rotation = f32x4x4_from_quat(q_rot1*q_rot);
-    f32x4x4 translate = f32x4x4_translate(t);
-    f32x4x4 world = translate * rotation * s;
+void draw_scene(Scene* scene, f32x4x4 world_transformation, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
 
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
-        f32x4x4 transformation = world * obj->transform;
+        f32x4x4 transformation = world_transformation * obj->transform;
 
         // if (frustum_cull(obj->bbox)) {}
 
@@ -642,20 +634,6 @@ void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
             uint32_t ind_count = sm->count;
 
             draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
-            // draw_submesh(framebuffer, zbuffer, w, h, NULL, transformation, mesh->vertices, sm_indices, ind_count);
-
-            // printf("%d material name: ", j);
-            // sv_print(sm->mat->name);
-            // printf("\n");
-            // if (// (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub_kut")) == sm->mat->name.size)  &&
-            //     // (sv_find(sm->mat->name, sv_from_cstr("sp_00_stup"    )) == sm->mat->name.size)  &&
-            //     // (sv_find(sm->mat->name, sv_from_cstr("sp_01_stub"    )) == sm->mat->name.size)  &&
-            //     (sv_find(sm->mat->name, sv_from_cstr("sp_zid_vani"   )) == sm->mat->name.size)  &&
-            //     (sv_find(sm->mat->name, sv_from_cstr("sp_00_zid"     )) == sm->mat->name.size)  // &&
-            //     // (sv_find(sm->mat->name, sv_from_cstr("sp_00_pod"     )) == sm->mat->name.size)
-            // ) {
-            //     draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
-            // }
         }
 
     }

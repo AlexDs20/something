@@ -33,6 +33,6 @@ typedef struct {
 
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
 // draw_model()
-void draw_scene(Scene* scene, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
+void draw_scene(Scene* scene, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
 
 #endif // ADS_RENDERER_H

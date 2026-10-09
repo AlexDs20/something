@@ -64,7 +64,7 @@ int32_t ads_input_mouse_y() {
 
 #ifdef ADS_X11
 #include <X11/Xutil.h>
-void _handle_event(input_event_t ev) {
+void _handle_x11_event(input_event_t ev) {
     if (ev.event_type == ADS_INPUT_KEY) {
         Key k = ADS_KEY_NULL;
         switch (ev.data.key.id) {
@@ -175,7 +175,6 @@ void _handle_event(input_event_t ev) {
         // printf("handle event: pressed: %d \t down: %d \t released: %d\n", input.key_pressed[k], input.key_down[k], input.key_released[k]);
     }
     else if (ev.event_type == ADS_INPUT_MOUSE_BUTTON) {
-        printf("Handling mouse event!");
         MouseButton button = ADS_MOUSE_NONE;
         switch (ev.data.mouse_button.button) {
             case Button1: { button = ADS_MOUSE1; } break;
@@ -207,7 +206,7 @@ void _handle_event(input_event_t ev) {
     }
 }
 
-void _handle_input_pre_events(void) {
+void _handle_x11_input_pre_events(void) {
     // printf("pre pre event: pressed: %d \t down: %d \t released: %d\n", input.key_pressed[ADS_KEY_A], input.key_down[ADS_KEY_A], input.key_released[ADS_KEY_A]);
     for (uint32_t i=0; i<ADS_KEY_COUNT; i++) {
         input.key_down[i] |= input.key_pressed[i];
@@ -222,7 +221,7 @@ void _handle_input_pre_events(void) {
     }
 }
 
-void _handle_input_post_events(void) {
+void _handle_x11_input_post_events(void) {
     // printf("pre post event: pressed: %d \t down: %d \t released: %d\n", input.key_pressed[ADS_KEY_A], input.key_down[ADS_KEY_A], input.key_released[ADS_KEY_A]);
     for (uint32_t i=0; i<ADS_KEY_COUNT; i++) {
         // Remove down and pressed if it's released

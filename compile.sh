@@ -14,7 +14,7 @@ CPPCOMP=g++
 BUILD_DIR="./build"
 EXE="${BUILD_DIR}/main"
 
-rm -r "$BUILD_DIR"
+# rm -r "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 if [[ -f $EXE ]]; then
