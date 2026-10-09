@@ -178,7 +178,6 @@ bool ads_input_mouse_released(MouseButton button);
 int32_t ads_input_mouse_x();
 int32_t ads_input_mouse_y();
 
-
 void ads_input_debug_print_down(void);
 void _handle_x11_event(input_event_t ev);
 void _handle_x11_input_pre_events(void);

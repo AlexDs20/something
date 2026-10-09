@@ -70,8 +70,6 @@ int main(int argc, char** argv) {
     t.rotation = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI)
         * quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
 
-    f32x4x4 world = f32x4x4_from_transform(t);
-
     // u32* win_buffer = model->material->map_Kd.buffer;
     // u32 canvas_w = model->material->map_Kd.width;
     // u32 canvas_h = model->material->map_Kd.height;
@@ -89,7 +87,6 @@ int main(int argc, char** argv) {
 
     s32x2 mouse_pos = {0, 0};
     while (running) {
-        world = f32x4x4_from_transform(t);
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
@@ -117,8 +114,9 @@ int main(int argc, char** argv) {
         new_mouse_pos.x = ads_input_mouse_x();
         new_mouse_pos.y = ads_input_mouse_y();
         // s32x2 dx = {new_mouse_pos.x - mouse_pos.x, new_mouse_pos.y - mouse_pos.y };
-        // t.rotation = quat_mul(t.rotation, quat_make(0.0f, 0.0f, 1.0f, dx.x / 10.0f));
+        // t.rotation = quat_mul(t.rotation, quat_make(0.0f, 0.0f, 0.0f, 1.0f));
         mouse_pos = new_mouse_pos;
+        f32x4x4 world = f32x4x4_from_transform(t);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
