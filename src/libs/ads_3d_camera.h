@@ -8,6 +8,15 @@ typedef enum {
     ADS_CAMERA_COUNT,
 } ADSCameraType;
 
+typedef enum {
+    ADS_MOTION_DIRECTION_NONE,
+    ADS_MOTION_DIRECTION_FORWARD,
+    ADS_MOTION_DIRECTION_BACKWARD,
+    ADS_MOTION_DIRECTION_LEFT,
+    ADS_MOTION_DIRECTION_RIGHT,
+    ADS_MOTION_DIRECTION_COUNT,
+} MotionDirection;
+
 typedef struct _Camera {
     ADSCameraType camera_type;
 
@@ -15,6 +24,13 @@ typedef struct _Camera {
 
     f32x3 direction;
     f32x3 right;
+
+    f32 yaw;        // Left/right
+    f32 pitch;      // up/down
+    f32 roll;       // tilt side NOT used currently (until plane like camera)
+
+    f32 speed;
+    f32 rotation_speed;
 } Camera;
 
 #ifdef __cplusplus
@@ -23,8 +39,8 @@ extern "C" {
 Camera camera_init(ADSCameraType camera_type);
 
 f32x4x4 camera_get_transformation(const Camera camera);
-void camera_move_forward(Camera* camera, f32 amount);
-void camera_move_right(Camera* camera, f32 amount);
+void camera_move(Camera* camera, MotionDirection direction, f32 delta_time);
+void camera_rotate(Camera* camera, s32x2 dx);
 
 #ifdef __cplusplus
 }

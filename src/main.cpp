@@ -1,5 +1,11 @@
 #include <unistd.h>         // STDOUT_FILENO
 #include <sys/syscall.h>    // syscall()
+
+// #ifndef _POSIX_C_SOURCE
+// #define _POSIX_C_SOURCE 200809L     // Define to expose POSIX functions: clock_gettime
+// #endif
+
+#include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -79,27 +85,39 @@ int main(int argc, char** argv) {
 
     Camera camera = camera_init(ADS_CAMERA_FIRST_PERSON);
 
+    struct timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
+
     s32x2 mouse_pos = {0, 0};
+
     while (running) {
+        // Handle time:
+        struct timespec new_time;
+        clock_gettime(CLOCK_MONOTONIC, &new_time);
+
+        double dt = (new_time.tv_sec - current_time.tv_sec)
+                  + (new_time.tv_nsec - current_time.tv_nsec) * 1e-9;
+
+        current_time = new_time;
+
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
-        const f32 SPEED = 10.0f;
         // f32 dzoom = 0.0f;
         // const f32 ZOOM = 1.0f;
 
         // Keyboard motion
         if (ads_input_key_pressed(ADS_KEY_W) || ads_input_key_down(ADS_KEY_W)) {
-            camera_move_forward(&camera, SPEED);
+            camera_move(&camera, ADS_MOTION_DIRECTION_FORWARD, (f32)dt);
         }
         if (ads_input_key_pressed(ADS_KEY_S) || ads_input_key_down(ADS_KEY_S)) {
-            camera_move_forward(&camera, -SPEED);
+            camera_move(&camera, ADS_MOTION_DIRECTION_BACKWARD, (f32)dt);
         }
         if (ads_input_key_pressed(ADS_KEY_A) || ads_input_key_down(ADS_KEY_A)) {
-            camera_move_right(&camera, -SPEED);
+            camera_move(&camera, ADS_MOTION_DIRECTION_LEFT, (f32)dt);
         }
         if (ads_input_key_pressed(ADS_KEY_D) || ads_input_key_down(ADS_KEY_D)) {
-            camera_move_right(&camera, SPEED);
+            camera_move(&camera, ADS_MOTION_DIRECTION_RIGHT, (f32)dt);
         }
 
         // // Mouse wheel
@@ -114,8 +132,10 @@ int main(int argc, char** argv) {
             ads_input_mouse_x(),
             ads_input_mouse_y()
         };
-        s32x2 dx = new_mouse_pos - mouse_pos;
-        // TODO: Continue here
+        s32x2 dx = s32x2_sub(new_mouse_pos, mouse_pos);
+        
+        camera_rotate(&camera, dx);
+
         mouse_pos = new_mouse_pos;
         f32x4x4 world = camera_get_transformation(camera);
 

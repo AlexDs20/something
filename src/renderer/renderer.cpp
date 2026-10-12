@@ -615,12 +615,12 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 }
 
 // TODO: Add perspective transformation due to camera
-void draw_scene(Scene* scene, f32x4x4 world_transformation, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
+void draw_scene(Scene* scene, f32x4x4 transformation, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
         // f32x4x4 transformation = world_transformation * obj->transform;
-        f32x4x4 transformation = world_transformation * f32x4x4_scale_f32(400.0f);
+        f32x4x4 transfo = transformation * f32x4x4_scale_f32(400.0f);
 
         // if (frustum_cull(obj->bbox)) {}
 
@@ -633,7 +633,7 @@ void draw_scene(Scene* scene, f32x4x4 world_transformation, u32* framebuffer, f3
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
 
-            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transformation, mesh->vertices, sm_indices, ind_count);
+            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transfo, mesh->vertices, sm_indices, ind_count);
         }
     }
 }

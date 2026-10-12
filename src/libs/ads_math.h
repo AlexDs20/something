@@ -51,6 +51,28 @@ static inline s32   s32_max(s32 a, s32 b)                       { return a > b ?
 static inline s32   s32_abs(s32 a)                              { return a < 0 ? -a : a; }
 static inline s32   s32_clamp(s32 x, s32 a, s32 b)              { return s32_min(s32_max(x, a), b); }
 
+// f32
+static inline f32   f32_ninf(void)                              { f32Bits t; t.u = 0xFF800000; return t.f; }
+static inline f32   f32_inf(void)                               { f32Bits t; t.u = 0x7F800000; return t.f; }
+static inline f32   f32_min(f32 a, f32 b)                       { return a < b ? a : b; }
+static inline f32   f32_max(f32 a, f32 b)                       { return a > b ? a : b; }
+static inline f32   f32_clamp(f32 x, f32 a, f32 b)              { return f32_min(f32_max(x, a), b); }
+static inline f32   f32_floor(f32 a)                            { return floorf(a); }
+static inline f32   f32_ceil(f32 a)                             { return ceilf(a); }
+static inline f32   f32_sin(f32 rad)                            { return sinf(rad); }
+static inline f32   f32_cos(f32 rad)                            { return cosf(rad); }
+static inline f32   f32_tan(f32 rad)                            { return tanf(rad); }
+static inline f32   f32_abs(f32 a)                              { return a < 0 ? -a : a; }
+static inline bool  f32_equal(f32 a, f32 b)                     { f32 diff = a - b; if (diff < 0) {diff = -diff;} f32 max_val = a > b ? a : b; if (max_val < 0) {max_val = -max_val;} f32 tol = max_val * F32_EPSILON; if (tol < F32_ABS_EPSILON) {tol = F32_ABS_EPSILON;} return diff <= tol; }
+static inline f32   f32_sqrt(f32 a)                             { return sqrtf(a); }
+static inline f32   f32_rsqrt(f32 a)                            { ASSERT(a>0.0f); return 1.0f / sqrtf(a); }
+static inline f32   f32_lerp_fast(f32 a, f32 b, f32 t)          { return a  + (b - a) * t; }
+static inline f32   f32_lerp(f32 a, f32 b, f32 t)               { return a * (1.0f - t) + b * t; }
+static inline bool  f32_inrange(f32 x, f32 a, f32 b)            { return (x >= a) && (x < b);}
+static inline f32   f32_deg_to_rad(f32 d)                       { return d * F32_PI * (1.0f / 180.0f); }
+static inline f32   f32_rad_to_deg(f32 r)                       { return r * 180.0f * (1.0f / F32_PI); }
+static inline f32   f32_sign(f32 a)                             { return (f32)((a > 0.0f) - (a < 0.0f)); }
+
 // s32x2
 static inline s32x2 s32x2_make      (s32 x, s32 y)              { s32x2 result; result.x = x; result.y = y; return result; }
 static inline s32x2 s32x2_splat     (s32 a)                     { return s32x2_make(a, a); }
@@ -84,28 +106,6 @@ static inline s32x2 s32x2_lerp(s32x2 a, s32x2 b, s32 t)         { return s32x2_m
 // static inline bool  s32x2_interval_overlap(s32x2 a, s32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
 static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return acosf(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
 static inline s32x2 s32x2_mask_select(bool2 mask, s32x2 a, s32x2 b) { s32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
-
-// f32
-static inline f32   f32_ninf(void)                              { f32Bits t; t.u = 0xFF800000; return t.f; }
-static inline f32   f32_inf(void)                               { f32Bits t; t.u = 0x7F800000; return t.f; }
-static inline f32   f32_min(f32 a, f32 b)                       { return a < b ? a : b; }
-static inline f32   f32_max(f32 a, f32 b)                       { return a > b ? a : b; }
-static inline f32   f32_clamp(f32 x, f32 a, f32 b)              { return f32_min(f32_max(x, a), b); }
-static inline f32   f32_floor(f32 a)                            { return floorf(a); }
-static inline f32   f32_ceil(f32 a)                             { return ceilf(a); }
-static inline f32   f32_sin(f32 rad)                            { return sinf(rad); }
-static inline f32   f32_cos(f32 rad)                            { return cosf(rad); }
-static inline f32   f32_tan(f32 rad)                            { return tanf(rad); }
-static inline f32   f32_abs(f32 a)                              { return a < 0 ? -a : a; }
-static inline bool  f32_equal(f32 a, f32 b)                     { f32 diff = a - b; if (diff < 0) {diff = -diff;} f32 max_val = a > b ? a : b; if (max_val < 0) {max_val = -max_val;} f32 tol = max_val * F32_EPSILON; if (tol < F32_ABS_EPSILON) {tol = F32_ABS_EPSILON;} return diff <= tol; }
-static inline f32   f32_sqrt(f32 a)                             { return sqrtf(a); }
-static inline f32   f32_rsqrt(f32 a)                            { ASSERT(a>0.0f); return 1.0f / sqrtf(a); }
-static inline f32   f32_lerp_fast(f32 a, f32 b, f32 t)          { return a  + (b - a) * t; }
-static inline f32   f32_lerp(f32 a, f32 b, f32 t)               { return a * (1.0f - t) + b * t; }
-static inline bool  f32_inrange(f32 x, f32 a, f32 b)            { return (x >= a) && (x < b);}
-static inline f32   f32_deg_to_rad(f32 d)                       { return d * F32_PI * (1.0f / 180.0f); }
-static inline f32   f32_rad_to_deg(f32 r)                       { return r * 180.0f * (1.0f / F32_PI); }
-static inline f32   f32_sign(f32 a)                             { return (f32)((a > 0.0f) - (a < 0.0f)); }
 
 // f32x2
 static inline f32x2 f32x2_make      (f32 x, f32 y)              { f32x2 result; result.x = x; result.y = y; return result; }
@@ -455,6 +455,22 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
 
 #ifdef __cplusplus
 }
+
+static inline s32x2 operator+(s32x2 a, s32x2 b)                 { return s32x2_add(a, b);       }
+static inline s32x2 operator+(s32   a, s32x2 b)                 { return s32x2_addl_s32(a, b);  }
+static inline s32x2 operator+(s32x2 a, s32   b)                 { return s32x2_addr_s32(a, b);  }
+static inline s32x2 operator-(s32x2 a, s32x2 b)                 { return s32x2_sub(a, b);       }
+static inline s32x2 operator-(s32   a, s32x2 b)                 { return s32x2_subl_s32(a, b);  }
+static inline s32x2 operator-(s32x2 a, s32   b)                 { return s32x2_subr_s32(a, b);  }
+static inline s32x2 operator-(s32x2 a)                          { return s32x2_subu(a);         }
+static inline s32x2 operator*(s32x2 a, s32x2 b)                 { return s32x2_mul(a, b);       }
+static inline s32x2 operator*(s32   a, s32x2 b)                 { return s32x2_mull_s32(a, b);  }
+static inline s32x2 operator*(s32x2 a, s32   b)                 { return s32x2_mulr_s32(a, b);  }
+static inline s32x2 operator/(s32x2 a, s32x2 b)                 { return s32x2_div(a, b);       }
+static inline s32x2 operator/(s32   a, s32x2 b)                 { return s32x2_divl_s32(a, b);  }
+static inline s32x2 operator/(s32x2 a, s32   b)                 { return s32x2_divr_s32(a, b);  }
+static inline bool  operator==(s32x2 a, s32x2 b)                { return s32x2_equal(a, b);     }
+static inline bool  operator!=(s32x2 a, s32x2 b)                { return s32x2_nequal(a, b);    }
 
 static inline f32x2 operator+(f32x2 a, f32x2 b)                 { return f32x2_add(a, b);       }
 static inline f32x2 operator+(f32   a, f32x2 b)                 { return f32x2_addl_f32(a, b);  }
