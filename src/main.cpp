@@ -110,10 +110,12 @@ int main(int argc, char** argv) {
         //     dzoom = -ZOOM;
         // }
 
-        s32x2 new_mouse_pos = {0, 0};
-        new_mouse_pos.x = ads_input_mouse_x();
-        new_mouse_pos.y = ads_input_mouse_y();
-
+        s32x2 new_mouse_pos = {
+            ads_input_mouse_x(),
+            ads_input_mouse_y()
+        };
+        s32x2 dx = new_mouse_pos - mouse_pos;
+        // TODO: Continue here
         mouse_pos = new_mouse_pos;
         f32x4x4 world = camera_get_transformation(camera);
 
