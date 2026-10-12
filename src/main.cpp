@@ -1,20 +1,17 @@
 #include <unistd.h>         // STDOUT_FILENO
 #include <sys/syscall.h>    // syscall()
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 
-#include "base/base.h"
 #include "libs/ads_math.h"
 #include "memory/allocators.h"
 #include "platform/window.h"
 #include "renderer/renderer.h"
-#include "libs/ads_images.h"
-#include "platform/memory.h"
 #include "platform/input.h"
 
 #include "libs/ads_string.h"
 #include "libs/ads_model_loader.h"
+#include "libs/ads_3d_camera.h"
 
 #include "gf_profiling.c"
 
@@ -46,7 +43,6 @@ int main(int argc, char** argv) {
     Arena* scene_arena = arena_alloc_create(1*GiB);
     Arena* frame_arena = arena_alloc_create(1*GiB);
 
-
     StringView fp;
     int args = argc - 1;
     if (args == 0) {
@@ -64,15 +60,11 @@ int main(int argc, char** argv) {
     // Model* model = model_read(scene_arena, fp);
     Scene* scene = model_read(scene_arena, fp);
 
-    Transform t;
-    t.scale = f32x3_splat(50.0f);
-    t.position = f32x3_make(900.0f, 400.0f, 0.0f);
-    t.rotation = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI)
-        * quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
-
-    // u32* win_buffer = model->material->map_Kd.buffer;
-    // u32 canvas_w = model->material->map_Kd.width;
-    // u32 canvas_h = model->material->map_Kd.height;
+    // Transform t;
+    // t.scale = f32x3_splat(50.0f);
+    // t.position = f32x3_make(900.0f, 400.0f, 0.0f);
+    // t.rotation = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI)
+    //     * quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
 
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
@@ -85,38 +77,45 @@ int main(int argc, char** argv) {
 
     u32 running = 1;
 
+    Camera camera = camera_init(ADS_CAMERA_FIRST_PERSON);
+
     s32x2 mouse_pos = {0, 0};
     while (running) {
         arena_alloc_reset_zero(frame_arena);
         running = platform_handle_events(&win);
 
+        const f32 SPEED = 10.0f;
+        // f32 dzoom = 0.0f;
+        // const f32 ZOOM = 1.0f;
+
+        // Keyboard motion
         if (ads_input_key_pressed(ADS_KEY_W) || ads_input_key_down(ADS_KEY_W)) {
-            t.position = f32x3_add(t.position, f32x3_make(0.0f, 10.0f, 0.0f));
+            camera_move_forward(&camera, SPEED);
         }
         if (ads_input_key_pressed(ADS_KEY_S) || ads_input_key_down(ADS_KEY_S)) {
-            t.position = f32x3_sub(t.position, f32x3_make(0.0f, 10.0f, 0.0f));
+            camera_move_forward(&camera, -SPEED);
         }
         if (ads_input_key_pressed(ADS_KEY_A) || ads_input_key_down(ADS_KEY_A)) {
-            t.position = f32x3_sub(t.position, f32x3_make(10.0f, 0.0f, 0.0f));
+            camera_move_right(&camera, -SPEED);
         }
         if (ads_input_key_pressed(ADS_KEY_D) || ads_input_key_down(ADS_KEY_D)) {
-            t.position = f32x3_add(t.position, f32x3_make(10.0f, 0.0f, 0.0f));
+            camera_move_right(&camera, SPEED);
         }
 
-        if (ads_input_mouse_released(ADS_MOUSE4)) {
-            t.scale = f32x3_add(t.scale, f32x3_splat(1.0f));
-        }
-        else if (ads_input_mouse_released(ADS_MOUSE5)) {
-            t.scale = f32x3_sub(t.scale, f32x3_splat(1.0f));
-        }
+        // // Mouse wheel
+        // if (ads_input_mouse_released(ADS_MOUSE4)) {
+        //     dzoom = ZOOM;
+        // }
+        // else if (ads_input_mouse_released(ADS_MOUSE5)) {
+        //     dzoom = -ZOOM;
+        // }
 
         s32x2 new_mouse_pos = {0, 0};
         new_mouse_pos.x = ads_input_mouse_x();
         new_mouse_pos.y = ads_input_mouse_y();
-        // s32x2 dx = {new_mouse_pos.x - mouse_pos.x, new_mouse_pos.y - mouse_pos.y };
-        // t.rotation = quat_mul(t.rotation, quat_make(0.0f, 0.0f, 0.0f, 1.0f));
+
         mouse_pos = new_mouse_pos;
-        f32x4x4 world = f32x4x4_from_transform(t);
+        f32x4x4 world = camera_get_transformation(camera);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window

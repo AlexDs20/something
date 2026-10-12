@@ -619,7 +619,8 @@ void draw_scene(Scene* scene, f32x4x4 world_transformation, u32* framebuffer, f3
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
-        f32x4x4 transformation = world_transformation * obj->transform;
+        // f32x4x4 transformation = world_transformation * obj->transform;
+        f32x4x4 transformation = world_transformation * f32x4x4_scale_f32(400.0f);
 
         // if (frustum_cull(obj->bbox)) {}
 
