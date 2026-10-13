@@ -5,6 +5,7 @@
 typedef enum {
     ADS_CAMERA_NONE,
     ADS_CAMERA_FIRST_PERSON,
+    ADS_CAMERA_FREE_FLIGHT,
     ADS_CAMERA_COUNT,
 } ADSCameraType;
 
@@ -38,7 +39,7 @@ extern "C" {
 #endif
 Camera camera_init(ADSCameraType camera_type);
 
-f32x4x4 camera_get_transformation(const Camera camera);
+f32x4x4 camera_get_view_matrix(const Camera* camera);
 void camera_move(Camera* camera, MotionDirection direction, f32 delta_time);
 void camera_rotate(Camera* camera, s32x2 dx);
 

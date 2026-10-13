@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
     u32 running = 1;
 
-    Camera camera = camera_init(ADS_CAMERA_FIRST_PERSON);
+    Camera camera = camera_init(ADS_CAMERA_FREE_FLIGHT);
 
     struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
@@ -133,11 +133,10 @@ int main(int argc, char** argv) {
             ads_input_mouse_y()
         };
         s32x2 dx = s32x2_sub(new_mouse_pos, mouse_pos);
-        
         camera_rotate(&camera, dx);
 
         mouse_pos = new_mouse_pos;
-        f32x4x4 world = camera_get_transformation(camera);
+        f32x4x4 world = camera_get_view_matrix(&camera);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window

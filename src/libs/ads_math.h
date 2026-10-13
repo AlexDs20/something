@@ -8,16 +8,17 @@
 extern "C" {
 #endif
 
-#define F32_PI_HALF         1.5707963267948966192f
-#define F32_PI              3.1415926535897932384f
-#define F32_3_PI_HALF       4.7123889803846898577f
-#define F32_TAU             6.2831853071795864769f
-#define F32_EPSILON         1e-6f
-#define F32_ABS_EPSILON     1e-8f
-#define F32_SQRT2           1.4142135623730951f
-#define F32_RSQRT2          0.7071067811865475f
-#define F32_SQRT3           1.7320508075688772f
-#define F32_RSQRT3          0.5773502691896258f
+#define F32_PI_HALF         1.5707963267948966192F
+#define F32_PI              3.1415926535897932384F
+#define F32_3_PI_HALF       4.7123889803846898577F
+#define F32_TAU             6.2831853071795864769F
+#define F32_EPSILON         1E-6F
+#define F32_ABS_EPSILON     1E-8F
+#define F32_SQRT2           1.4142135623730951F
+#define F32_RSQRT2          0.7071067811865475F
+#define F32_SQRT3           1.7320508075688772F
+#define F32_RSQRT3          0.5773502691896258F
+#define F32_1DEG            0.017453292519943295F
 
 // bool
 static inline bool2 bool2_make(bool a, bool b)                  { bool2 r; r.x = a; r.y = b; return r; }
@@ -347,16 +348,10 @@ static inline f32x4x4 f32x4x4_scale_f32x3(f32x3 s) {
 }
 
 // static inline f32x4x4 f32x4x4_inverse(const f32x4x4& m);
-// static inline f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
+
+// // Projection
 // static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
 // static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
-
-// // Camera
-// f32x4x4 f32x4x4_look_at(f32x3 eye, f32x3 target, f32x3 up);
-//
-// // Projection
-// f32x4x4 f32x4x4_perspective( f32 fov_y_rad, f32 aspect, f32 near_plane, f32 far_plane);
-// f32x4x4 f32x4x4_orthographic( f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
 
 static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
     f32x4x4 m = f32x4x4_identity();

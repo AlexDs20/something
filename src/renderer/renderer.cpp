@@ -159,13 +159,12 @@ void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u
     // printf("[%d,%d]\n", miny, maxy);
 }
 
-#define EPS (1e-6)
 f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
     f32x3 v1 = f32x3_make(C->x-A->x, B->x-A->x, A->x-P.x);
     f32x3 v2 = f32x3_make(C->y-A->y, B->y-A->y, A->y-P.y);
     f32x3 u = f32x3_cross(v1, v2);
 
-    if (f32_abs(u.z) <= EPS) {
+    if (f32_abs(u.z) <= F32_EPSILON) {
         return f32x3_make(-1, -1, -1);
     }
     return f32x3_make(u.x/u.z, u.y/u.z, 1);
@@ -619,7 +618,7 @@ void draw_scene(Scene* scene, f32x4x4 transformation, u32* framebuffer, f32* zbu
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
-        // f32x4x4 transformation = world_transformation * obj->transform;
+        // f32x4x4 transfo = transformation * obj->transform;
         f32x4x4 transfo = transformation * f32x4x4_scale_f32(400.0f);
 
         // if (frustum_cull(obj->bbox)) {}

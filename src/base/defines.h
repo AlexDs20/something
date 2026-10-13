@@ -47,6 +47,6 @@
 #define PANIC
 #endif
 
-#define NOT_IMPLEMENTED(x)      do { printf( "\n" #x " not implemented." ); } while(0)
+#define NOT_IMPLEMENTED(x)      do { printf( "\n" #x " not implemented." ); ASSERT(false); } while(0)
 
 #endif // ADS_DEFINES_H
