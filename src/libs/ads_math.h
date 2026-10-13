@@ -61,8 +61,11 @@ static inline f32   f32_clamp(f32 x, f32 a, f32 b)              { return f32_min
 static inline f32   f32_floor(f32 a)                            { return floorf(a); }
 static inline f32   f32_ceil(f32 a)                             { return ceilf(a); }
 static inline f32   f32_sin(f32 rad)                            { return sinf(rad); }
+static inline f32   f32_asin(f32 a)                             { return asinf(a); }
 static inline f32   f32_cos(f32 rad)                            { return cosf(rad); }
+static inline f32   f32_acos(f32 a)                             { return acosf(a); }
 static inline f32   f32_tan(f32 rad)                            { return tanf(rad); }
+static inline f32   f32_atan(f32 a)                             { return atanf(a); }
 static inline f32   f32_abs(f32 a)                              { return a < 0 ? -a : a; }
 static inline bool  f32_equal(f32 a, f32 b)                     { f32 diff = a - b; if (diff < 0) {diff = -diff;} f32 max_val = a > b ? a : b; if (max_val < 0) {max_val = -max_val;} f32 tol = max_val * F32_EPSILON; if (tol < F32_ABS_EPSILON) {tol = F32_ABS_EPSILON;} return diff <= tol; }
 static inline f32   f32_sqrt(f32 a)                             { return sqrtf(a); }

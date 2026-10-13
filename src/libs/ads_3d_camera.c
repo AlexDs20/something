@@ -1,9 +1,14 @@
 #include "libs/ads_3d_camera.h"
 #include "libs/ads_math.h"
 
-static const f32 DEFAULT_SPEED_FACTOR = 600.0f;
+static const f32 DEFAULT_SPEED_FACTOR = 400.0f;
 static const f32 DEFAULT_ROTATION_SPEED_FACTOR = 0.005f;
-// static const f32x3 WORLD_UP = {0.0f, 1.0f, 0.0f};
+static const f32 DEFAULT_FOV = F32_PI / 3;
+static const f32 DEFAULT_ASPECT_RATIO = 16.0f / 9.0f;
+static const f32 DEFAULT_NEAR_PLANE = 0.1f;
+static const f32 DEFAULT_FAR_PLANE = 1000.0f;
+static const f32 DEFAULT_YAW = F32_PI;
+static const f32 DEFAULT_PITCH = 0.0f;
 
 void camera_debug_print(const Camera* camera) {
     printf("\nPitch: %.3f   Yaw: %.3f   Dir:(%.3f,%.3f,%.3f)   Right:(%.3f,%.3f,%.3f)",
@@ -16,6 +21,10 @@ void camera_debug_print(const Camera* camera) {
             camera->right.y,
             camera->right.z
             );
+}
+
+f32 camera_horizontal_fov(const Camera* camera) {
+    return 2.0f * f32_atan(camera->aspect_ratio * f32_tan(camera->fov / 2.0f));
 }
 
 static void camera_update_direction(Camera* camera) {
@@ -41,23 +50,32 @@ Camera camera_init(ADSCameraType camera_type) {
     Camera camera;
 
     camera.camera_type = camera_type;
+    camera.position = f32x3_splat(0.0f);
+
+    camera.yaw = DEFAULT_YAW;
+    camera.pitch = DEFAULT_PITCH;
+
+    camera.fov = DEFAULT_FOV;
+    camera.aspect_ratio = DEFAULT_ASPECT_RATIO;
+    camera.near_plane = DEFAULT_NEAR_PLANE;
+    camera.far_plane = DEFAULT_FAR_PLANE;
+
+    camera.scaling_y = 1.0f / f32_tan(camera.fov / 2);
+    camera.scaling_x = camera.scaling_y / camera.aspect_ratio;
+
     camera.speed = DEFAULT_SPEED_FACTOR;
     camera.rotation_speed = DEFAULT_ROTATION_SPEED_FACTOR;
 
-    camera.yaw = F32_PI;
-    camera.pitch = 0;
-
     switch(camera_type) {
         case ADS_CAMERA_FIRST_PERSON: {
-            camera.position = f32x3_splat(0.0f);
         } break;
         case ADS_CAMERA_FREE_FLIGHT: {
-            camera.position = f32x3_splat(0.0f);
         } break;
         default:{
             NOT_IMPLEMENTED("Other cameras init");
         }
     }
+
     camera_update_direction(&camera);
     return camera;
 }
@@ -141,6 +159,38 @@ void camera_rotate(Camera* camera, s32x2 dx) {
     }
 }
 
+f32x4x4 camera_get_model_matrix(const Camera* camera) {
+    f32x3 camera_up = f32x3_cross(camera->right, camera->direction);
+    f32x4x4 R = {
+        .data = {
+            camera->right.x, camera_up.x, -camera->direction.x,  0.0f,
+            camera->right.y, camera_up.y, -camera->direction.y,  0.0f,
+            camera->right.z, camera_up.z, -camera->direction.z,  0.0f,
+            0.0f,            0.0f,        0.0f,                  1.0f,
+        }
+    };
+
+    f32x4x4 T = {
+        .data = {
+            1.0f, 0.0f, 0.0f,  camera->position.x,
+            0.0f, 1.0f, 0.0f,  camera->position.y,
+            0.0f, 0.0f, 1.0f,  camera->position.z,
+            0.0f, 0.0f, 0.0f,  1.0f,
+        }
+    };
+
+    f32x4x4 result = f32x4x4_mul(T, R);
+    return result;
+}
+    // f32x4x4 result = {
+    //     .data = {
+    //          camera->right.x,      camera->right.y,      camera->right.z,      -f32x3_dot(camera->right, camera->position),
+    //          camera_up.x,          camera_up.y,          camera_up.z,          -f32x3_dot(camera_up, camera->position),
+    //         -camera->direction.x, -camera->direction.y, -camera->direction.z,   f32x3_dot(camera->direction, camera->position),
+    //         0.0f, 0.0f, 0.0f, 1.0f,
+    //     }
+    // };
+
 f32x4x4 camera_get_view_matrix(const Camera* camera) {
     // Model = Translation(Rotation(x)) = (T * R) * x
     // Here we take the inverse:
@@ -158,5 +208,23 @@ f32x4x4 camera_get_view_matrix(const Camera* camera) {
         }
     };
 
+    return result;
+}
+
+f32x4x4 camera_get_projection_matrix(const Camera* camera) {
+    printf("%f\n", camera->yaw);
+    f32x4x4 result = f32x4x4_identity();
+
+    // const f32 f = camera->far_plane;
+    // const f32 n = camera->near_plane;
+
+    // f32x4x4 result = {
+    //     .data = {
+    //         camera->scaling_x, 0.0f, 0.0f, 0.0f,
+    //         0.0f, camera->scaling_y, 0.0f, 0.0f,
+    //         0.0f, 0.0f, - (f+n) / (f-n), - 2*f*n/(f-n),
+    //         0.0f, 0.0f, -1.0f, 0.0f
+    //     }
+    // };
     return result;
 }

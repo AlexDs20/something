@@ -26,9 +26,17 @@ typedef struct _Camera {
     f32x3 direction;
     f32x3 right;
 
-    f32 yaw;        // Left/right
-    f32 pitch;      // up/down
-    f32 roll;       // tilt side NOT used currently (until plane like camera)
+    f32 yaw;            // Left/right
+    f32 pitch;          // up/down
+    f32 roll;           // tilt side NOT used currently (until plane like camera)
+
+    // Needed for "Perspective" camera
+    f32 fov;            // vertical FOV
+    f32 aspect_ratio;
+    f32 near_plane;
+    f32 far_plane;
+    f32 scaling_x;
+    f32 scaling_y;
 
     f32 speed;
     f32 rotation_speed;
@@ -39,7 +47,9 @@ extern "C" {
 #endif
 Camera camera_init(ADSCameraType camera_type);
 
+f32x4x4 camera_get_model_matrix(const Camera* camera);
 f32x4x4 camera_get_view_matrix(const Camera* camera);
+f32x4x4 camera_get_projection_matrix(const Camera* camera);
 void camera_move(Camera* camera, MotionDirection direction, f32 delta_time);
 void camera_rotate(Camera* camera, s32x2 dx);
 

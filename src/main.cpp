@@ -136,7 +136,9 @@ int main(int argc, char** argv) {
         camera_rotate(&camera, dx);
 
         mouse_pos = new_mouse_pos;
-        f32x4x4 world = camera_get_view_matrix(&camera);
+        f32x4x4 view = camera_get_view_matrix(&camera);
+        // f32x4x4 proj = camera_get_projection_matrix(&camera);
+        // f32x4x4 pv = f32x4x4_mul(&proj, &view);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
@@ -156,7 +158,7 @@ int main(int argc, char** argv) {
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_scene(scene, world, win_buffer, zbuffer, canvas_w, canvas_h);
+        draw_scene(scene, view, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
