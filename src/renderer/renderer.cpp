@@ -618,28 +618,19 @@ static void clip_triangle(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex
 }
 */
 
-static void perspective_divide(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex* c){
-    a->position.x = a->position.x / a->position.w;
-    a->position.y = a->position.y / a->position.w;
-    a->position.z = a->position.z / a->position.w;
+static void screen_space_from_clip(const ClipSpaceVertex* in, u32 width, u32 height, RasterVertex* out) {
+    f32 inv_w = 1.0f / in->position.w;
+        
+    f32 ndc_x = in->position.x * inv_w;
+    f32 ndc_y = in->position.y * inv_w;
+    f32 ndc_z = in->position.z * inv_w;
 
-    b->position.x = b->position.x / b->position.w;
-    b->position.y = b->position.y / b->position.w;
-    b->position.z = b->position.z / b->position.w;
-
-    c->position.x = c->position.x / c->position.w;
-    c->position.y = c->position.y / c->position.w;
-    c->position.z = c->position.z / c->position.w;
-    return;
-}
-
-static void screen_space_from_ndc(const ClipSpaceVertex* in, u32 width, u32 height, RasterVertex* out) {
     // Rescale x from [-1, 1] to [0, w]
-    out->position.x = (in->position.x + 1.0f) * 0.5f * width;
+    out->position.x = (ndc_x + 1.0f) * 0.5f * width;
     // Rescale y from [-1, 1] to [0, h] with 0 on top
-    out->position.y = (1.0f - in->position.y) * 0.5f * height;
-
-    out->inv_w = 1.0f / in->position.w;
+    out->position.y = (1.0f - ndc_y) * 0.5f * height;
+    out->position.z = ndc_z;
+    out->inv_w = inv_w;
 
     out->normals = in->normals;
     out->texcoords = in->texcoords;
@@ -680,12 +671,10 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
         // }
         // // Fan triangulate the clipped triangle
 
-        perspective_divide(&a, &b, &c);
-
         RasterVertex a_r, b_r, c_r;
-        screen_space_from_ndc(&a, w, h, &a_r);
-        screen_space_from_ndc(&b, w, h, &b_r);
-        screen_space_from_ndc(&c, w, h, &c_r);
+        screen_space_from_clip(&a, w, h, &a_r);
+        screen_space_from_clip(&b, w, h, &b_r);
+        screen_space_from_clip(&c, w, h, &c_r);
 
         fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a_r, &b_r, &c_r);
     }
@@ -698,7 +687,7 @@ void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zb
         // f32x4x4* world_from_model = &obj->transform;
         // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, world_from_model);
 
-        f32x4x4 world_from_model = f32x4x4_identity();
+        f32x4x4 world_from_model = f32x4x4_translate({0.5f, 0.5f, -10.0f});
         // f32x4x4 world_from_model = f32x4x4_scale_f32(400.0f);
         f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
 
