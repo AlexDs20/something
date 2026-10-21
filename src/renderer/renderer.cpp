@@ -6,9 +6,18 @@
 #include "renderer/renderer.h"
 #include "libs/ads_math.h"
 
-void print(f32x3* v) {
-    printf("f32x3: (%f,%f,%f)\n", v->x, v->y, v->z);
-}
+typedef struct {
+    f32x4 position;
+    f32x3 normals;
+    f32x3 texcoords;
+} ClipSpaceVertex;
+
+typedef struct {
+    f32x3 position; 
+    f32 inv_w;
+    f32x3 normals;
+    f32x3 texcoords;
+} RasterVertex;
 
 void draw_line(u32* framebuffer, u32 w, u32 h, f32x3* a, f32x3* b, u32 c) {
     float dx = b->x-a->x;
@@ -97,7 +106,7 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
     }
 }
 
-void swap_vertices(f32x3* a, f32x3* b) {
+void swap_f32x3(f32x3* a, f32x3* b) {
     f32x3 tmp = *b;
     *b = *a;
     *a = tmp;
@@ -105,9 +114,9 @@ void swap_vertices(f32x3* a, f32x3* b) {
 
 void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
     if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
-    if (a->y>b->y) swap_vertices(a, b);
-    if (a->y>c->y) swap_vertices(a, c);
-    if (b->y>c->y) swap_vertices(b, c);
+    if (a->y>b->y) swap_f32x3(a, b);
+    if (a->y>c->y) swap_f32x3(a, c);
+    if (b->y>c->y) swap_f32x3(b, c);
 
 
     f32 zmid = (a->z + b->z + c->z) / 3;
@@ -242,7 +251,7 @@ void shader_frag_color(
         u32 width, u32 /*height*/,
         Material* /*mat*/,
         u32 x, u32 y,
-        Vertex* a, Vertex* b, Vertex* /*c*/,
+        RasterVertex* a, RasterVertex* b, RasterVertex* /*c*/,
         f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
         ) {
 
@@ -259,7 +268,7 @@ void shader_frag_texture(
         u32 width, u32 /*height*/,
         Material* mat,
         u32 x, u32 y,
-        Vertex* a, Vertex* b, Vertex* c,
+        RasterVertex* a, RasterVertex* b, RasterVertex* c,
         f32 w0, f32 w1, f32 w2
         ) {
     // va->u,v,w => are the texture coordinates
@@ -290,7 +299,7 @@ inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy)
 }
 
 
-void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
+void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, RasterVertex* v1, RasterVertex* v2, RasterVertex* v3) {
     /*
      * assert b->x <= c->x;
      */
@@ -373,7 +382,7 @@ void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
     }
 }
 
-void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
+void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, RasterVertex* v1, RasterVertex* v2, RasterVertex* v3) {
     /*
      * assert a->x <= b->x
      */
@@ -462,7 +471,7 @@ void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Mat
     }
 }
 
-void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, Vertex* v1, Vertex* v2, Vertex* v3) {
+void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, RasterVertex* v1, RasterVertex* v2, RasterVertex* v3) {
 /*
      * f(t) = A + t * AB            t in [0, 1]
      *
@@ -512,11 +521,12 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
 
     // Sort in order of ascending y: a.y<b.y<c.y
     f32x3* t;
-    Vertex* tv;
+    RasterVertex* tv;
     if (b->y < a->y) { t = a; a = b; b = t;     tv = v1; v1 = v2; v2 = tv;}
     if (c->y < a->y) { t = a; a = c; c = t;     tv = v1; v1 = v3; v3 = tv;}
     if (c->y < b->y) { t = b; b = c; c = t;     tv = v2; v2 = v3; v3 = tv;}
 
+    // TODO: Maybe (certainly) this will not be needed later when implementing clipping and frustum culling
     // Fast terminate
     if (c->y < 0) return;
     if (a->y >= h) return;
@@ -554,7 +564,7 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
         f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
         f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
 
-        Vertex extra;
+        RasterVertex extra;
         extra.position.x = extra_x;
         extra.position.y = b->y;
         extra.position.z = extra_z;
@@ -589,38 +599,110 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
     }
 }
 
-void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 transformation, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
+static f32x4 f32x3_transform_point(const f32x4x4* m, f32x3 p) {
+    // Normal matrix multiplication but with p.w = 1.0f because it's a point.
+    f32x4 result;
+    result.x = m->m[0][0] * p.x + m->m[0][1] * p.y + m->m[0][2] * p.z + m->m[0][3];
+    result.y = m->m[1][0] * p.x + m->m[1][1] * p.y + m->m[1][2] * p.z + m->m[1][3];
+    result.z = m->m[2][0] * p.x + m->m[2][1] * p.y + m->m[2][2] * p.z + m->m[2][3];
+    result.w = m->m[3][0] * p.x + m->m[3][1] * p.y + m->m[3][2] * p.z + m->m[3][3];
+    return result;
+}
+// TODO:
+// static inline f32x3 f32x3_transform_vector(const f32x4x4* m, f32x3 p);
+
+/*
+static void clip_triangle(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex* c){
+    // Do the clipping here
+    return;
+}
+*/
+
+static void perspective_divide(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex* c){
+    a->position.x = a->position.x / a->position.w;
+    a->position.y = a->position.y / a->position.w;
+    a->position.z = a->position.z / a->position.w;
+
+    b->position.x = b->position.x / b->position.w;
+    b->position.y = b->position.y / b->position.w;
+    b->position.z = b->position.z / b->position.w;
+
+    c->position.x = c->position.x / c->position.w;
+    c->position.y = c->position.y / c->position.w;
+    c->position.z = c->position.z / c->position.w;
+    return;
+}
+
+static void screen_space_from_ndc(const ClipSpaceVertex* in, u32 width, u32 height, RasterVertex* out) {
+    // Rescale x from [-1, 1] to [0, w]
+    out->position.x = (in->position.x + 1.0f) * 0.5f * width;
+    // Rescale y from [-1, 1] to [0, h] with 0 on top
+    out->position.y = (1.0f - in->position.y) * 0.5f * height;
+
+    out->inv_w = 1.0f / in->position.w;
+
+    out->normals = in->normals;
+    out->texcoords = in->texcoords;
+
+    return;
+}
+
+void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
     for (u32 i=0; i<n_indices; i+=3) {
         Vertex* a_ = &vertices[indices[i+0]];
         Vertex* b_ = &vertices[indices[i+1]];
         Vertex* c_ = &vertices[indices[i+2]];
 
+        // TODO: Maybe this is where I need to call the "vertex shader"
+        // Vertex shader must:
+        //  - Output f32x4 for the position
+        //  - Transform the normals
+
         // vertex shader
-        Vertex a, b, c;
-        a.position = f32x3_transform_point(&transformation, a_->position);
+        ClipSpaceVertex a, b, c;
+        a.position  = f32x3_transform_point(&clip_from_model, a_->position);
         a.texcoords = a_->texcoords;
         a.normals   = a_->normals;
 
-        b.position = f32x3_transform_point(&transformation, b_->position);
+        b.position  = f32x3_transform_point(&clip_from_model, b_->position);
         b.texcoords = b_->texcoords;
         b.normals   = b_->normals;
 
-        c.position = f32x3_transform_point(&transformation, c_->position);
+        c.position = f32x3_transform_point(&clip_from_model, c_->position);
         c.texcoords = c_->texcoords;
         c.normals   = c_->normals;
 
-        fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a, &b, &c);
+        // TODO: Actually clip the triangle to the clip boundary.
+        //  This can wait, the rasterizer handles going outside the size of the screen in pixelspace
+        // u32 n = clip_triangle(&a, &b, &c);
+        // if (n < 3) {
+        //     continue;
+        // }
+        // // Fan triangulate the clipped triangle
+
+        perspective_divide(&a, &b, &c);
+
+        RasterVertex a_r, b_r, c_r;
+        screen_space_from_ndc(&a, w, h, &a_r);
+        screen_space_from_ndc(&b, w, h, &b_r);
+        screen_space_from_ndc(&c, w, h, &c_r);
+
+        fill_triangle_scanline(framebuffer, zbuffer, w, h, mat, &a_r, &b_r, &c_r);
     }
 }
 
-// TODO: Add perspective transformation due to camera
-void draw_scene(Scene* scene, f32x4x4 transformation, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
+void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
 
-        // f32x4x4 transfo = transformation * obj->transform;
-        f32x4x4 transfo = transformation * f32x4x4_scale_f32(400.0f);
+        // f32x4x4* world_from_model = &obj->transform;
+        // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, world_from_model);
 
+        f32x4x4 world_from_model = f32x4x4_identity();
+        // f32x4x4 world_from_model = f32x4x4_scale_f32(400.0f);
+        f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
+
+        // TODO
         // if (frustum_cull(obj->bbox)) {}
 
         Mesh* mesh = obj->mesh;
@@ -632,7 +714,7 @@ void draw_scene(Scene* scene, f32x4x4 transformation, u32* framebuffer, f32* zbu
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
 
-            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, transfo, mesh->vertices, sm_indices, ind_count);
+            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, clip_from_model, mesh->vertices, sm_indices, ind_count);
         }
     }
 }

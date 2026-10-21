@@ -21,19 +21,6 @@
 
 #include "gf_profiling.c"
 
-struct Transform {
-    f32x3 position;
-    f32x3 scale;
-    Quaternion rotation;
-};
-
-f32x4x4 f32x4x4_from_transform(const Transform& t) {
-    f32x4x4 S = f32x4x4_scale_f32x3(t.scale);
-    f32x4x4 R = f32x4x4_from_quat(t.rotation);
-    f32x4x4 T = f32x4x4_translate(t.position);
-    return T * R * S;
-}
-
 int main(int argc, char** argv) {
     const char* usage = "   \
         Usage: \
@@ -66,12 +53,6 @@ int main(int argc, char** argv) {
     // Model* model = model_read(scene_arena, fp);
     Scene* scene = model_read(scene_arena, fp);
 
-    // Transform t;
-    // t.scale = f32x3_splat(50.0f);
-    // t.position = f32x3_make(900.0f, 400.0f, 0.0f);
-    // t.rotation = quat_make_rotation({0.0f, 1.0f, 0.0f}, 0.2f*F32_PI)
-    //     * quat_make_rotation({1.0f, 0.0f, 0.0f}, 0.2f*F32_PI);
-
     u32 canvas_w = 1920;
     u32 canvas_h = 1080;
     const u32 bg_color = 0x0000182B;
@@ -79,11 +60,12 @@ int main(int argc, char** argv) {
     // TODO: Add support for RGB and GREY currently only RGBA
     Win win = platform_init_win(1920, 1080, "Handmade something!", ADSV_NEAREST);
 
-    const f32 ninf = f32_ninf();
+    const f32 NINF = f32_ninf();
 
     u32 running = 1;
 
     Camera camera = camera_init(ADS_CAMERA_FREE_FLIGHT);
+    f32x4x4 clip_from_view = camera_get_projection_matrix(&camera);   // As long as we do not change the aspect ratio etc, it's constant
 
     struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
@@ -136,9 +118,8 @@ int main(int argc, char** argv) {
         camera_rotate(&camera, dx);
 
         mouse_pos = new_mouse_pos;
-        f32x4x4 view = camera_get_view_matrix(&camera);
-        // f32x4x4 proj = camera_get_projection_matrix(&camera);
-        // f32x4x4 pv = f32x4x4_mul(&proj, &view);
+        f32x4x4 view_from_world = camera_get_view_matrix(&camera);
+        f32x4x4 clip_from_world = f32x4x4_mul(&clip_from_view, &view_from_world);
 
         // Allocate the canvas size we want to draw onto
         // It does not have to be the same size as the window
@@ -154,11 +135,12 @@ int main(int argc, char** argv) {
 
         for (u64 i=0; i<canvas_h*canvas_w; i++) {
             win_buffer[i] = bg_color;
-            zbuffer[i] = ninf;
+            zbuffer[i] = NINF;
         }
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
-        draw_scene(scene, view, win_buffer, zbuffer, canvas_w, canvas_h);
+        // draw_scene(scene, view, win_buffer, zbuffer, canvas_w, canvas_h);
+        draw_scene(scene, clip_from_world, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 

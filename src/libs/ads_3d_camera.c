@@ -3,7 +3,7 @@
 
 static const f32 DEFAULT_SPEED_FACTOR = 400.0f;
 static const f32 DEFAULT_ROTATION_SPEED_FACTOR = 0.005f;
-static const f32 DEFAULT_FOV = F32_PI / 3;
+static const f32 DEFAULT_FOV = F32_PI / 2;
 static const f32 DEFAULT_ASPECT_RATIO = 16.0f / 9.0f;
 static const f32 DEFAULT_NEAR_PLANE = 0.1f;
 static const f32 DEFAULT_FAR_PLANE = 1000.0f;
@@ -161,6 +161,7 @@ void camera_rotate(Camera* camera, s32x2 dx) {
 
 f32x4x4 camera_get_model_matrix(const Camera* camera) {
     f32x3 camera_up = f32x3_cross(camera->right, camera->direction);
+#if 0
     f32x4x4 R = {
         .data = {
             camera->right.x, camera_up.x, -camera->direction.x,  0.0f,
@@ -179,17 +180,20 @@ f32x4x4 camera_get_model_matrix(const Camera* camera) {
         }
     };
 
-    f32x4x4 result = f32x4x4_mul(T, R);
+    f32x4x4 result = f32x4x4_mul(&T, &R);
+#else
+    // Same but skipping the matmul
+    f32x4x4 result = {
+        .data = {
+            camera->right.x, camera_up.x, -camera->direction.x, camera->position.x,
+            camera->right.y, camera_up.y, -camera->direction.y, camera->position.y,
+            camera->right.z, camera_up.z, -camera->direction.z, camera->position.z,
+            0.0f,            0.0f,        0.0f,                 1.0f,
+        }
+    };
+#endif
     return result;
 }
-    // f32x4x4 result = {
-    //     .data = {
-    //          camera->right.x,      camera->right.y,      camera->right.z,      -f32x3_dot(camera->right, camera->position),
-    //          camera_up.x,          camera_up.y,          camera_up.z,          -f32x3_dot(camera_up, camera->position),
-    //         -camera->direction.x, -camera->direction.y, -camera->direction.z,   f32x3_dot(camera->direction, camera->position),
-    //         0.0f, 0.0f, 0.0f, 1.0f,
-    //     }
-    // };
 
 f32x4x4 camera_get_view_matrix(const Camera* camera) {
     // Model = Translation(Rotation(x)) = (T * R) * x
@@ -212,19 +216,14 @@ f32x4x4 camera_get_view_matrix(const Camera* camera) {
 }
 
 f32x4x4 camera_get_projection_matrix(const Camera* camera) {
-    printf("%f\n", camera->yaw);
-    f32x4x4 result = f32x4x4_identity();
-
-    // const f32 f = camera->far_plane;
-    // const f32 n = camera->near_plane;
-
-    // f32x4x4 result = {
-    //     .data = {
-    //         camera->scaling_x, 0.0f, 0.0f, 0.0f,
-    //         0.0f, camera->scaling_y, 0.0f, 0.0f,
-    //         0.0f, 0.0f, - (f+n) / (f-n), - 2*f*n/(f-n),
-    //         0.0f, 0.0f, -1.0f, 0.0f
-    //     }
-    // };
+    printf("Yaw: %.3f\n", camera->yaw);
+    f32x4x4 result = {
+        .data = {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f,
+        }
+    };
     return result;
 }

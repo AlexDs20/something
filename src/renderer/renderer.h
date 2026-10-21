@@ -4,9 +4,6 @@
 #include "base/base.h"
 #include "libs/ads_model_loader.h"
 
-// tmp?
-void print(f32x3* v);
-
 typedef void (*FragmentShader)(
     void* shader_ctx,
     f32x3* a,
@@ -31,8 +28,13 @@ typedef struct {
     f32x4x4* world;
 } TextureContext;
 
-void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer);
-// draw_model()
-void draw_scene(Scene* scene, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
+
+// TODO:
+// void draw_model_wireframe(struct Object* model, u32 w, u32 h, u32* framebuffer);
+// void draw_scene_wireframe(struct Scene* scene, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
+
+
+// void draw_model(struct Object* obj, struct Material* mat, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
+void draw_scene(struct Scene* scene, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
 
 #endif // ADS_RENDERER_H

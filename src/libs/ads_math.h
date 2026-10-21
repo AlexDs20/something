@@ -192,16 +192,7 @@ static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equ
      return f32x3_sub(f32x3_mull_f32(eta, i), f32x3_mull_f32(eta * dot_ni + f32_sqrt(k), N));
 }
 
-static inline f32x3 f32x3_transform_point(const f32x4x4* m, f32x3 p) {
-    f32x3 result;
-    result.x = m->m[0][0] * p.x + m->m[0][1] * p.y + m->m[0][2] * p.z + m->m[0][3];
-    result.y = m->m[1][0] * p.x + m->m[1][1] * p.y + m->m[1][2] * p.z + m->m[1][3];
-    result.z = m->m[2][0] * p.x + m->m[2][1] * p.y + m->m[2][2] * p.z + m->m[2][3];
-    return result;
-}
-// static inline f32x3 f32x3_transform_vector(const f32x4x4* m, f32x3 p);
-static inline f32x3 f32x3_mask_select(bool3 mask, f32x3 a, f32x3 b) { f32x3 r; r.x = mask.y ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; return r; }
-
+static inline f32x3 f32x3_mask_select(bool3 mask, f32x3 a, f32x3 b) { f32x3 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; return r; }
 
 // f32x4
 static inline f32x4 f32x4_make(f32 x, f32 y, f32 z, f32 w)      { f32x4 result; result.x = x; result.y = y; result.z = z; result.w = w; return result; }
