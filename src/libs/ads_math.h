@@ -108,7 +108,7 @@ static inline s32x2 s32x2_perpendicular(s32x2 a)                { return s32x2_m
 static inline s32x2 s32x2_lerp_fast(s32x2 a, s32x2 b, s32 t)    { return s32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
 static inline s32x2 s32x2_lerp(s32x2 a, s32x2 b, s32 t)         { return s32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
 // static inline bool  s32x2_interval_overlap(s32x2 a, s32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
-static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return acosf(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
+static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return f32_acos(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
 static inline s32x2 s32x2_mask_select(bool2 mask, s32x2 a, s32x2 b) { s32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
 
 // f32x2
@@ -144,7 +144,7 @@ static inline f32x2 f32x2_perpendicular(f32x2 a)                { return f32x2_m
 static inline f32x2 f32x2_lerp_fast(f32x2 a, f32x2 b, f32 t)    { return f32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
 static inline f32x2 f32x2_lerp(f32x2 a, f32x2 b, f32 t)         { return f32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
 // static inline bool  f32x2_interval_overlap(f32x2 a, f32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
-static inline f32   f32x2_angle(f32x2 a, f32x2 b)               { return acosf(f32_clamp(f32x2_dot(a, b) * f32_rsqrt(f32x2_length2(a) * f32x2_length2(b)), -1.0f, 1.0f)); }
+static inline f32   f32x2_angle(f32x2 a, f32x2 b)               { return f32_acos(f32_clamp(f32x2_dot(a, b) * f32_rsqrt(f32x2_length2(a) * f32x2_length2(b)), -1.0f, 1.0f)); }
 static inline f32x2 f32x2_mask_select(bool2 mask, f32x2 a, f32x2 b) { f32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
 
 
@@ -181,7 +181,7 @@ static inline f32x3 f32x3_reflect(f32x3 a, f32x3 N)             { ASSERT(f32_equ
 static inline f32x3 f32x3_project(f32x3 a, f32x3 N)             { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32x3_mull_f32(f32x3_dot(a, N), N); }
 static inline f32x3 f32x3_lerp_fast(f32x3 a, f32x3 b, f32 t)    { return f32x3_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t); }
 static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t)         { return f32x3_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t, a.z * (1.0f - t) + b.z * t); }
-static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return acosf(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
+static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return f32_acos(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
 static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equal(f32x3_length2(N), 1.0f));
      ASSERT(f32_equal(f32x3_length2(i), 1.0f));
      f32 dot_ni = f32x3_dot(N, i);
@@ -407,11 +407,11 @@ static inline Quaternion quat_make_rotation(f32x3 rot_axis, f32 theta) {
 
     Quaternion q;
     f32 half_theta = theta * 0.5f;
-    f32 st = sinf(half_theta);
+    f32 st = f32_sin(half_theta);
     q.d.x  = rot_axis.x * st;
     q.d.y  = rot_axis.y * st;
     q.d.z  = rot_axis.z * st;
-    q.d.w  = cosf(half_theta);
+    q.d.w  = f32_cos(half_theta);
     return q;
 }
 

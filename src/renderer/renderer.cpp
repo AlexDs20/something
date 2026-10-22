@@ -638,21 +638,48 @@ static void screen_space_from_clip(const ClipSpaceVertex* in, u32 width, u32 hei
     return;
 }
 
+/*
+ * TODO: Do this at some point so we don't have to compute any inverse etc
+typedef enum {
+    TRANSFORMATION_NONE,
+    TRANSFORMATION_TRANSLATION,
+    TRANSFORMATION_ROTATION,
+    TRANSFORMATION_SCALE,
+    TRANSFORMATION_COMPOSITION,
+    TRANSFORMATION_COUNT
+} TransformationType;
+
+typedef struct Transformation Transformation;
+struct Transformation {
+    TransformationType type;
+    Transformation* next;
+    f32x4x4 mat;
+
+    // inverse_transpose used to transform covectors (normals)
+    // (M^-1)^T = ((TRS)^-1)^T 
+    //          = ((S)^-1 (R)^-1 (T)^-1)^T
+    //          = (T^-1)^T (R^-1)^T (S^-1)^T
+    //          = (T^-1)^T (R^T)^T (S^-1)^T
+    //          = (T^-1)^T R (S^-1)^T
+    //          = (T^-1)^T R (diag(1/sx,1/sy,1/sz))         // only use 3x3 mat, not 4x4
+    //    The translation should not affect the normal!
+    //          = R (diag(1/sx,1/sy,1/sz))
+    f32x4x4 inv_transpose;
+    bool computed;
+};
+*/
+
 void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
     for (u32 i=0; i<n_indices; i+=3) {
         Vertex* a_ = &vertices[indices[i+0]];
         Vertex* b_ = &vertices[indices[i+1]];
         Vertex* c_ = &vertices[indices[i+2]];
 
-        // TODO: Maybe this is where I need to call the "vertex shader"
-        // Vertex shader must:
-        //  - Output f32x4 for the position
-        //  - Transform the normals
-
-        // vertex shader
+        // Transform vertices to clip spaces
         ClipSpaceVertex a, b, c;
         a.position  = f32x3_transform_point(&clip_from_model, a_->position);
         a.texcoords = a_->texcoords;
+        // TODO: Save covector transfo so that we do not need to inverse/transpose which is kinda wasteful
         a.normals   = a_->normals;
 
         b.position  = f32x3_transform_point(&clip_from_model, b_->position);
@@ -687,8 +714,9 @@ void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zb
         // f32x4x4* world_from_model = &obj->transform;
         // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, world_from_model);
 
-        f32x4x4 world_from_model = f32x4x4_translate({0.5f, 0.5f, -10.0f});
-        // f32x4x4 world_from_model = f32x4x4_scale_f32(400.0f);
+        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -100.0f});
+        f32x4x4 s = f32x4x4_scale_f32(0.3f);
+        f32x4x4 world_from_model = f32x4x4_mul(&t, &s);
         f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
 
         // TODO

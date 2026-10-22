@@ -200,6 +200,7 @@ int trailing_zero_bits(u32 x) {
     return n;
 }
 
+#define TOPDOWN true
 void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     /*
      * Data in the buffer should be in the order: left to right, bottom up
@@ -239,7 +240,11 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
             u64 row0 = j0 * width;
             u64 row1 = j1 * width;
 
+#if defined(TOPDOWN) && TOPDOWN
+            u64 window_offset = j * window->w;
+#else
             u64 window_offset = (window->h - j - 1) * window->w;
+#endif
             for (u32 i=0; i<window->w; i++) {
                 f32 img_i = (i * w_ratio);
                 img_i = img_i>width_minus_1  ? (f32)(width_minus_1)  : img_i;
@@ -279,7 +284,11 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
     }
     else if (ADSV_NEAREST == window->draw_method){
         for (u32 j=0; j<window->h; j++) {
+#if defined(TOPDOWN) && TOPDOWN
+            u64 window_offset = j * window->w;
+#else
             u64 window_offset = (window->h - j - 1) * window->w;
+#endif
             for (u32 i=0; i<window->w; i++) {
                 u32 img_i = (i * w_ratio);
                 u32 img_j = (j * h_ratio);
@@ -304,7 +313,11 @@ void platform_render_to_window(u8* buffer, u32 width, u32 height, Win* window) {
         u32 width_bound = (width < window->w) ? width : window->w;
         u32 height_bound = (height < window->h) ? height : window->h;
         for (u32 j=0; j<height_bound; j++) {
+#if defined(TOPDOWN) && TOPDOWN
+            u64 window_offset = j * window->w;
+#else
             u64 window_offset = (window->h - j - 1) * window->w;
+#endif
             for (u32 i=0; i<width_bound; i++) {
                 u64 src_idx = (j * width + i);
                 u8* d = src+src_idx * 4;
