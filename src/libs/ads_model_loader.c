@@ -3,23 +3,9 @@
 #include "platform/io.h"
 #include "base/base.h"
 #include "libs/ads_images.h"
-#include "libs/ads_math.h"
+// #include "libs/ads_math.h"
 
 #include <stdlib.h>
-
-typedef struct Scene Scene;
-typedef struct Object Object;
-typedef struct AABB AABB;
-typedef struct Mesh Mesh;
-typedef struct SubMesh SubMesh;
-typedef struct Vertex Vertex;
-typedef struct Material Material;
-typedef struct Texture Texture;
-typedef struct ObjMaterial ObjMaterial;
-typedef struct ObjFace ObjFace;
-typedef struct ObjGroup ObjGroup;
-typedef struct ObjModel ObjModel;
-
 
 // TODO: Hash map of currently loaded textures which contains a count of how many times its used
 //  So when free we free only when the count is down to 0
@@ -538,6 +524,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
             string_append_sv(persist_arena, &current.group->name, current.usemtl);
 
             // Material index
+            // TODO(alex): BUG: This writes over the obj_model.materials[0].Kd!!
             current.group->material_index = -1;
             for (uint32_t i=0; i<n_mats; i++) {
                 ObjMaterial* m = obj_model->materials + i;
@@ -615,6 +602,7 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
     uint32_t n_mats = obj_model->n_materials;
     Material* mats = (Material*)arena_alloc_push(arena, n_mats*sizeof(Material));
     Material* mat = mats;
+    printf("\n============\nNumber of MATERIALS: %d\n==========\n", n_mats);
     for (uint32_t i=0; i<n_mats; i++, mat++) {
         ObjMaterial* obj_mat = &obj_model->materials[i];
         mat->name  = obj_mat->name;                     // newmtl
@@ -735,6 +723,8 @@ Scene* model_convert_from_obj(Arena* arena, ObjModel* obj_model) {
     scene->n_textures = n_tex;
     scene->objects    = object;
     scene->n_objects  = 1;
+
+    object_debug_print(&scene->objects[0]);
     return scene;
 }
 

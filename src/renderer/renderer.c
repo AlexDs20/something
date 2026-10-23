@@ -190,11 +190,18 @@ typedef union {
 } Bboxf32;
 
 void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
-    Bboxf32 bbox = {};
-    bbox.edge.left    = f32_min(a->x, f32_min(b->x, c->x));
-    bbox.edge.right   = f32_max(a->x, f32_max(b->x, c->x));
-    bbox.edge.bottom  = f32_min(a->y, f32_min(b->y, c->y));
-    bbox.edge.top     = f32_max(a->y, f32_max(b->y, c->y));
+    Bboxf32 bbox = {
+        .edge = {
+            .left = f32_min(a->x, f32_min(b->x, c->x)),
+            .right = f32_max(a->x, f32_max(b->x, c->x)),
+            .bottom = f32_min(a->y, f32_min(b->y, c->y)),
+            .top = f32_max(a->y, f32_max(b->y, c->y))
+        }
+    };
+    // bbox.edge.left    = f32_min(a->x, f32_min(b->x, c->x));
+    // bbox.edge.right   = f32_max(a->x, f32_max(b->x, c->x));
+    // bbox.edge.bottom  = f32_min(a->y, f32_min(b->y, c->y));
+    // bbox.edge.top     = f32_max(a->y, f32_max(b->y, c->y));
 
     s32 minx = (s32)f32_max(0.0f, f32_floor(bbox.edge.left));
     s32 maxx = (s32)f32_min(w,    f32_ceil(bbox.edge.right));
@@ -255,7 +262,7 @@ void shader_frag_color(
         f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
         ) {
 
-    f32x3 n = f32x3_clamp(255.0f * f32x3_cross(a->position, b->position), f32x3_splat(0.0f), f32x3_splat(255.0f));
+    f32x3 n = f32x3_clamp(f32x3_mull_f32(255.0f, f32x3_cross(a->position, b->position)), f32x3_splat(0.0f), f32x3_splat(255.0f));
     f32 color = ((uint8_t)n.x << 16) | ((uint8_t)n.y << 8) | (uint8_t)n.x;
     framebuffer[y*width+x] = color;
 
@@ -294,7 +301,7 @@ void shader_frag_texture(
     framebuffer[y*width+x] = texture->data[texture_y*texture->width+texture_x];
 }
 
-inline f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
+inline static f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
     return 0.5f * ( (by-ay) * (bx+ax) + (cy-by) * (cx+bx) + (ay-cy) * (ax+cx) );
 }
 
@@ -716,7 +723,7 @@ void draw_scene(Scene* scene, f32x4x4* clip_from_world, u32* framebuffer, f32* z
         f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, world_from_model);
 #else
         f32x4x4* world_from_model = &obj->transform;
-        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -5.0f});
+        f32x4x4 t = f32x4x4_translate((f32x3){0.0f, 0.0f, -5.0f});
         f32x4x4 tmp = f32x4x4_mul(&t, world_from_model);
         f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, &tmp);
 #endif

@@ -1,5 +1,5 @@
 #!/bin/bash
-CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic -Wno-deprecated-declarations -masm=intel"
+CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic -Wno-deprecated-declarations -Wno-missing-parameter-name -masm=intel"
 CPPFLAGS="-std=c++11 -Wall -Wextra -Werror -Wpedantic -Wno-deprecated"
 EXTRAFLAGS=""       #" -fsanitize=address,undefined,leak -fno-sanitize-recover"
 

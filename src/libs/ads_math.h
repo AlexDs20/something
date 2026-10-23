@@ -430,15 +430,16 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
 
 #ifdef ADS_DEBUG
 #include <stdio.h>
-#define f32_debug_print(v)                  do { printf("\nf32 %s = %f", #v, (v)); } while(0)
-#define f32x3_debug_print(v)                do { printf("\nf32x3 %s = (%f,%f,%f)", #v, (v).x, (v).y, (v).z); } while(0)
-#define f32x4_debug_print(v)                do { printf("\nf32x4 %s = (%f,%f,%f,%f)", #v, (v).x, (v).y, (v).z, (v).w); } while(0)
-#define quat_debug_print(v)                 do { printf("\nquat %s = (%f,%f,%f,%f)", #v, (v).d.x, (v).d.y, (v).d.z, (v).d.w); } while(0)
-#define f32x4x4_debug_print(v)              do { f32x4_debug_print((v).rows.row0); f32x4_debug_print((v).rows.row1); f32x4_debug_print((v).rows.row2); f32x4_debug_print((v).rows.row3);   } while(0)
+#define f32_debug_print(v)                  do { printf("f32 %s = %f", #v, (v)); } while(0)
+#define f32x3_debug_print(v)                do { printf("f32x3 %s = (%f,%f,%f)", #v, (v).x, (v).y, (v).z); } while(0)
+#define f32x4_debug_print(v)                do { printf("f32x4 %s = (%f,%f,%f,%f)", #v, (v).x, (v).y, (v).z, (v).w); } while(0)
+#define quat_debug_print(v)                 do { printf("quat %s = (%f,%f,%f,%f)", #v, (v).d.x, (v).d.y, (v).d.z, (v).d.w); } while(0)
+#define f32x4x4_debug_print(v)              do { f32x4_debug_print((v).rows.row0); printf("\n"); f32x4_debug_print((v).rows.row1); printf("\n"); f32x4_debug_print((v).rows.row2); printf("\n"); f32x4_debug_print((v).rows.row3);   } while(0)
 #else
 #define f32_debug_print(x)
 #define f32x3_debug_print(v)
 #define f32x4_debug_print(v)
+#define quat_debug_print(v)
 #define f32x4x4_debug_print(v)
 #endif
 

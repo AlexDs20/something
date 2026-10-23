@@ -12,6 +12,20 @@
  * Each mesh (contains vertices and indices) is made of submeshes with same material and index range
  */
 
+typedef struct Scene Scene;
+typedef struct Object Object;
+typedef struct AABB AABB;
+typedef struct Mesh Mesh;
+typedef struct SubMesh SubMesh;
+typedef struct Vertex Vertex;
+typedef struct Material Material;
+typedef struct Texture Texture;
+typedef struct ObjMaterial ObjMaterial;
+typedef struct ObjFace ObjFace;
+typedef struct ObjGroup ObjGroup;
+typedef struct ObjModel ObjModel;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -169,14 +183,82 @@ struct Scene {
     uint32_t n_objects;
 };
 
-static inline
-void objface_debug_print(struct ObjFace* f) {
+#ifdef ADS_DEBUG
+#include "libs/ads_math.h"
+
+static inline void
+objface_debug_print(struct ObjFace* f) {
     printf("\nv  indices = (%u,%u,%u)", f->v_indices[0], f->v_indices[1], f->v_indices[2]);
     printf("\nvt indices = (%u,%u,%u)", f->vt_indices[0], f->vt_indices[1], f->vt_indices[2]);
     printf("\nvn indices = (%u,%u,%u)", f->vn_indices[0], f->vn_indices[1], f->vn_indices[2]);
     printf("\nmaterial index: %d", f->material_index);
     printf("\nsmooth shading: %d", f->smooth_shading);
 }
+
+static inline void
+texture_debug_print(struct Texture* texture) {
+    if (texture == NULL) {
+        printf("NULL");
+        return;
+    }
+
+    printf("Texture: %p, (%d,%d,%d)", (void*)texture->data, texture->width, texture->height, texture->components);
+
+}
+
+static inline void
+material_debug_print(struct Material* mat) {
+    printf("\nMaterial: %s", mat->name.buffer);
+    printf("\nKa: "); f32x3_debug_print(mat->Ka);
+    printf("\nKd: "); f32x3_debug_print(mat->Kd);
+    printf("\nKs: "); f32x3_debug_print(mat->Ks);
+    printf("\nKe: "); f32x3_debug_print(mat->Ke);
+    printf("\nTf: "); f32x3_debug_print(mat->Tf);
+
+    printf("\nNs: "); f32_debug_print(mat->Ns);
+    printf("\nNi: "); f32_debug_print(mat->Ni);
+    printf("\nTr: "); f32_debug_print(mat->Tr);
+    printf("\nIllum: %d", mat->illum);
+
+    printf("\nTexture map_Ka: "); texture_debug_print(mat->map_Ka);
+    printf("\nTexture map_Kd: "); texture_debug_print(mat->map_Kd);
+    printf("\nTexture map_Ks: "); texture_debug_print(mat->map_Ks);
+    printf("\nTexture map_Bump: "); texture_debug_print(mat->map_Bump);
+    printf("\nTexture map_d: "); texture_debug_print(mat->map_d);
+
+    // printf(enum shader)
+}
+
+static inline void
+submesh_debug_print(struct SubMesh* sm) {
+    printf("Submesh indices: %d -> %d\n", sm->start_index, sm->start_index + sm->count);
+    printf("Submesh material: \n");
+    material_debug_print(sm->mat);
+}
+
+static inline void
+mesh_debug_print(struct Mesh* mesh) {
+    printf("Mesh:\n");
+    printf("  Vertices: %d -> %p\n", mesh->n_vertices, (void*)mesh->vertices);
+    printf("  Indices: %d -> %p\n", mesh->n_indices, (void*)mesh->indices);
+    printf("  Submeshes: %d -> %p\n", mesh->n_submeshes, (void*)mesh->submeshes);
+    for (uint32_t i=0; i<mesh->n_submeshes; ++i) {
+        printf("  Submesh %d:", i);
+        submesh_debug_print(&mesh->submeshes[i]);
+        printf("\n");
+    }
+}
+
+static inline void
+object_debug_print(struct Object* obj) {
+    mesh_debug_print(obj->mesh);
+    f32x4x4_debug_print(obj->transform);
+    // bbox_debug_print();
+}
+
+#else
+#define objface_debug_print(f)
+#endif
 
 struct Scene* model_read(Arena* arena, StringView filepath);
 #ifdef __cplusplus
