@@ -712,12 +712,16 @@ void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zb
         Object* obj = &scene->objects[i];
 
         // f32x4x4* world_from_model = &obj->transform;
-        // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, world_from_model);
+        f32x4x4* world = &obj->transform;
+        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -2.0f});
+        f32x4x4 world_from_model = f32x4x4_mul(&t, world);
 
-        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -100.0f});
-        f32x4x4 s = f32x4x4_scale_f32(0.3f);
-        f32x4x4 world_from_model = f32x4x4_mul(&t, &s);
         f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
+
+        // f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -2.0f});
+        // f32x4x4 s = f32x4x4_scale_f32(1.0f);
+        // f32x4x4 world_from_model = f32x4x4_mul(&t, &s);
+        // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
 
         // TODO
         // if (frustum_cull(obj->bbox)) {}

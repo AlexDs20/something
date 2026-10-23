@@ -31,7 +31,7 @@ typedef struct _Camera {
     f32 roll;           // tilt side NOT used currently (until plane like camera)
 
     // Needed for "Perspective" camera
-    f32 fov;            // vertical FOV
+    f32 fov;            // horizongal FOV
     f32 aspect_ratio;
     f32 near_plane;
     f32 far_plane;

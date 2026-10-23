@@ -1,12 +1,12 @@
 #include "libs/ads_3d_camera.h"
 #include "libs/ads_math.h"
 
-static const f32 DEFAULT_SPEED_FACTOR = 400.0f;
+static const f32 DEFAULT_SPEED_FACTOR = 1.0f;
 static const f32 DEFAULT_ROTATION_SPEED_FACTOR = 0.005f;
 static const f32 DEFAULT_FOV = F32_PI / 2;
 static const f32 DEFAULT_ASPECT_RATIO = 16.0f / 9.0f;
 static const f32 DEFAULT_NEAR_PLANE = 0.1f;
-static const f32 DEFAULT_FAR_PLANE = 1000.0f;
+static const f32 DEFAULT_FAR_PLANE = 100.0f;
 static const f32 DEFAULT_YAW = F32_PI;
 static const f32 DEFAULT_PITCH = 0.0f;
 
@@ -24,7 +24,11 @@ void camera_debug_print(const Camera* camera) {
 }
 
 f32 camera_horizontal_fov(const Camera* camera) {
-    return 2.0f * f32_atan(camera->aspect_ratio * f32_tan(camera->fov / 2.0f));
+    return camera->fov;
+}
+
+f32 camera_vertical_fov(const Camera* camera) {
+    return 2.0f * f32_atan( (1.0f / camera->aspect_ratio) * f32_tan(camera->fov / 2.0f));
 }
 
 static void camera_update_direction(Camera* camera) {
@@ -60,8 +64,8 @@ Camera camera_init(ADSCameraType camera_type) {
     camera.near_plane = DEFAULT_NEAR_PLANE;
     camera.far_plane = DEFAULT_FAR_PLANE;
 
-    camera.scaling_y = 1.0f / f32_tan(camera.fov / 2);
-    camera.scaling_x = camera.scaling_y / camera.aspect_ratio;
+    camera.scaling_x = 1.0f / f32_tan(camera.fov / 2);
+    camera.scaling_y = camera.scaling_x / camera.aspect_ratio;
 
     camera.speed = DEFAULT_SPEED_FACTOR;
     camera.rotation_speed = DEFAULT_ROTATION_SPEED_FACTOR;
@@ -216,13 +220,17 @@ f32x4x4 camera_get_view_matrix(const Camera* camera) {
 }
 
 f32x4x4 camera_get_projection_matrix(const Camera* camera) {
-    printf("Yaw: %.3f\n", camera->yaw);
+    const f32 n = camera->near_plane;
+    const f32 f = camera->far_plane;
+    const f32 sx = camera->scaling_x;
+    const f32 sy = camera->scaling_y;
+
     f32x4x4 result = {
         .data = {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f,
+            sx,   0.0f, 0.0f,      0.0f,
+            0.0f, sy,   0.0f,      0.0f,
+            0.0f, 0.0f, n / (f-n), -f*n / (f-n),
+            0.0f, 0.0f, -1.0f,     0.0f,
         }
     };
     return result;
