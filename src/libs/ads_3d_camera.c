@@ -50,7 +50,7 @@ static void camera_update_direction(Camera* camera) {
     );
 }
 
-Camera camera_init(ADSCameraType camera_type) {
+Camera camera_init(CameraType camera_type) {
     Camera camera;
 
     camera.camera_type = camera_type;
@@ -220,18 +220,32 @@ f32x4x4 camera_get_view_matrix(const Camera* camera) {
 }
 
 f32x4x4 camera_get_projection_matrix(const Camera* camera) {
-    const f32 n = camera->near_plane;
-    const f32 f = camera->far_plane;
-    const f32 sx = camera->scaling_x;
-    const f32 sy = camera->scaling_y;
+    // This perspective camera maps to clip space where the near and far planes 
+    // are mapped to [0, -1]  with 0 the near plane and -1 the far plane
+    // This is just so that we keep the intuition that the camera always looks in -Z direction
 
-    f32x4x4 result = {
-        .data = {
-            sx,   0.0f, 0.0f,      0.0f,
-            0.0f, sy,   0.0f,      0.0f,
-            0.0f, 0.0f, n / (f-n), -f*n / (f-n),
-            0.0f, 0.0f, -1.0f,     0.0f,
+    f32x4x4 result;
+    switch (camera->camera_type) {
+        case ADS_CAMERA_FREE_FLIGHT:
+        case ADS_CAMERA_FIRST_PERSON: {
+            const f32 n = camera->near_plane;
+            const f32 f = camera->far_plane;
+            const f32 sx = camera->scaling_x;
+            const f32 sy = camera->scaling_y;
+
+            result = (f32x4x4){
+                .data = {
+                    sx,   0.0f, 0.0f,      0.0f,
+                    0.0f, sy,   0.0f,      0.0f,
+                    0.0f, 0.0f, f / (f-n), f*n / (f-n),
+                    0.0f, 0.0f, -1.0f,     0.0f,
+                }
+            };
+        } break;
+        default: {
+            result = f32x4x4_identity();
         }
-    };
+    }
+
     return result;
 }

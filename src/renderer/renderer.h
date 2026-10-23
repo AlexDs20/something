@@ -35,6 +35,6 @@ typedef struct {
 
 
 // void draw_model(struct Object* obj, struct Material* mat, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
-void draw_scene(struct Scene* scene, f32x4x4 world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
+void draw_scene(struct Scene* scene, f32x4x4* world, u32* framebuffer, f32* zbuffer, u32 w, u32 h);
 
 #endif // ADS_RENDERER_H

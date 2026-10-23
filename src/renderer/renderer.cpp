@@ -620,10 +620,10 @@ static void clip_triangle(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex
 
 static void screen_space_from_clip(const ClipSpaceVertex* in, u32 width, u32 height, RasterVertex* out) {
     f32 inv_w = 1.0f / in->position.w;
-        
-    f32 ndc_x = in->position.x * inv_w;
-    f32 ndc_y = in->position.y * inv_w;
-    f32 ndc_z = in->position.z * inv_w;
+
+    f32 ndc_x = in->position.x * inv_w; // [-1, 1]
+    f32 ndc_y = in->position.y * inv_w; // [-1, 1]
+    f32 ndc_z = in->position.z * inv_w; // [0, -1] near plane at 0 and far plane at -1
 
     // Rescale x from [-1, 1] to [0, w]
     out->position.x = (ndc_x + 1.0f) * 0.5f * width;
@@ -669,7 +669,7 @@ struct Transformation {
 };
 */
 
-void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4 clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
+void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4* clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
     for (u32 i=0; i<n_indices; i+=3) {
         Vertex* a_ = &vertices[indices[i+0]];
         Vertex* b_ = &vertices[indices[i+1]];
@@ -677,21 +677,22 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 
         // Transform vertices to clip spaces
         ClipSpaceVertex a, b, c;
-        a.position  = f32x3_transform_point(&clip_from_model, a_->position);
+        a.position  = f32x3_transform_point(clip_from_model, a_->position);
         a.texcoords = a_->texcoords;
         // TODO: Save covector transfo so that we do not need to inverse/transpose which is kinda wasteful
         a.normals   = a_->normals;
 
-        b.position  = f32x3_transform_point(&clip_from_model, b_->position);
+        b.position  = f32x3_transform_point(clip_from_model, b_->position);
         b.texcoords = b_->texcoords;
         b.normals   = b_->normals;
 
-        c.position = f32x3_transform_point(&clip_from_model, c_->position);
+        c.position = f32x3_transform_point(clip_from_model, c_->position);
         c.texcoords = c_->texcoords;
         c.normals   = c_->normals;
 
         // TODO: Actually clip the triangle to the clip boundary.
         //  This can wait, the rasterizer handles going outside the size of the screen in pixelspace
+        //  look into Sutherland–Hodgman algorithm for this
         // u32 n = clip_triangle(&a, &b, &c);
         // if (n < 3) {
         //     continue;
@@ -707,21 +708,18 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
     }
 }
 
-void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
+void draw_scene(Scene* scene, f32x4x4* clip_from_world, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
-
-        // f32x4x4* world_from_model = &obj->transform;
-        f32x4x4* world = &obj->transform;
-        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -2.0f});
-        f32x4x4 world_from_model = f32x4x4_mul(&t, world);
-
-        f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
-
-        // f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -2.0f});
-        // f32x4x4 s = f32x4x4_scale_f32(1.0f);
-        // f32x4x4 world_from_model = f32x4x4_mul(&t, &s);
-        // f32x4x4 clip_from_model = f32x4x4_mul(&clip_from_world, &world_from_model);
+#if 0
+        f32x4x4* world_from_model = &obj->transform;
+        f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, world_from_model);
+#else
+        f32x4x4* world_from_model = &obj->transform;
+        f32x4x4 t = f32x4x4_translate({0.0f, 0.0f, -5.0f});
+        f32x4x4 tmp = f32x4x4_mul(&t, world_from_model);
+        f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, &tmp);
+#endif
 
         // TODO
         // if (frustum_cull(obj->bbox)) {}
@@ -735,7 +733,7 @@ void draw_scene(Scene* scene, f32x4x4 clip_from_world, u32* framebuffer, f32* zb
             uint32_t* sm_indices = &ind[sm->start_index];
             uint32_t ind_count = sm->count;
 
-            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, clip_from_model, mesh->vertices, sm_indices, ind_count);
+            draw_submesh(framebuffer, zbuffer, w, h, sm->mat, &clip_from_model, mesh->vertices, sm_indices, ind_count);
         }
     }
 }

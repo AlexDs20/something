@@ -7,7 +7,7 @@ typedef enum {
     ADS_CAMERA_FIRST_PERSON,
     ADS_CAMERA_FREE_FLIGHT,
     ADS_CAMERA_COUNT,
-} ADSCameraType;
+} CameraType;
 
 typedef enum {
     ADS_MOTION_DIRECTION_NONE,
@@ -19,7 +19,7 @@ typedef enum {
 } MotionDirection;
 
 typedef struct _Camera {
-    ADSCameraType camera_type;
+    CameraType camera_type;
 
     f32x3 position;
 
@@ -45,7 +45,7 @@ typedef struct _Camera {
 #ifdef __cplusplus
 extern "C" {
 #endif
-Camera camera_init(ADSCameraType camera_type);
+Camera camera_init(CameraType camera_type);
 
 f32x4x4 camera_get_model_matrix(const Camera* camera);
 f32x4x4 camera_get_view_matrix(const Camera* camera);

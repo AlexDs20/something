@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
     clock_gettime(CLOCK_MONOTONIC, &current_time);
 
     s32x2 mouse_pos = {0, 0};
+    bool mouse_pos_initialized = false;
 
     while (running) {
         // Handle time:
@@ -114,10 +115,16 @@ int main(int argc, char** argv) {
             ads_input_mouse_x(),
             ads_input_mouse_y()
         };
-        s32x2 dx = s32x2_sub(new_mouse_pos, mouse_pos);
-        camera_rotate(&camera, dx);
 
+        if (mouse_pos_initialized) {
+            s32x2 dx = s32x2_sub(new_mouse_pos, mouse_pos);
+            camera_rotate(&camera, dx);
+        }
+        else {
+            mouse_pos_initialized = true;
+        }
         mouse_pos = new_mouse_pos;
+
         f32x4x4 view_from_world = camera_get_view_matrix(&camera);
         f32x4x4 clip_from_world = f32x4x4_mul(&clip_from_view, &view_from_world);
 
@@ -140,7 +147,7 @@ int main(int argc, char** argv) {
 
         // draw_model_wireframe(model, canvas_w, canvas_h, win_buffer);
         // draw_scene(scene, view, win_buffer, zbuffer, canvas_w, canvas_h);
-        draw_scene(scene, clip_from_world, win_buffer, zbuffer, canvas_w, canvas_h);
+        draw_scene(scene, &clip_from_world, win_buffer, zbuffer, canvas_w, canvas_h);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_depth);
         // draw_model(model, canvas_w, canvas_h, win_buffer, zbuffer, (void*) (&frag_context), shader_frag_color);
 
