@@ -691,13 +691,13 @@ clip_triangle(const f32x4* a, const f32x4* b, const f32x4* c, f32x4* out_coordin
 
     // printf("W: (%.3f,%.3f,%.3f)\n", a->w, b->w, c->w);
 
-    if (f32_abs(a->x) >= a->w || f32_abs(a->y) >= a->w || a->z >= 0.0f || a->z <= -a->w) {
+    if (f32_abs(a->x) > a->w || f32_abs(a->y) > a->w || a->z > 0.0f || a->z < -a->w) {
         return -1;
     }
-    if (f32_abs(b->x) >= b->w || f32_abs(b->y) >= b->w || b->z >= 0.0f || b->z <= -a->w) {
+    if (f32_abs(b->x) > b->w || f32_abs(b->y) > b->w || b->z > 0.0f || b->z < -b->w) {
         return -1;
     }
-    if (f32_abs(c->x) >= b->w || f32_abs(c->y) >= c->w || c->z >= 0.0f || c->z <= -a->w) {
+    if (f32_abs(c->x) > c->w || f32_abs(c->y) > c->w || c->z > 0.0f || c->z < -c->w) {
         return -1;
     }
 
