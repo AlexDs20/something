@@ -208,7 +208,14 @@ texture_debug_print(struct Texture* texture) {
 
 static inline void
 material_debug_print(struct Material* mat) {
-    printf("\nMaterial: %s", mat->name.buffer);
+    if (mat == NULL) {
+        printf("Material: NULL");
+        return;
+    }
+    printf("Material: ");
+    if (mat->name.buffer != NULL) {
+        printf("%s", mat->name.buffer);
+    }
     printf("\nKa: "); f32x3_debug_print(mat->Ka);
     printf("\nKd: "); f32x3_debug_print(mat->Kd);
     printf("\nKs: "); f32x3_debug_print(mat->Ks);
@@ -231,6 +238,10 @@ material_debug_print(struct Material* mat) {
 
 static inline void
 submesh_debug_print(struct SubMesh* sm) {
+    printf("SubMesh: %p\n", (void*)sm);
+    if (sm == NULL) {
+        return;
+    }
     printf("Submesh indices: %d -> %d\n", sm->start_index, sm->start_index + sm->count);
     printf("Submesh material: \n");
     material_debug_print(sm->mat);
@@ -238,6 +249,10 @@ submesh_debug_print(struct SubMesh* sm) {
 
 static inline void
 mesh_debug_print(struct Mesh* mesh) {
+    if (mesh == NULL) {
+        printf("Mesh: NULL\n");
+        return;
+    }
     printf("Mesh:\n");
     printf("  Vertices: %d -> %p\n", mesh->n_vertices, (void*)mesh->vertices);
     printf("  Indices: %d -> %p\n", mesh->n_indices, (void*)mesh->indices);
@@ -257,7 +272,12 @@ object_debug_print(struct Object* obj) {
 }
 
 #else
-#define objface_debug_print(f)
+#define objface_debug_print(f_ptr)
+#define texture_debug_print(t_ptr)
+#define material_debug_print(mat_ptr)
+#define submesh_debug_print(sm_ptr)
+#define mesh_debug_print(mesh_ptr)
+#define object_debug_print(obj_ptr)
 #endif
 
 struct Scene* model_read(Arena* arena, StringView filepath);

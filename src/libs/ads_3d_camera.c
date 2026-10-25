@@ -221,7 +221,7 @@ f32x4x4 camera_get_view_matrix(const Camera* camera) {
 
 f32x4x4 camera_get_projection_matrix(const Camera* camera) {
     // This perspective camera maps to clip space where the near and far planes 
-    // are mapped to [0, -1]  with 0 the near plane and -1 the far plane
+    // are mapped to [-1, 0]  with 0 the near plane and -1 the far plane
     // This is just so that we keep the intuition that the camera always looks in -Z direction
 
     f32x4x4 result;

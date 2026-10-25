@@ -10,8 +10,15 @@
 - *ADS_LOCAL_ARENA_POOL_COUNT*:
 - *ADS_LOCAL_ARENA_CAPACITY*:
 
-
 # TODO
+- Change coordinate system
+    - I currently made it so that x is right, y is up on the screen and z is out towards the viewer
+    - I should make it: x->right, z up on screen and y into the screen
+- Math:
+    - only one varient: f32x2_add_f32() no left and right
+    - check there is f32xX_gt greater than osv
+    - check that f32X_equal f32X_nequal returns boolX not bool
+
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
     - [x] Progressive decoding
@@ -23,7 +30,9 @@
     - [x] Allow flipping along y.
     - [x] Test code on many images
 - OBJ parser:
-    - [ ] n-gons handling
+    - [x] n-gons handling   
+    - [ ] handle lines and points
+    - [ ] handle some more advanced parameters see some variant of the ponza scene
     - [ ] Several materials in a single 'g' or 'o'
 - Libs:
     - [ ] Image
@@ -32,9 +41,9 @@
     - [ ] DataStructures
         - [X] Vector (to revisit)
         - [ ] HashMap
-    - [ ] Input:
-        - [ ] Keyboard
-        - [ ] Mouse
+    - [x] Input:
+        - [x] Keyboard
+        - [x] Mouse
         - [ ] Controller
     - [X] Math
         - [ ] USE SSE / AVX2

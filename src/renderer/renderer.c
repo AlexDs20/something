@@ -256,17 +256,22 @@ void shader_frag_depth(
 void shader_frag_color(
         u32* framebuffer , f32* /*zbuffer*/,
         u32 width, u32 /*height*/,
-        Material* /*mat*/,
+        Material* mat,
         u32 x, u32 y,
-        RasterVertex* a, RasterVertex* b, RasterVertex* /*c*/,
+        RasterVertex* /*a*/, RasterVertex* /*b*/, RasterVertex* /*c*/,
         f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
         ) {
 
-    f32x3 n = f32x3_clamp(f32x3_mull_f32(255.0f, f32x3_cross(a->position, b->position)), f32x3_splat(0.0f), f32x3_splat(255.0f));
-    f32 color = ((uint8_t)n.x << 16) | ((uint8_t)n.y << 8) | (uint8_t)n.x;
+    u32 color = 0xFF00FF;
+    if (0 && f32x3_nequal(mat->Kd, (f32x3){0.0f, 0.0f, 0.0f})) {
+        f32x3 n = f32x3_mull_f32(255.0f, mat->Kd);
+        u32 r = (uint32_t)n.x << 0;
+        u32 g = (uint32_t)n.y << 8;
+        u32 b = (uint32_t)n.z << 16;
+        u32 a = (uint32_t)0   << 24;
+        color = a|b|g|r;
+    }
     framebuffer[y*width+x] = color;
-
-    // framebuffer[y*width+x] = 0xFFA500;
     return;
 }
 
@@ -676,6 +681,27 @@ struct Transformation {
 };
 */
 
+static s32
+clip_triangle(const f32x4* a, const f32x4* b, const f32x4* c, f32x4* out_coordinates) {
+    // f32x4_debug_print(*a);
+    // f32x4_debug_print(*b);
+    // f32x4_debug_print(*c);
+    // f32x4_debug_print(out_coordinates[0]);
+    out_coordinates[0].x = 0.0f;
+
+    if (f32_abs(a->x) >= a->w || f32_abs(a->y) >= a->w || a->z >= 0.0f || a->z <= -1.0f) {
+        return -1;
+    }
+    if (f32_abs(b->x) >= b->w || f32_abs(b->y) >= b->w || b->z >= 0.0f || b->z <= -1.0f) {
+        return -1;
+    }
+    if (f32_abs(c->x) >= b->w || f32_abs(c->y) >= c->w || c->z >= 0.0f || c->z <= -1.0f) {
+        return -1;
+    }
+
+    return 3;
+}
+
 void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4* clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
     for (u32 i=0; i<n_indices; i+=3) {
         Vertex* a_ = &vertices[indices[i+0]];
@@ -697,6 +723,7 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
         c.texcoords = c_->texcoords;
         c.normals   = c_->normals;
 
+
         // TODO: Actually clip the triangle to the clip boundary.
         //  This can wait, the rasterizer handles going outside the size of the screen in pixelspace
         //  look into Sutherland–Hodgman algorithm for this
@@ -705,6 +732,9 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
         //     continue;
         // }
         // // Fan triangulate the clipped triangle
+        f32x4 clipped_triangle_coordiantes[9];
+        s32 n = clip_triangle(&a.position, &b.position, &c.position, clipped_triangle_coordiantes);
+        if (n == -1) continue;
 
         RasterVertex a_r, b_r, c_r;
         screen_space_from_clip(&a, w, h, &a_r);
@@ -718,15 +748,9 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
 void draw_scene(Scene* scene, f32x4x4* clip_from_world, u32* framebuffer, f32* zbuffer, u32 w, u32 h) {
     for (u32 i=0; i<scene->n_objects; i++) {
         Object* obj = &scene->objects[i];
-#if 0
+
         f32x4x4* world_from_model = &obj->transform;
         f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, world_from_model);
-#else
-        f32x4x4* world_from_model = &obj->transform;
-        f32x4x4 t = f32x4x4_translate((f32x3){0.0f, 0.0f, -5.0f});
-        f32x4x4 tmp = f32x4x4_mul(&t, world_from_model);
-        f32x4x4 clip_from_model = f32x4x4_mul(clip_from_world, &tmp);
-#endif
 
         // TODO
         // if (frustum_cull(obj->bbox)) {}

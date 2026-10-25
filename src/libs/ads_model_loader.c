@@ -345,13 +345,13 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
         file = sv_trim_front(file);
     }
     // If no group, create default one
-    if (n_g == 0) {
-        n_g = 1;
-    }
+    const uint32_t n_group_real = n_g;
+    n_g =  n_g > 0 ? n_g : 1;
+
     file = file_copy;
 
     // Second pass => the actual parsing
-    ObjModel* obj_model  =                      (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel)         );
+    ObjModel* obj_model  =                      (ObjModel*)   arena_alloc_push_zero(persist_arena, sizeof(ObjModel)    * 1  );
     obj_model->vertices  = n_v    == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_v);
     obj_model->texcoords = n_vt   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vt);
     obj_model->normals   = n_vn   == 0 ? NULL : (f32x3*)      arena_alloc_push_zero(persist_arena, sizeof(f32x3)       * n_vn);
@@ -370,7 +370,7 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
     uint32_t i_v = 0, i_vt = 0, i_vn = 0; // These are used in case the provided indices are < 0 (relative to last currently seen)
     uint32_t i_f = 0;
-    uint32_t i_g = 1;
+    uint32_t i_g = 0;
 
     struct {
         f32x3* vertex;
@@ -399,7 +399,9 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
     current.material_index = 0;
 
     // Default group in case nothing is given in the obj file
-    current.group->name = string_init_cstr(persist_arena, "default");
+    if (n_group_real == 0) {
+        current.group->name = string_init_cstr(persist_arena, "default");
+    }
 
     // TODO: Handle the materials properly by also creating a default material
     while (file.size > 0) {
@@ -513,18 +515,13 @@ ObjModel* model_parse_obj(Arena* persist_arena, StringView file, StringView base
 
             // Concat groupname with mtllib and usemtl
             current.group->name = string_init_empty(persist_arena, current.group_name.size);
-            if (current.group_name.size != 0) {
-                string_append_sv(persist_arena, &current.group->name, current.group_name);
-                string_append_cstr(persist_arena, &current.group->name, "__");
-            }
-            if (current.mtllib.size != 0) {
-                string_append_sv(persist_arena, &current.group->name, current.mtllib);
-                string_append_cstr(persist_arena, &current.group->name, "__");
-            }
+            string_append_sv(persist_arena, &current.group->name, current.group_name);
+            string_append_cstr(persist_arena, &current.group->name, "__");
+            string_append_sv(persist_arena, &current.group->name, current.mtllib);
+            string_append_cstr(persist_arena, &current.group->name, "__");
             string_append_sv(persist_arena, &current.group->name, current.usemtl);
 
             // Material index
-            // TODO(alex): BUG: This writes over the obj_model.materials[0].Kd!!
             current.group->material_index = -1;
             for (uint32_t i=0; i<n_mats; i++) {
                 ObjMaterial* m = obj_model->materials + i;
