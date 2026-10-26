@@ -262,15 +262,12 @@ void shader_frag_color(
         f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
         ) {
 
-    u32 color = 0xFF00FF;
-    if (f32x3_nequal(mat->Kd, (f32x3){0.0f, 0.0f, 0.0f})) {
-        f32x3 n = f32x3_mull_f32(255.0f, mat->Kd);
-        u32 r = (uint32_t)n.x << 0;
-        u32 g = (uint32_t)n.y << 8;
-        u32 b = (uint32_t)n.z << 16;
-        u32 a = (uint32_t)0   << 24;
-        color = a|b|g|r;
-    }
+    f32x3 n = f32x3_mull_f32(255.0f, mat->Kd);
+    u32 r = (uint32_t)n.x << 0;
+    u32 g = (uint32_t)n.y << 8;
+    u32 b = (uint32_t)n.z << 16;
+    u32 a = (uint32_t)0   << 24;
+    u32 color = a|b|g|r;
     framebuffer[y*width+x] = color;
     return;
 }
