@@ -263,7 +263,7 @@ void shader_frag_color(
         ) {
 
     u32 color = 0xFF00FF;
-    if (0 && f32x3_nequal(mat->Kd, (f32x3){0.0f, 0.0f, 0.0f})) {
+    if (f32x3_nequal(mat->Kd, (f32x3){0.0f, 0.0f, 0.0f})) {
         f32x3 n = f32x3_mull_f32(255.0f, mat->Kd);
         u32 r = (uint32_t)n.x << 0;
         u32 g = (uint32_t)n.y << 8;
