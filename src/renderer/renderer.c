@@ -708,8 +708,10 @@ clip_triangle(const f32x4* a, const f32x4* b, const f32x4* c, f32x4* out_coordin
 static const u8 MAX_CLIPPED_VERTICES = 9;
 static u32
 clip_triangle(ClipSpaceVertex* in_3, ClipSpaceVertex* out) {
-    ClipSpaceVertex buffer_in[MAX_CLIPPED_VERTICES];
-    ClipSpaceVertex buffer_out[MAX_CLIPPED_VERTICES];
+    ClipSpaceVertex buffer_a[MAX_CLIPPED_VERTICES];
+    ClipSpaceVertex buffer_b[MAX_CLIPPED_VERTICES];
+    ClipSpaceVertex* buffer_in = buffer_a;
+    ClipSpaceVertex* buffer_out = buffer_b;
 
     buffer_in[0] = in_3[0];
     buffer_in[1] = in_3[1];
@@ -718,67 +720,88 @@ clip_triangle(ClipSpaceVertex* in_3, ClipSpaceVertex* out) {
     // For x left: x > -w
     u32 n_in = 3;
     u32 n_out = 0;
+    for (u8 side=0; side < 6; side++) {
+        for (u32 i=0; i<n_in; i++) {
+            ClipSpaceVertex* n = &buffer_in[i];
+            ClipSpaceVertex* p = &buffer_in[(i+n_in-1)%n_in];
+
+            f32 dp, dn;
+            // This is the only difference between different checks
+            switch (side) {
+                case 0: {   // x left
+                    dp = p->position.x + p->position.w;
+                    dn = n->position.x + n->position.w;
+                } break;
+                case 1: {   // x right
+                    dp = p->position.w - p->position.x;
+                    dn = n->position.w - n->position.x;
+                } break;
+                case 2: {   // y bottom
+                    dp = p->position.y + p->position.w;
+                    dn = n->position.y + n->position.w;
+                } break;
+                case 3: {   // y top
+                    dp = p->position.w - p->position.y;
+                    dn = n->position.w - n->position.y;
+                } break;
+                case 4: {   // z near
+                    dp = - p->position.z;
+                    dn = - n->position.z;
+                } break;
+                case 5: {   // z far
+                    dp = p->position.z + p->position.w;
+                    dn = n->position.z + n->position.w;
+                } break;
+            }
+
+            bool p_inside = dp >= 0.0f;
+            bool n_inside = dn >= 0.0f;
+
+            // If crossing boundary
+            if (p_inside != n_inside) {
+                /*
+                 * For the x left plane:
+                 * We have v = n - p
+                 * r(t) = p + t * v
+                 * r(t) = {x(t),y(t),z(t),w(t)}
+                 * look for x(t) = -w(t) with t in [0,1]
+                 * gives: t = - (px+pw) / (vx+vw)
+                 * t = - (px+pw) / (nx+nw - (px+pw))
+                 */
+                f32x4 vp = f32x4_sub(n->position, p->position);
+                f32x3 vt = f32x3_sub(n->texcoords, p->texcoords);
+                f32x3 vn = f32x3_sub(n->normals, p->normals);
+                f32 t = dp / (dp - dn);
+
+                ClipSpaceVertex intersection;
+                intersection.position = f32x4_add(p->position, f32x4_mull_f32(t, vp));      // p + t*v_position
+                intersection.texcoords = f32x3_add(p->texcoords, f32x3_mull_f32(t, vt));    // p + t*v_texture
+                intersection.normals = f32x3_add(p->normals, f32x3_mull_f32(t, vn));        // p + t*v_normal
+
+                // If previous inside and current outside => add intersection
+                // If previous outside and current inside => add intersection then add current
+                // If both inside => add current (and in that case we are not in this if)
+                // If both outside => nothing
+                ASSERT(n_out < MAX_CLIPPED_VERTICES);
+                buffer_out[n_out++] = intersection;
+            }
+            if (n_inside) {
+                ASSERT(n_out < MAX_CLIPPED_VERTICES);
+                buffer_out[n_out++] = *n;
+            }
+        }
+        ClipSpaceVertex* tmp = buffer_in;
+        buffer_in = buffer_out;
+        buffer_out = tmp;
+        n_in = n_out;
+        n_out = 0;
+    }
+
     for (u32 i=0; i<n_in; i++) {
-        ClipSpaceVertex* n = &buffer_in[i];
-        ClipSpaceVertex* p = &buffer_in[(i+n_in-1)%n_in];
-
-        f32 dp, dn;
-        // This is the only difference between different checks
-        {
-            dp = p->position.x + p->position.w;
-            dn = n->position.x + n->position.w;
-        }
-
-        bool p_inside = dp >= 0.0f;
-        bool n_inside = dn >= 0.0f;
-
-        // If crossing boundary
-        if (p_inside != n_inside) {
-            /*
-             * We have v = n - p
-             * r(t) = p + t * v
-             * r(t) = {x(t),y(t),z(t),w(t)}
-             * look for x(t) = -w(t) with t in [0,1]
-             * gives: t = - (px+pw) / (vx+vw)
-             * t = - (px+pw) / (nx+nw - (px+pw))
-             */
-            f32x4 vp = f32x4_sub(n->position, p->position);
-            f32x3 vt = f32x3_sub(n->texcoords, p->texcoords);
-            f32x3 vn = f32x3_sub(n->normals, p->normals);
-            f32 t = dp / (dp - dn);
-
-            ClipSpaceVertex intersection;
-            intersection.position = f32x4_add(p->position, f32x4_mull_f32(t, vp));      // p + t*v_position
-            intersection.texcoords = f32x3_add(p->texcoords, f32x3_mull_f32(t, vt));    // p + t*v_texture
-            intersection.normals = f32x3_add(p->normals, f32x3_mull_f32(t, vn));        // p + t*v_normal
-
-            // If previous inside and current outside => add intersection
-            // If previous outside and current inside => add intersection then add current
-            // If both inside => add current (and in that case we are not in this if)
-            // If both outside => nothing
-            buffer_out[n_out++] = intersection;
-        }
-        if (n_inside) {
-            buffer_out[n_out++] = *n;
-        }
+        out[i] = buffer_in[i];
     }
 
-    for (u32 i=0; i<n_out; i++) {
-        out[i] = buffer_out[i];
-    }
-
-    if (in_3[0].position.x > in_3[0].position.w || f32_abs(in_3[0].position.y) > in_3[0].position.w || in_3[0].position.z > 0.0f || in_3[0].position.z < -in_3[0].position.w) {
-        return -1;
-    }
-    if (in_3[1].position.x > in_3[1].position.w || f32_abs(in_3[1].position.y) > in_3[1].position.w || in_3[1].position.z > 0.0f || in_3[1].position.z < -in_3[1].position.w) {
-        return -1;
-    }
-    if (in_3[2].position.x > in_3[2].position.w || f32_abs(in_3[2].position.y) > in_3[2].position.w || in_3[2].position.z > 0.0f || in_3[2].position.z < -in_3[2].position.w) {
-        return -1;
-    }
-
-
-    return n_out;
+    return n_in;
 }
 
 void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f32x4x4* clip_from_model, Vertex* vertices, uint32_t* indices, uint32_t n_indices) {
