@@ -65,7 +65,7 @@ Camera camera_init(CameraType camera_type) {
     camera.far_plane = DEFAULT_FAR_PLANE;
 
     camera.scaling_x = 1.0f / f32_tan(camera.fov / 2);
-    camera.scaling_y = camera.scaling_x / camera.aspect_ratio;
+    camera.scaling_y = camera.aspect_ratio * camera.scaling_x;
 
     camera.speed = DEFAULT_SPEED_FACTOR;
     camera.rotation_speed = DEFAULT_ROTATION_SPEED_FACTOR;
