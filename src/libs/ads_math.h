@@ -50,8 +50,8 @@ static inline bool4 bool4_or(bool4 a, bool4 b)                  { bool4 r; r.x =
 static inline bool4 bool4_xor(bool4 a, bool4 b)                 { bool4 r; r.x =  a.x != b.x; r.y = a.y != b.y; r.z = a.z != b.z; r.w = a.w != b.w; return r; }
 
 // s32
-static inline s32   s32_equal(s32 a, s32 b)                     { return a == b; }
-static inline s32   s32_nequal(s32 a, s32 b)                    { return a != b; }
+static inline bool  s32_equal(s32 a, s32 b)                     { return a == b; }
+static inline bool  s32_nequal(s32 a, s32 b)                    { return a != b; }
 static inline s32   s32_min(s32 a, s32 b)                       { return a < b ? a : b; }
 static inline s32   s32_max(s32 a, s32 b)                       { return a > b ? a : b; }
 static inline s32   s32_abs(s32 a)                              { return a < 0 ? -a : a; }
@@ -72,8 +72,35 @@ static inline f32   f32_acos(f32 a)                             { return acosf(a
 static inline f32   f32_tan(f32 rad)                            { return tanf(rad); }
 static inline f32   f32_atan(f32 a)                             { return atanf(a); }
 static inline f32   f32_abs(f32 a)                              { return a < 0 ? -a : a; }
-static inline bool  f32_equal(f32 a, f32 b)                     { f32 diff = a - b; if (diff < 0) {diff = -diff;} f32 max_val = a > b ? a : b; if (max_val < 0) {max_val = -max_val;} f32 tol = max_val * F32_EPSILON; if (tol < F32_ABS_EPSILON) {tol = F32_ABS_EPSILON;} return diff <= tol; }
-static inline bool  f32_nequal(f32 a, f32 b)                     { return !f32_equal(a, b); }
+static inline bool  f32_equal(f32 a, f32 b)                     { return a == b; }
+static inline bool  f32_nequal(f32 a, f32 b)                    { return a != b; }
+static inline bool  f32_approx_equal(f32 a, f32 b)              { 
+    if (a == b) {
+        return true;
+    }
+
+    // TODO: If one is infinite => return false;
+    // if (is_inf(a) || is_inf(b)) return false;
+    // f32 diff = f32_abs(a-b);
+    // f32 max_val = f32_max(f32_abs(a), f32_abs(b));
+    // f32 tol = f32_max(max_val * F32_EPSILON, F32_ABS_EPSILON);
+    // return diff <= tol;
+
+    f32 diff = a - b;
+    if (diff < 0) {
+        diff = -diff;
+    }
+    f32 max_val = a > b ? a : b;
+    if (max_val < 0) {
+        max_val = -max_val;
+    }
+    f32 tol = max_val * F32_EPSILON;
+    if (tol < F32_ABS_EPSILON) {
+        tol = F32_ABS_EPSILON;
+    }
+    return diff <= tol;
+}
+static inline bool  f32_approx_nequal(f32 a, f32 b)             { return !f32_approx_equal(a, b); }
 static inline f32   f32_sqrt(f32 a)                             { return sqrtf(a); }
 static inline f32   f32_rsqrt(f32 a)                            { ASSERT(a>0.0f); return 1.0f / sqrtf(a); }
 static inline f32   f32_lerp_fast(f32 a, f32 b, f32 t)          { return a  + (b - a) * t; }
@@ -108,8 +135,9 @@ static inline s32x2 s32x2_abs(s32x2 a)                          { return s32x2_m
 static inline s32   s32x2_dot(s32x2 a, s32x2 b)                 { return (a.x * b.x + a.y * b.y); }
 static inline s32   s32x2_length2(s32x2 a)                      { return (a.x * a.x + a.y * a.y); }
 static inline s32   s32x2_wedge(s32x2 a, s32x2 b)               { return a.x * b.y - a.y * b.x; }
-static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return f32_acos(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
+static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return f32_acos(f32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
 static inline s32x2 s32x2_perpendicular(s32x2 a)                { return s32x2_make(-a.y, a.x); }
+// TODO: look at f32 t parameter for interpolation
 static inline s32x2 s32x2_lerp_fast(s32x2 a, s32x2 b, s32 t)    { return s32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
 static inline s32x2 s32x2_lerp(s32x2 a, s32x2 b, s32 t)         { return s32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
 static inline s32x2 s32x2_mask_select(bool2 mask, s32x2 a, s32x2 b) { s32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
@@ -451,8 +479,8 @@ static inline s32x2 operator*(s32x2 a, s32   b)                 { return s32x2_m
 static inline s32x2 operator/(s32x2 a, s32x2 b)                 { return s32x2_div(a, b);       }
 static inline s32x2 operator/(s32   a, s32x2 b)                 { return s32_div_s32x2(a, b);  }
 static inline s32x2 operator/(s32x2 a, s32   b)                 { return s32x2_div_s32(a, b);  }
-static inline bool  operator==(s32x2 a, s32x2 b)                { return s32x2_equal(a, b);     }
-static inline bool  operator!=(s32x2 a, s32x2 b)                { return s32x2_nequal(a, b);    }
+static inline bool  operator==(s32x2 a, s32x2 b)                { return bool2_all(s32x2_equal(a, b));     }
+static inline bool  operator!=(s32x2 a, s32x2 b)                { return bool2_any(s32x2_nequal(a, b));    }
 
 static inline f32x2 operator+(f32x2 a, f32x2 b)                 { return f32x2_add(a, b);       }
 static inline f32x2 operator+(f32   a, f32x2 b)                 { return f32_add_f32x2(a, b);  }
@@ -467,8 +495,8 @@ static inline f32x2 operator*(f32x2 a, f32   b)                 { return f32x2_m
 static inline f32x2 operator/(f32x2 a, f32x2 b)                 { return f32x2_div(a, b);       }
 static inline f32x2 operator/(f32   a, f32x2 b)                 { return f32_div_f32x2(a, b);  }
 static inline f32x2 operator/(f32x2 a, f32   b)                 { return f32x2_div_f32(a, b);  }
-static inline bool  operator==(f32x2 a, f32x2 b)                { return f32x2_equal(a, b);     }
-static inline bool  operator!=(f32x2 a, f32x2 b)                { return f32x2_neqal(a, b);    }
+static inline bool  operator==(f32x2 a, f32x2 b)                { return bool2_all(f32x2_equal(a, b));     }
+static inline bool  operator!=(f32x2 a, f32x2 b)                { return bool2_any(f32x2_nequal(a, b));    }
 
 static inline f32x3 operator+(f32x3 a, f32x3 b)                 { return f32x3_add(a, b);       }
 static inline f32x3 operator+(f32   a, f32x3 b)                 { return f32_add_f32x3(a, b);  }
@@ -483,8 +511,8 @@ static inline f32x3 operator*(f32x3 a, f32   b)                 { return f32x3_m
 static inline f32x3 operator/(f32x3 a, f32x3 b)                 { return f32x3_div(a, b);       }
 static inline f32x3 operator/(f32   a, f32x3 b)                 { return f32_div_f32x3(a, b);  }
 static inline f32x3 operator/(f32x3 a, f32   b)                 { return f32x3_div_f32(a, b);  }
-static inline bool  operator==(f32x3 a, f32x3 b)                { return f32x3_equal(a, b);     }
-static inline bool  operator!=(f32x3 a, f32x3 b)                { return f32x3_nequal(a, b);    }
+static inline bool  operator==(f32x3 a, f32x3 b)                { return bool3_all(f32x3_equal(a, b));     }
+static inline bool  operator!=(f32x3 a, f32x3 b)                { return bool3_any(f32x3_nequal(a, b));    }
 
 static inline f32x4 operator+(f32x4 a, f32x4 b)                 { return f32x4_add(a, b);       }
 static inline f32x4 operator+(f32   a, f32x4 b)                 { return f32_add_f32x4(a, b);  }
@@ -499,8 +527,8 @@ static inline f32x4 operator*(f32x4 a, f32   b)                 { return f32x4_m
 static inline f32x4 operator/(f32x4 a, f32x4 b)                 { return f32x4_div(a, b);       }
 static inline f32x4 operator/(f32   a, f32x4 b)                 { return f32_div_f32x4(a, b);  }
 static inline f32x4 operator/(f32x4 a, f32   b)                 { return f32x4_div_f32(a, b);  }
-static inline bool  operator==(f32x4 a, f32x4 b)                { return f32x4_equal(a, b);     }
-static inline bool  operator!=(f32x4 a, f32x4 b)                { return f32x4_nequal(a, b);    }
+static inline bool  operator==(f32x4 a, f32x4 b)                { return bool4_all(f32x4_equal(a, b));     }
+static inline bool  operator!=(f32x4 a, f32x4 b)                { return bool4_any(f32x4_nequal(a, b));    }
 
 static inline f32x4x4 operator+(const f32x4x4& a, const f32x4x4& b)     { return f32x4x4_add(&a, &b); }
 static inline f32x4x4 operator-(const f32x4x4& a, const f32x4x4& b)     { return f32x4x4_sub(&a, &b); }
