@@ -8,17 +8,21 @@
 extern "C" {
 #endif
 
-#define F32_PI_HALF         1.5707963267948966192F
-#define F32_PI              3.1415926535897932384F
-#define F32_3_PI_HALF       4.7123889803846898577F
-#define F32_TAU             6.2831853071795864769F
+
+
+#define F32_PI              3.141592653589793238462643383279502884F
+#define F32_RPI             0.318309886183790671537767526745028724F
+#define F32_PI_HALF         1.570796326794896619231321691639751442F
+#define F32_3_PI_HALF       4.712388980384689857693965074919254326F
+#define F32_TAU             6.283185307179586476925286766559005768F
+#define F32_SQRT2           1.414213562373095048801688724209698079F
+#define F32_RSQRT2          0.707106781186547524400844362104849039F
+#define F32_SQRT3           1.732050807568877293527446341505872367F
+#define F32_RSQRT3          0.577350269189625764509148780501957456F
+#define F32_1DEG            0.017453292519943295769236907684886127F
+
 #define F32_EPSILON         1E-6F
 #define F32_ABS_EPSILON     1E-8F
-#define F32_SQRT2           1.4142135623730951F
-#define F32_RSQRT2          0.7071067811865475F
-#define F32_SQRT3           1.7320508075688772F
-#define F32_RSQRT3          0.5773502691896258F
-#define F32_1DEG            0.017453292519943295F
 
 // bool
 static inline bool2 bool2_make(bool a, bool b)                  { bool2 r; r.x = a; r.y = b; return r; }
@@ -47,6 +51,7 @@ static inline bool4 bool4_xor(bool4 a, bool4 b)                 { bool4 r; r.x =
 
 // s32
 static inline s32   s32_equal(s32 a, s32 b)                     { return a == b; }
+static inline s32   s32_nequal(s32 a, s32 b)                    { return a != b; }
 static inline s32   s32_min(s32 a, s32 b)                       { return a < b ? a : b; }
 static inline s32   s32_max(s32 a, s32 b)                       { return a > b ? a : b; }
 static inline s32   s32_abs(s32 a)                              { return a < 0 ? -a : a; }
@@ -68,175 +73,171 @@ static inline f32   f32_tan(f32 rad)                            { return tanf(ra
 static inline f32   f32_atan(f32 a)                             { return atanf(a); }
 static inline f32   f32_abs(f32 a)                              { return a < 0 ? -a : a; }
 static inline bool  f32_equal(f32 a, f32 b)                     { f32 diff = a - b; if (diff < 0) {diff = -diff;} f32 max_val = a > b ? a : b; if (max_val < 0) {max_val = -max_val;} f32 tol = max_val * F32_EPSILON; if (tol < F32_ABS_EPSILON) {tol = F32_ABS_EPSILON;} return diff <= tol; }
+static inline bool  f32_nequal(f32 a, f32 b)                     { return !f32_equal(a, b); }
 static inline f32   f32_sqrt(f32 a)                             { return sqrtf(a); }
 static inline f32   f32_rsqrt(f32 a)                            { ASSERT(a>0.0f); return 1.0f / sqrtf(a); }
 static inline f32   f32_lerp_fast(f32 a, f32 b, f32 t)          { return a  + (b - a) * t; }
 static inline f32   f32_lerp(f32 a, f32 b, f32 t)               { return a * (1.0f - t) + b * t; }
-static inline bool  f32_inrange(f32 x, f32 a, f32 b)            { return (x >= a) && (x < b);}
-static inline f32   f32_deg_to_rad(f32 d)                       { return d * F32_PI * (1.0f / 180.0f); }
-static inline f32   f32_rad_to_deg(f32 r)                       { return r * 180.0f * (1.0f / F32_PI); }
+static inline bool  f32_in_range(f32 x, f32 a, f32 b)           { return (x >= a) && (x < b);}
+static inline f32   f32_deg_to_rad(f32 d)                       { return d * F32_1DEG; }
+static inline f32   f32_rad_to_deg(f32 r)                       { return r * 180.0f * F32_RPI; }
 static inline f32   f32_sign(f32 a)                             { return (f32)((a > 0.0f) - (a < 0.0f)); }
 
 // s32x2
 static inline s32x2 s32x2_make      (s32 x, s32 y)              { s32x2 result; result.x = x; result.y = y; return result; }
 static inline s32x2 s32x2_splat     (s32 a)                     { return s32x2_make(a, a); }
 static inline s32x2 s32x2_add       (s32x2 a, s32x2 b)          { return s32x2_make(a.x + b.x, a.y + b.y); }
-static inline s32x2 s32x2_addl_s32  (s32   a, s32x2 b)          { return s32x2_make(a   + b.x, a   + b.y); }
-static inline s32x2 s32x2_addr_s32  (s32x2 a, s32   b)          { return s32x2_make(a.x + b  , a.y + b  ); }
+static inline s32x2 s32_add_s32x2   (s32   a, s32x2 b)          { return s32x2_make(a   + b.x, a   + b.y); }
+static inline s32x2 s32x2_add_s32   (s32x2 a, s32   b)          { return s32x2_make(a.x + b  , a.y + b  ); }
 static inline s32x2 s32x2_sub       (s32x2 a, s32x2 b)          { return s32x2_make(a.x - b.x, a.y - b.y); }
-static inline s32x2 s32x2_subl_s32  (s32   a, s32x2 b)          { return s32x2_make(a   - b.x, a   - b.y); }
-static inline s32x2 s32x2_subr_s32  (s32x2 a, s32   b)          { return s32x2_make(a.x - b  , a.y - b  ); }
+static inline s32x2 s32_sub_s32x2   (s32   a, s32x2 b)          { return s32x2_make(a   - b.x, a   - b.y); }
+static inline s32x2 s32x2_sub_s32   (s32x2 a, s32   b)          { return s32x2_make(a.x - b  , a.y - b  ); }
 static inline s32x2 s32x2_subu      (s32x2 a)                   { return s32x2_make(-a.x     , -a.y     ); }
 static inline s32x2 s32x2_mul       (s32x2 a, s32x2 b)          { return s32x2_make(a.x * b.x, a.y * b.y); }
-static inline s32x2 s32x2_mull_s32  (s32   a, s32x2 b)          { return s32x2_make(a   * b.x, a   * b.y); }
-static inline s32x2 s32x2_mulr_s32  (s32x2 a, s32   b)          { return s32x2_make(a.x * b  , a.y * b  ); }
+static inline s32x2 s32_mul_s32x2   (s32   a, s32x2 b)          { return s32x2_make(a   * b.x, a   * b.y); }
+static inline s32x2 s32x2_mul_s32   (s32x2 a, s32   b)          { return s32x2_make(a.x * b  , a.y * b  ); }
 static inline s32x2 s32x2_div       (s32x2 a, s32x2 b)          { ASSERT(b.x!=0 && b.y!=0);      return s32x2_make(a.x / b.x, a.y / b.y); }
-static inline s32x2 s32x2_divl_s32  (s32   a, s32x2 b)          { ASSERT(b.x!=0 && b.y!=0);      return s32x2_make(a   / b.x, a   / b.y); }
-static inline s32x2 s32x2_divr_s32  (s32x2 a, s32   b)          { ASSERT(b!=0); return s32x2_make(a.x / b, a.y / b); }
-static inline bool  s32x2_equal     (s32x2 a, s32x2 b)          { return (   s32_equal(a.x, b.x)  &&   s32_equal(a.y, b.y)  ); }
-static inline bool  s32x2_nequal    (s32x2 a, s32x2 b)          { return !s32x2_equal(a, b); }
+static inline s32x2 s32_div_s32x2   (s32   a, s32x2 b)          { ASSERT(b.x!=0 && b.y!=0);      return s32x2_make(a   / b.x, a   / b.y); }
+static inline s32x2 s32x2_div_s32   (s32x2 a, s32   b)          { ASSERT(b!=0); return s32x2_make(a.x / b, a.y / b); }
+static inline bool2 s32x2_equal     (s32x2 a, s32x2 b)          { return bool2_make(s32_equal(a.x, b.x), s32_equal(a.y, b.y)); }
+static inline bool2 s32x2_nequal    (s32x2 a, s32x2 b)          { return bool2_make(s32_nequal(a.x, b.x), s32_nequal(a.y, b.y)); }
 static inline s32x2 s32x2_min(s32x2 a, s32x2 b)                 { return s32x2_make(s32_min(a.x, b.x), s32_min(a.y, b.y)); }
 static inline s32x2 s32x2_max(s32x2 a, s32x2 b)                 { return s32x2_make(s32_max(a.x, b.x), s32_max(a.y, b.y)); }
 static inline s32x2 s32x2_clamp(s32x2 x, s32x2 a, s32x2 b)      { return s32x2_min(s32x2_max(x, a), b); }
 static inline s32x2 s32x2_abs(s32x2 a)                          { return s32x2_make(s32_abs(a.x), s32_abs(a.y)); }
 static inline s32   s32x2_dot(s32x2 a, s32x2 b)                 { return (a.x * b.x + a.y * b.y); }
 static inline s32   s32x2_length2(s32x2 a)                      { return (a.x * a.x + a.y * a.y); }
-// static inline s32   s32x2_length (s32x2 a)                      { return s32_sqrt(s32x2_length2(a)); }
-// static inline s32x2 s32x2_normalize(s32x2 a)                    { s32 len2 = s32x2_length2(a); ASSERT(len2!=0); s32 inv = s32_rsqrt(len2); return s32x2_make(a.x*inv, a.y*inv); }
 static inline s32   s32x2_wedge(s32x2 a, s32x2 b)               { return a.x * b.y - a.y * b.x; }
+static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return f32_acos(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
 static inline s32x2 s32x2_perpendicular(s32x2 a)                { return s32x2_make(-a.y, a.x); }
 static inline s32x2 s32x2_lerp_fast(s32x2 a, s32x2 b, s32 t)    { return s32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
 static inline s32x2 s32x2_lerp(s32x2 a, s32x2 b, s32 t)         { return s32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
-// static inline bool  s32x2_interval_overlap(s32x2 a, s32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
-static inline f32   s32x2_angle(s32x2 a, s32x2 b)               { return f32_acos(s32_clamp(s32x2_dot(a, b) * f32_rsqrt((f32)(s32x2_length2(a) * s32x2_length2(b))), -1.0f, 1.0f)); }
 static inline s32x2 s32x2_mask_select(bool2 mask, s32x2 a, s32x2 b) { s32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
+// static inline bool  s32x2_interval_overlap(s32x2 a, s32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
 
 // f32x2
 static inline f32x2 f32x2_make      (f32 x, f32 y)              { f32x2 result; result.x = x; result.y = y; return result; }
 static inline f32x2 f32x2_splat     (f32 a)                     { return f32x2_make(a, a); }
 static inline f32x2 f32x2_add       (f32x2 a, f32x2 b)          { return f32x2_make(a.x + b.x, a.y + b.y); }
-static inline f32x2 f32x2_addl_f32  (f32   a, f32x2 b)          { return f32x2_make(a   + b.x, a   + b.y); }
-static inline f32x2 f32x2_addr_f32  (f32x2 a, f32   b)          { return f32x2_make(a.x + b  , a.y + b  ); }
+static inline f32x2 f32_add_f32x2   (f32   a, f32x2 b)          { return f32x2_make(a   + b.x, a   + b.y); }
+static inline f32x2 f32x2_add_f32   (f32x2 a, f32   b)          { return f32x2_make(a.x + b  , a.y + b  ); }
 static inline f32x2 f32x2_sub       (f32x2 a, f32x2 b)          { return f32x2_make(a.x - b.x, a.y - b.y); }
-static inline f32x2 f32x2_subl_f32  (f32   a, f32x2 b)          { return f32x2_make(a   - b.x, a   - b.y); }
-static inline f32x2 f32x2_subr_f32  (f32x2 a, f32   b)          { return f32x2_make(a.x - b  , a.y - b  ); }
+static inline f32x2 f32_sub_f32x2   (f32   a, f32x2 b)          { return f32x2_make(a   - b.x, a   - b.y); }
+static inline f32x2 f32x2_sub_f32   (f32x2 a, f32   b)          { return f32x2_make(a.x - b  , a.y - b  ); }
 static inline f32x2 f32x2_subu      (f32x2 a)                   { return f32x2_make(-a.x     , -a.y     ); }
 static inline f32x2 f32x2_mul       (f32x2 a, f32x2 b)          { return f32x2_make(a.x * b.x, a.y * b.y); }
-static inline f32x2 f32x2_mull_f32  (f32   a, f32x2 b)          { return f32x2_make(a   * b.x, a   * b.y); }
-static inline f32x2 f32x2_mulr_f32  (f32x2 a, f32   b)          { return f32x2_make(a.x * b  , a.y * b  ); }
+static inline f32x2 f32_mul_f32x2   (f32   a, f32x2 b)          { return f32x2_make(a   * b.x, a   * b.y); }
+static inline f32x2 f32x2_mul_f32   (f32x2 a, f32   b)          { return f32x2_make(a.x * b  , a.y * b  ); }
 static inline f32x2 f32x2_div       (f32x2 a, f32x2 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f);      return f32x2_make(a.x / b.x, a.y / b.y); }
-static inline f32x2 f32x2_divl_f32  (f32   a, f32x2 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f);      return f32x2_make(a   / b.x, a   / b.y); }
-static inline f32x2 f32x2_divr_f32  (f32x2 a, f32   b)          { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x2_make(a.x * inv, a.y * inv); }
-static inline bool  f32x2_equal     (f32x2 a, f32x2 b)          { return (   f32_equal(a.x, b.x)  &&   f32_equal(a.y, b.y)  ); }
-static inline bool  f32x2_nequal    (f32x2 a, f32x2 b)          { return !f32x2_equal(a, b); }
-static inline f32x2 f32x2_min(f32x2 a, f32x2 b)                 { return f32x2_make(f32_min(a.x, b.x), f32_min(a.y, b.y)); }
-static inline f32x2 f32x2_max(f32x2 a, f32x2 b)                 { return f32x2_make(f32_max(a.x, b.x), f32_max(a.y, b.y)); }
-static inline f32x2 f32x2_clamp(f32x2 x, f32x2 a, f32x2 b)      { return f32x2_min(f32x2_max(x, a), b); }
-static inline f32x2 f32x2_floor(f32x2 a)                        { return f32x2_make(f32_floor(a.x), f32_floor(a.y)); }
-static inline f32x2 f32x2_ceil(f32x2 a)                         { return f32x2_make(f32_ceil(a.x), f32_ceil(a.y)); }
-static inline f32x2 f32x2_abs(f32x2 a)                          { return f32x2_make(f32_abs(a.x), f32_abs(a.y)); }
-static inline bool2 f32x2_gt(f32x2 a, f32x2 b)                  { return bool2_make(a.x>b.x, a.y>b.y);}
-static inline bool2 f32x2_ge(f32x2 a, f32x2 b)                  { return bool2_make(a.x>=b.x, a.y>=b.y);}
-static inline bool2 f32x2_lt(f32x2 a, f32x2 b)                  { return bool2_make(a.x<b.x, a.y<b.y);}
-static inline bool2 f32x2_le(f32x2 a, f32x2 b)                  { return bool2_make(a.x<=b.x, a.y<=b.y);}
-static inline f32   f32x2_dot(f32x2 a, f32x2 b)                 { return (a.x * b.x + a.y * b.y); }
-static inline f32   f32x2_length2(f32x2 a)                      { return (a.x * a.x + a.y * a.y); }
-static inline f32   f32x2_length (f32x2 a)                      { return f32_sqrt(f32x2_length2(a)); }
-static inline f32x2 f32x2_normalize(f32x2 a)                    { f32 len2 = f32x2_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x2_make(a.x*inv, a.y*inv); }
-static inline f32   f32x2_wedge(f32x2 a, f32x2 b)               { return a.x * b.y - a.y * b.x; }
+static inline f32x2 f32_div_f32x2   (f32   a, f32x2 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f);      return f32x2_make(a   / b.x, a   / b.y); }
+static inline f32x2 f32x2_div_f32   (f32x2 a, f32   b)          { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x2_make(a.x * inv, a.y * inv); }
+static inline bool2 f32x2_equal     (f32x2 a, f32x2 b)          { return bool2_make(f32_equal(a.x, b.x), f32_equal(a.y, b.y)); }
+static inline bool2 f32x2_nequal    (f32x2 a, f32x2 b)          { return bool2_make(f32_nequal(a.x, b.x), f32_nequal(a.y, b.y)); }
+static inline f32x2 f32x2_min       (f32x2 a, f32x2 b)          { return f32x2_make(f32_min(a.x, b.x), f32_min(a.y, b.y)); }
+static inline f32x2 f32x2_max       (f32x2 a, f32x2 b)          { return f32x2_make(f32_max(a.x, b.x), f32_max(a.y, b.y)); }
+static inline f32x2 f32x2_clamp     (f32x2 x, f32x2 a, f32x2 b) { return f32x2_min(f32x2_max(x, a), b); }
+static inline f32x2 f32x2_floor     (f32x2 a)                   { return f32x2_make(f32_floor(a.x), f32_floor(a.y)); }
+static inline f32x2 f32x2_ceil      (f32x2 a)                   { return f32x2_make(f32_ceil(a.x), f32_ceil(a.y)); }
+static inline f32x2 f32x2_abs       (f32x2 a)                   { return f32x2_make(f32_abs(a.x), f32_abs(a.y)); }
+static inline bool2 f32x2_gt        (f32x2 a, f32x2 b)          { return bool2_make(a.x>b.x, a.y>b.y);}
+static inline bool2 f32x2_ge        (f32x2 a, f32x2 b)          { return bool2_make(a.x>=b.x, a.y>=b.y);}
+static inline bool2 f32x2_lt        (f32x2 a, f32x2 b)          { return bool2_make(a.x<b.x, a.y<b.y);}
+static inline bool2 f32x2_le        (f32x2 a, f32x2 b)          { return bool2_make(a.x<=b.x, a.y<=b.y);}
+static inline f32   f32x2_dot       (f32x2 a, f32x2 b)          { return (a.x * b.x + a.y * b.y); }
+static inline f32   f32x2_length2   (f32x2 a)                   { return (a.x * a.x + a.y * a.y); }
+static inline f32   f32x2_length    (f32x2 a)                   { return f32_sqrt(f32x2_length2(a)); }
+static inline f32x2 f32x2_normalize (f32x2 a)                   { f32 len2 = f32x2_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x2_make(a.x*inv, a.y*inv); }
+static inline f32   f32x2_wedge     (f32x2 a, f32x2 b)          { return a.x * b.y - a.y * b.x; }
 static inline f32x2 f32x2_perpendicular(f32x2 a)                { return f32x2_make(-a.y, a.x); }
-static inline f32x2 f32x2_lerp_fast(f32x2 a, f32x2 b, f32 t)    { return f32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
-static inline f32x2 f32x2_lerp(f32x2 a, f32x2 b, f32 t)         { return f32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
-// static inline bool  f32x2_interval_overlap(f32x2 a, f32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
+static inline f32x2 f32x2_lerp_fast (f32x2 a, f32x2 b, f32 t)   { return f32x2_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); }
+static inline f32x2 f32x2_lerp      (f32x2 a, f32x2 b, f32 t)   { return f32x2_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t); }
 static inline f32   f32x2_angle(f32x2 a, f32x2 b)               { return f32_acos(f32_clamp(f32x2_dot(a, b) * f32_rsqrt(f32x2_length2(a) * f32x2_length2(b)), -1.0f, 1.0f)); }
 static inline f32x2 f32x2_mask_select(bool2 mask, f32x2 a, f32x2 b) { f32x2 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; return r; }
-
+// static inline bool  f32x2_interval_overlap(f32x2 a, f32x2 b)    { return (a.y > b.x) && (a.x < b.y); }
 
 // f32x3
-static inline f32x3 f32x3_make(f32 x, f32 y, f32 z)             { f32x3 result; result.x = x; result.y = y; result.z = z; return result; }
-static inline f32x3 f32x3_splat(f32 a)                          { return f32x3_make(a, a, a); }
-static inline f32x3 f32x3_add(f32x3 a, f32x3 b)                 { return f32x3_make(a.x + b.x, a.y + b.y, a.z + b.z); }
-static inline f32x3 f32x3_addl_f32(f32   a, f32x3 b)                 { return f32x3_make(a   + b.x, a   + b.y, a   + b.z); }
-static inline f32x3 f32x3_addr_f32(f32x3 a, f32   b)                 { return f32x3_make(a.x + b  , a.y + b  , a.z + b  ); }
-static inline f32x3 f32x3_sub(f32x3 a, f32x3 b)                 { return f32x3_make(a.x - b.x, a.y - b.y, a.z - b.z); }
-static inline f32x3 f32x3_subl_f32(f32   a, f32x3 b)                 { return f32x3_make(a   - b.x, a   - b.y, a   - b.z); }
-static inline f32x3 f32x3_subr_f32(f32x3 a, f32   b)                 { return f32x3_make(a.x - b  , a.y - b  , a.z - b  ); }
-static inline f32x3 f32x3_subu(f32x3 a)                          { return f32x3_make(-a.x,     -a.y,      -a.z      ); }
-static inline f32x3 f32x3_mul(f32x3 a, f32x3 b)                 { return f32x3_make(a.x * b.x, a.y * b.y, a.z * b.z); }
-static inline f32x3 f32x3_mull_f32(f32   a, f32x3 b)                 { return f32x3_make(a   * b.x, a   * b.y, a   * b.z); }
-static inline f32x3 f32x3_mulr_f32(f32x3 a, f32   b)                 { return f32x3_make(a.x * b  , a.y * b  , a.z * b  ); }
-static inline f32x3 f32x3_div(f32x3 a, f32x3 b)                 { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f); return f32x3_make(a.x / b.x, a.y / b.y, a.z / b.z); }
-static inline f32x3 f32x3_divl_f32(f32   a, f32x3 b)                 { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f); return f32x3_make(a   / b.x, a   / b.y, a   / b.z); }
-static inline f32x3 f32x3_divr_f32(f32x3 a, f32   b)                 { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x3_make(a.x * inv, a.y * inv, a.z * inv); }
-static inline bool  f32x3_equal(f32x3 a, f32x3 b)                { return (f32_equal(a.x, b.x) && f32_equal(a.y, b.y) && f32_equal(a.z, b.z)); }
-static inline bool  f32x3_nequal(f32x3 a, f32x3 b)                { return !f32x3_equal(a, b); }
-static inline f32x3 f32x3_min(f32x3 a, f32x3 b)                 { return f32x3_make(f32_min(a.x, b.x), f32_min(a.y, b.y), f32_min(a.z, b.z)); }
-static inline f32x3 f32x3_max(f32x3 a, f32x3 b)                 { return f32x3_make(f32_max(a.x, b.x), f32_max(a.y, b.y), f32_max(a.z, b.z)); }
-static inline f32x3 f32x3_clamp(f32x3 x, f32x3 a, f32x3 b)      { return f32x3_min(f32x3_max(x, a), b); }
-static inline f32x3 f32x3_floor(f32x3 a)                        { return f32x3_make(f32_floor(a.x), f32_floor(a.y), f32_floor(a.z)); }
-static inline f32x3 f32x3_ceil(f32x3 a)                         { return f32x3_make(f32_ceil(a.x), f32_ceil(a.y), f32_ceil(a.z)); }
-static inline f32x3 f32x3_abs(f32x3 a)                          { return f32x3_make(f32_abs(a.x), f32_abs(a.y), f32_abs(a.z)); }
-static inline bool3 f32x3_gt(f32x3 a, f32x3 b)                  { return bool3_make(a.x>b.x, a.y>b.y, a.z>b.z);}
-static inline bool3 f32x3_ge(f32x3 a, f32x3 b)                  { return bool3_make(a.x>=b.x, a.y>=b.y, a.z>=b.z);}
-static inline bool3 f32x3_lt(f32x3 a, f32x3 b)                  { return bool3_make(a.x<b.x, a.y<b.y, a.z<b.z);}
-static inline bool3 f32x3_le(f32x3 a, f32x3 b)                  { return bool3_make(a.x<=b.x, a.y<=b.y, a.z<=b.z);}
-static inline f32   f32x3_dot(f32x3 a, f32x3 b)                 { return a.x * b.x + a.y * b.y + a.z * b.z; }
-static inline f32   f32x3_length2(f32x3 a)                      { return a.x * a.x + a.y * a.y + a.z * a.z; }
-static inline f32   f32x3_length (f32x3 a)                      { return f32_sqrt(f32x3_length2(a)); }
-static inline f32x3 f32x3_normalize(f32x3 a)                    { f32 len2 = f32x3_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x3_make(a.x * inv, a.y * inv, a.z * inv); }
-static inline f32x3 f32x3_cross(f32x3 a, f32x3 b)               { return f32x3_make(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
-static inline f32x3 f32x3_reflect(f32x3 a, f32x3 N)             { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32x3_sub(a, f32x3_mull_f32(2 * f32x3_dot(a, N), N)); }
-static inline f32x3 f32x3_project(f32x3 a, f32x3 N)             { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32x3_mull_f32(f32x3_dot(a, N), N); }
-static inline f32x3 f32x3_lerp_fast(f32x3 a, f32x3 b, f32 t)    { return f32x3_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t); }
-static inline f32x3 f32x3_lerp(f32x3 a, f32x3 b, f32 t)         { return f32x3_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t, a.z * (1.0f - t) + b.z * t); }
-static inline f32   f32x3_angle(f32x3 a, f32x3 b)               { return f32_acos(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
-static inline f32x3 f32x3_refract(f32x3 i, f32x3 N, f32 eta)    { ASSERT(f32_equal(f32x3_length2(N), 1.0f));
+static inline f32x3 f32x3_make      (f32 x, f32 y, f32 z)       { f32x3 result; result.x = x; result.y = y; result.z = z; return result; }
+static inline f32x3 f32x3_splat     (f32 a)                     { return f32x3_make(a, a, a); }
+static inline f32x3 f32x3_add       (f32x3 a, f32x3 b)          { return f32x3_make(a.x + b.x, a.y + b.y, a.z + b.z); }
+static inline f32x3 f32_add_f32x3   (f32   a, f32x3 b)          { return f32x3_make(a   + b.x, a   + b.y, a   + b.z); }
+static inline f32x3 f32x3_add_f32   (f32x3 a, f32   b)          { return f32x3_make(a.x + b  , a.y + b  , a.z + b  ); }
+static inline f32x3 f32x3_sub       (f32x3 a, f32x3 b)          { return f32x3_make(a.x - b.x, a.y - b.y, a.z - b.z); }
+static inline f32x3 f32_sub_f32x3   (f32   a, f32x3 b)          { return f32x3_make(a   - b.x, a   - b.y, a   - b.z); }
+static inline f32x3 f32x3_sub_f32   (f32x3 a, f32   b)          { return f32x3_make(a.x - b  , a.y - b  , a.z - b  ); }
+static inline f32x3 f32x3_subu      (f32x3 a)                   { return f32x3_make(-a.x,     -a.y,      -a.z      ); }
+static inline f32x3 f32x3_mul       (f32x3 a, f32x3 b)          { return f32x3_make(a.x * b.x, a.y * b.y, a.z * b.z); }
+static inline f32x3 f32_mul_f32x3   (f32   a, f32x3 b)          { return f32x3_make(a   * b.x, a   * b.y, a   * b.z); }
+static inline f32x3 f32x3_mul_f32   (f32x3 a, f32   b)          { return f32x3_make(a.x * b  , a.y * b  , a.z * b  ); }
+static inline f32x3 f32x3_div       (f32x3 a, f32x3 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f); return f32x3_make(a.x / b.x, a.y / b.y, a.z / b.z); }
+static inline f32x3 f32_div_f32x3   (f32   a, f32x3 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f); return f32x3_make(a   / b.x, a   / b.y, a   / b.z); }
+static inline f32x3 f32x3_div_f32   (f32x3 a, f32   b)          { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x3_make(a.x * inv, a.y * inv, a.z * inv); }
+static inline bool3 f32x3_equal     (f32x3 a, f32x3 b)          { return bool3_make(f32_equal(a.x, b.x), f32_equal(a.y, b.y), f32_equal(a.z, b.z)); }
+static inline bool3 f32x3_nequal    (f32x3 a, f32x3 b)          { return bool3_make(f32_nequal(a.x, b.x), f32_nequal(a.y, b.y), f32_nequal(a.z, b.z)); }
+static inline f32x3 f32x3_min       (f32x3 a, f32x3 b)          { return f32x3_make(f32_min(a.x, b.x), f32_min(a.y, b.y), f32_min(a.z, b.z)); }
+static inline f32x3 f32x3_max       (f32x3 a, f32x3 b)          { return f32x3_make(f32_max(a.x, b.x), f32_max(a.y, b.y), f32_max(a.z, b.z)); }
+static inline f32x3 f32x3_clamp     (f32x3 x, f32x3 a, f32x3 b) { return f32x3_min(f32x3_max(x, a), b); }
+static inline f32x3 f32x3_floor     (f32x3 a)                   { return f32x3_make(f32_floor(a.x), f32_floor(a.y), f32_floor(a.z)); }
+static inline f32x3 f32x3_ceil      (f32x3 a)                   { return f32x3_make(f32_ceil(a.x), f32_ceil(a.y), f32_ceil(a.z)); }
+static inline f32x3 f32x3_abs       (f32x3 a)                   { return f32x3_make(f32_abs(a.x), f32_abs(a.y), f32_abs(a.z)); }
+static inline bool3 f32x3_gt        (f32x3 a, f32x3 b)          { return bool3_make(a.x>b.x, a.y>b.y, a.z>b.z); }
+static inline bool3 f32x3_ge        (f32x3 a, f32x3 b)          { return bool3_make(a.x>=b.x, a.y>=b.y, a.z>=b.z); }
+static inline bool3 f32x3_lt        (f32x3 a, f32x3 b)          { return bool3_make(a.x<b.x, a.y<b.y, a.z<b.z); }
+static inline bool3 f32x3_le        (f32x3 a, f32x3 b)          { return bool3_make(a.x<=b.x, a.y<=b.y, a.z<=b.z); }
+static inline f32   f32x3_dot       (f32x3 a, f32x3 b)          { return a.x * b.x + a.y * b.y + a.z * b.z; }
+static inline f32   f32x3_length2   (f32x3 a)                   { return a.x * a.x + a.y * a.y + a.z * a.z; }
+static inline f32   f32x3_length    (f32x3 a)                   { return f32_sqrt(f32x3_length2(a)); }
+static inline f32x3 f32x3_normalize (f32x3 a)                   { f32 len2 = f32x3_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x3_make(a.x * inv, a.y * inv, a.z * inv); }
+static inline f32x3 f32x3_cross     (f32x3 a, f32x3 b)          { return f32x3_make(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
+static inline f32x3 f32x3_reflect   (f32x3 a, f32x3 N)          { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32x3_sub(a, f32_mul_f32x3(2 * f32x3_dot(a, N), N)); }
+static inline f32x3 f32x3_project   (f32x3 a, f32x3 N)          { ASSERT(f32_equal(f32x3_length2(N), 1.0f)); return f32_mul_f32x3(f32x3_dot(a, N), N); }
+static inline f32x3 f32x3_lerp_fast (f32x3 a, f32x3 b, f32 t)   { return f32x3_make(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t); }
+static inline f32x3 f32x3_lerp      (f32x3 a, f32x3 b, f32 t)   { return f32x3_make(a.x * (1.0f - t) + b.x * t, a.y * (1.0f - t) + b.y * t, a.z * (1.0f - t) + b.z * t); }
+static inline f32   f32x3_angle     (f32x3 a, f32x3 b)          { return f32_acos(f32_clamp(f32x3_dot(a, b) * f32_rsqrt(f32x3_length2(a)*f32x3_length2(b)), -1.0f, 1.0f)); }
+static inline f32x3 f32x3_refract   (f32x3 i, f32x3 N, f32 eta) { ASSERT(f32_equal(f32x3_length2(N), 1.0f));
      ASSERT(f32_equal(f32x3_length2(i), 1.0f));
      f32 dot_ni = f32x3_dot(N, i);
      f32 k = 1.0f - eta * eta * (1.0f - dot_ni * dot_ni);
      if (k < 0.0f) {
          return f32x3_make(0.0f, 0.0f, 0.0f);
      }
-     return f32x3_sub(f32x3_mull_f32(eta, i), f32x3_mull_f32(eta * dot_ni + f32_sqrt(k), N));
+     return f32x3_sub(f32_mul_f32x3(eta, i), f32_mul_f32x3(eta * dot_ni + f32_sqrt(k), N));
 }
 
 static inline f32x3 f32x3_mask_select(bool3 mask, f32x3 a, f32x3 b) { f32x3 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; return r; }
 
 // f32x4
-static inline f32x4 f32x4_make(f32 x, f32 y, f32 z, f32 w)      { f32x4 result; result.x = x; result.y = y; result.z = z; result.w = w; return result; }
-static inline f32x4 f32x4_splat(f32 a)                          { return f32x4_make(a, a, a, a); }
-static inline f32x4 f32x4_add(f32x4 a, f32x4 b)                 { return f32x4_make(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
-static inline f32x4 f32x4_addl_f32(f32   a, f32x4 b)            { return f32x4_make(a   + b.x, a   + b.y, a   + b.z, a   + b.w); }
-static inline f32x4 f32x4_addr_f32(f32x4 a, f32   b)            { return f32x4_make(a.x + b  , a.y + b  , a.z + b  , a.w + b  ); }
-static inline f32x4 f32x4_sub(f32x4 a, f32x4 b)                 { return f32x4_make(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
-static inline f32x4 f32x4_subl_f32(f32   a, f32x4 b)            { return f32x4_make(a   - b.x, a   - b.y, a   - b.z, a   - b.w); }
-static inline f32x4 f32x4_subr_f32(f32x4 a, f32   b)            { return f32x4_make(a.x - b  , a.y - b  , a.z - b  , a.w - b  ); }
-static inline f32x4 f32x4_subu(f32x4 a)                         { return f32x4_make(-a.x, -a.y, -a.z, -a.w); }
-static inline f32x4 f32x4_mul(f32x4 a, f32x4 b)                 { return f32x4_make(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w); }
-static inline f32x4 f32x4_mull_f32(f32   a, f32x4 b)            { return f32x4_make(a   * b.x, a   * b.y, a   * b.z, a   * b.w); }
-static inline f32x4 f32x4_mulr_f32(f32x4 a, f32   b)            { return f32x4_make(a.x * b  , a.y * b  , a.z * b  , a.w * b  ); }
-static inline f32x4 f32x4_div(f32x4 a, f32x4 b)                 { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f && b.w!=0.0f); return f32x4_make(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w); }
-static inline f32x4 f32x4_divl_f32(f32   a, f32x4 b)            { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f && b.w!=0.0f); return f32x4_make(a   / b.x, a   / b.y, a   / b.z, a   / b.w); }
-static inline f32x4 f32x4_divr_f32(f32x4 a, f32   b)            { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x4_make(a.x * inv, a.y * inv, a.z * inv, a.w * inv); }
-static inline bool  f32x4_equal(f32x4 a, f32x4 b)               { return (f32_equal(a.x, b.x) && f32_equal(a.y, b.y) && f32_equal(a.z, b.z) && f32_equal(a.w, b.w)); }
-static inline bool  f32x4_nequal(f32x4 a, f32x4 b)              { return !f32x4_equal(a, b); }
-static inline f32x4 f32x4_min(f32x4 a, f32x4 b)                 { return f32x4_make(f32_min(a.x, b.x), f32_min(a.y, b.y), f32_min(a.z, b.z), f32_min(a.w, b.w)); }
-static inline f32x4 f32x4_max(f32x4 a, f32x4 b)                 { return f32x4_make(f32_max(a.x, b.x), f32_max(a.y, b.y), f32_max(a.z, b.z), f32_max(a.w, b.w)); }
-static inline f32x4 f32x4_clamp(f32x4 x, f32x4 a, f32x4 b)      { return f32x4_min(f32x4_max(x, a), b); }
-static inline f32x4 f32x4_abs(f32x4 a)                          { return f32x4_make(f32_abs(a.x), f32_abs(a.y), f32_abs(a.z), f32_abs(a.w)); }
-static inline f32x4 f32x4_floor(f32x4 a)                        { return f32x4_make(f32_floor(a.x), f32_floor(a.y), f32_floor(a.z), f32_floor(a.w)); }
-static inline f32x4 f32x4_ceil(f32x4 a)                         { return f32x4_make(f32_ceil(a.x), f32_ceil(a.y), f32_ceil(a.z), f32_ceil(a.w)); }
-static inline bool4 f32x4_gt(f32x4 a, f32x4 b)                  { return bool4_make(a.x>b.x, a.y>b.y, a.z>b.z, a.w>b.w);}
-static inline bool4 f32x4_ge(f32x4 a, f32x4 b)                  { return bool4_make(a.x>=b.x, a.y>=b.y, a.z>=b.z, a.w>=b.w);}
-static inline bool4 f32x4_lt(f32x4 a, f32x4 b)                  { return bool4_make(a.x<b.x, a.y<b.y, a.z<b.z, a.w<b.w);}
-static inline bool4 f32x4_le(f32x4 a, f32x4 b)                  { return bool4_make(a.x<=b.x, a.y<=b.y, a.z<=b.z, a.w<=b.w);}
-static inline f32   f32x4_dot(f32x4 a, f32x4 b)                 { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
-static inline f32   f32x4_length2(f32x4 a)                      { return a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w; }
-static inline f32   f32x4_length (f32x4 a)                      { return f32_sqrt(f32x4_length2(a)); }
-static inline f32x4 f32x4_normalize(f32x4 a)                    { f32 len2 = f32x4_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x4_mulr_f32(a, inv); }
+static inline f32x4 f32x4_make      (f32 x, f32 y, f32 z, f32 w){ f32x4 result; result.x = x; result.y = y; result.z = z; result.w = w; return result; }
+static inline f32x4 f32x4_splat     (f32 a)                     { return f32x4_make(a, a, a, a); }
+static inline f32x4 f32x4_add       (f32x4 a, f32x4 b)          { return f32x4_make(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
+static inline f32x4 f32_add_f32x4   (f32   a, f32x4 b)          { return f32x4_make(a   + b.x, a   + b.y, a   + b.z, a   + b.w); }
+static inline f32x4 f32x4_add_f32   (f32x4 a, f32   b)          { return f32x4_make(a.x + b  , a.y + b  , a.z + b  , a.w + b  ); }
+static inline f32x4 f32x4_sub       (f32x4 a, f32x4 b)          { return f32x4_make(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
+static inline f32x4 f32_sub_f32x4   (f32   a, f32x4 b)          { return f32x4_make(a   - b.x, a   - b.y, a   - b.z, a   - b.w); }
+static inline f32x4 f32x4_sub_f32   (f32x4 a, f32   b)          { return f32x4_make(a.x - b  , a.y - b  , a.z - b  , a.w - b  ); }
+static inline f32x4 f32x4_subu      (f32x4 a)                   { return f32x4_make(-a.x, -a.y, -a.z, -a.w); }
+static inline f32x4 f32x4_mul       (f32x4 a, f32x4 b)          { return f32x4_make(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w); }
+static inline f32x4 f32_mul_f32x4   (f32   a, f32x4 b)          { return f32x4_make(a   * b.x, a   * b.y, a   * b.z, a   * b.w); }
+static inline f32x4 f32x4_mul_f32   (f32x4 a, f32   b)          { return f32x4_make(a.x * b  , a.y * b  , a.z * b  , a.w * b  ); }
+static inline f32x4 f32x4_div       (f32x4 a, f32x4 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f && b.w!=0.0f); return f32x4_make(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w); }
+static inline f32x4 f32_div_f32x4   (f32   a, f32x4 b)          { ASSERT(b.x!=0.0f && b.y!=0.0f && b.z!=0.0f && b.w!=0.0f); return f32x4_make(a   / b.x, a   / b.y, a   / b.z, a   / b.w); }
+static inline f32x4 f32x4_div_f32   (f32x4 a, f32   b)          { ASSERT(b!=0.0f); f32 inv = 1.0f / b; return f32x4_make(a.x * inv, a.y * inv, a.z * inv, a.w * inv); }
+static inline bool4 f32x4_equal     (f32x4 a, f32x4 b)          { return bool4_make(f32_equal(a.x, b.x), f32_equal(a.y, b.y), f32_equal(a.z, b.z), f32_equal(a.w, b.w)); }
+static inline bool4 f32x4_nequal    (f32x4 a, f32x4 b)          { return bool4_make(f32_nequal(a.x, b.x), f32_nequal(a.y, b.y), f32_nequal(a.z, b.z), f32_nequal(a.w, b.w)); }
+static inline f32x4 f32x4_min       (f32x4 a, f32x4 b)          { return f32x4_make(f32_min(a.x, b.x), f32_min(a.y, b.y), f32_min(a.z, b.z), f32_min(a.w, b.w)); }
+static inline f32x4 f32x4_max       (f32x4 a, f32x4 b)          { return f32x4_make(f32_max(a.x, b.x), f32_max(a.y, b.y), f32_max(a.z, b.z), f32_max(a.w, b.w)); }
+static inline f32x4 f32x4_clamp     (f32x4 x, f32x4 a, f32x4 b) { return f32x4_min(f32x4_max(x, a), b); }
+static inline f32x4 f32x4_abs       (f32x4 a)                   { return f32x4_make(f32_abs(a.x), f32_abs(a.y), f32_abs(a.z), f32_abs(a.w)); }
+static inline f32x4 f32x4_floor     (f32x4 a)                   { return f32x4_make(f32_floor(a.x), f32_floor(a.y), f32_floor(a.z), f32_floor(a.w)); }
+static inline f32x4 f32x4_ceil      (f32x4 a)                   { return f32x4_make(f32_ceil(a.x), f32_ceil(a.y), f32_ceil(a.z), f32_ceil(a.w)); }
+static inline bool4 f32x4_gt        (f32x4 a, f32x4 b)          { return bool4_make(a.x>b.x, a.y>b.y, a.z>b.z, a.w>b.w);}
+static inline bool4 f32x4_ge        (f32x4 a, f32x4 b)          { return bool4_make(a.x>=b.x, a.y>=b.y, a.z>=b.z, a.w>=b.w);}
+static inline bool4 f32x4_lt        (f32x4 a, f32x4 b)          { return bool4_make(a.x<b.x, a.y<b.y, a.z<b.z, a.w<b.w);}
+static inline bool4 f32x4_le        (f32x4 a, f32x4 b)          { return bool4_make(a.x<=b.x, a.y<=b.y, a.z<=b.z, a.w<=b.w);}
+static inline f32   f32x4_dot       (f32x4 a, f32x4 b)          { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
+static inline f32   f32x4_length2   (f32x4 a)                   { return a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w; }
+static inline f32   f32x4_length    (f32x4 a)                   { return f32_sqrt(f32x4_length2(a)); }
+static inline f32x4 f32x4_normalize (f32x4 a)                   { f32 len2 = f32x4_length2(a); ASSERT(len2!=0.0f); f32 inv = f32_rsqrt(len2); return f32x4_mul_f32(a, inv); }
 static inline f32x4 f32x4_mask_select(bool4 mask, f32x4 a, f32x4 b) { f32x4 r; r.x = mask.x ? a.x : b.x; r.y = mask.y ? a.y : b.y; r.z = mask.z ? a.z : b.z; r.w = mask.w ? a.w : b.w; return r; }
-
-// static inline f32x3 f32x4_perspective_divide(f32x4 a);
 
 // Matrix 4x4
 // Row major
@@ -355,10 +356,6 @@ static inline f32x4x4 f32x4x4_scale_f32x3(f32x3 s) {
 
 // static inline f32x4x4 f32x4x4_inverse(const f32x4x4& m);
 
-// // Projection
-// static inline f32x4x4 f32x4x4_perspective(f32 fov_y_rad, f32 aspect_ratio, f32 near_plane, f32 far_plane);
-// static inline f32x4x4 f32x4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_plane, f32 far_plane);
-
 static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
     f32x4x4 m = f32x4x4_identity();
 
@@ -386,35 +383,33 @@ static inline f32x4x4 f32x4x4_from_quat(Quaternion q) {
     return m;
 }
 
-
-
 // Quaternion
 static inline Quaternion quat_make(f32 x, f32 y, f32 z, f32 w)  { Quaternion q; q.d = f32x4_make(x, y, z, w); return q;}
 static inline Quaternion quat_make_f32x3(f32x3 a)               { Quaternion q; q.d.x = a.x; q.d.y = a.y; q.d.z = a.z; q.d.w = 0.0f; return q;}
 static inline Quaternion quat_identity(void)                    { Quaternion q; q.d = f32x4_make(0.0f,0.0f,0.0f,1.0f); return q; }
-static inline Quaternion quat_add(Quaternion a, Quaternion b)  { Quaternion q; q.d = f32x4_add(a.d, b.d); return q; }
-static inline Quaternion quat_sub(Quaternion a, Quaternion b)  { Quaternion q; q.d = f32x4_sub(a.d, b.d); return q; }
-static inline Quaternion quat_mul(Quaternion a, Quaternion b)  { Quaternion q;
+static inline Quaternion quat_add(Quaternion a, Quaternion b)   { Quaternion q; q.d = f32x4_add(a.d, b.d); return q; }
+static inline Quaternion quat_sub(Quaternion a, Quaternion b)   { Quaternion q; q.d = f32x4_sub(a.d, b.d); return q; }
+static inline Quaternion quat_mul(Quaternion a, Quaternion b)   { Quaternion q;
     q.d.x = a.d.w*b.d.x + a.d.x*b.d.w + a.d.y*b.d.z - a.d.z*b.d.y;
     q.d.y = a.d.w*b.d.y - a.d.x*b.d.z + a.d.y*b.d.w + a.d.z*b.d.x;
     q.d.z = a.d.w*b.d.z + a.d.x*b.d.y - a.d.y*b.d.x + a.d.z*b.d.w;
     q.d.w = a.d.w*b.d.w - a.d.x*b.d.x - a.d.y*b.d.y - a.d.z*b.d.z;
     return q;
 }
-static inline Quaternion quat_mull_f32(f32        a, Quaternion b)  { Quaternion q; q.d = f32x4_mull_f32(a, b.d); return q; }
-static inline Quaternion quat_mulr_f32(Quaternion a, f32        b)  { Quaternion q; q.d = f32x4_mulr_f32(a.d, b); return q; }
+static inline Quaternion f32_mul_quat(f32        a, Quaternion b)  { Quaternion q; q.d = f32_mul_f32x4(a, b.d); return q; }
+static inline Quaternion quat_mul_f32(Quaternion a, f32        b)  { Quaternion q; q.d = f32x4_mul_f32(a.d, b); return q; }
 static inline Quaternion quat_conjugate(Quaternion a)           { Quaternion q = quat_make(-a.d.x, -a.d.y, -a.d.z, a.d.w); return q; }
 static inline f32 quat_length2(Quaternion a)                    { return f32x4_length2(a.d); }
 static inline f32 quat_length(Quaternion a)                     { return f32x4_length(a.d); }
 static inline Quaternion quat_normalize(Quaternion a)           { Quaternion q; q.d = f32x4_normalize(a.d); return q; }
-static inline Quaternion quat_reciprocal(Quaternion a)          { return quat_mull_f32(1.0f / quat_length2(a), quat_conjugate(a)); }
+static inline Quaternion quat_reciprocal(Quaternion a)          { return f32_mul_quat(1.0f / quat_length2(a), quat_conjugate(a)); }
 
 static inline Quaternion quat_make_rotation(f32x3 rot_axis, f32 theta) {
     f32 len2 = f32x3_length2(rot_axis);
 
     ASSERT(f32_equal(len2, 1.0f));
     if (!f32_equal(len2, 1.0f)) {
-        rot_axis = f32x3_mull_f32(f32_rsqrt(len2), rot_axis);
+        rot_axis = f32_mul_f32x3(f32_rsqrt(len2), rot_axis);
     }
 
     Quaternion q;
@@ -433,8 +428,8 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
     // r_vec = p_vec + 2*cos(theta/2)sin(theta/2) * (u x p) + 2 * sin2(theta/2) * u x (u x p)
     ASSERT(f32_equal(quat_length2(q), 1.0f));
     f32x3 sin_rot = f32x3_make(q.d.x, q.d.y, q.d.z);
-    f32x3 t = f32x3_mull_f32(2.0f, f32x3_cross(sin_rot, v));
-    return f32x3_add(v, f32x3_add(f32x3_mull_f32(q.d.w, t), f32x3_cross(sin_rot, t)));
+    f32x3 t = f32_mul_f32x3(2.0f, f32x3_cross(sin_rot, v));
+    return f32x3_add(v, f32x3_add(f32_mul_f32x3(q.d.w, t), f32x3_cross(sin_rot, t)));
 }
 
 // static inline Quaternion quat_slerp(Quaternion a, Quaternion b, f32 t);
@@ -444,66 +439,66 @@ static inline f32x3 quat_rotate_f32x3(Quaternion q, f32x3 v) {
 }
 
 static inline s32x2 operator+(s32x2 a, s32x2 b)                 { return s32x2_add(a, b);       }
-static inline s32x2 operator+(s32   a, s32x2 b)                 { return s32x2_addl_s32(a, b);  }
-static inline s32x2 operator+(s32x2 a, s32   b)                 { return s32x2_addr_s32(a, b);  }
+static inline s32x2 operator+(s32   a, s32x2 b)                 { return s32_add_s32x2(a, b);  }
+static inline s32x2 operator+(s32x2 a, s32   b)                 { return s32x2_add_s32(a, b);  }
 static inline s32x2 operator-(s32x2 a, s32x2 b)                 { return s32x2_sub(a, b);       }
-static inline s32x2 operator-(s32   a, s32x2 b)                 { return s32x2_subl_s32(a, b);  }
-static inline s32x2 operator-(s32x2 a, s32   b)                 { return s32x2_subr_s32(a, b);  }
+static inline s32x2 operator-(s32   a, s32x2 b)                 { return s32_sub_s32x2(a, b);  }
+static inline s32x2 operator-(s32x2 a, s32   b)                 { return s32x2_sub_s32(a, b);  }
 static inline s32x2 operator-(s32x2 a)                          { return s32x2_subu(a);         }
 static inline s32x2 operator*(s32x2 a, s32x2 b)                 { return s32x2_mul(a, b);       }
-static inline s32x2 operator*(s32   a, s32x2 b)                 { return s32x2_mull_s32(a, b);  }
-static inline s32x2 operator*(s32x2 a, s32   b)                 { return s32x2_mulr_s32(a, b);  }
+static inline s32x2 operator*(s32   a, s32x2 b)                 { return s32_mul_s32x2(a, b);  }
+static inline s32x2 operator*(s32x2 a, s32   b)                 { return s32x2_mul_s32(a, b);  }
 static inline s32x2 operator/(s32x2 a, s32x2 b)                 { return s32x2_div(a, b);       }
-static inline s32x2 operator/(s32   a, s32x2 b)                 { return s32x2_divl_s32(a, b);  }
-static inline s32x2 operator/(s32x2 a, s32   b)                 { return s32x2_divr_s32(a, b);  }
+static inline s32x2 operator/(s32   a, s32x2 b)                 { return s32_div_s32x2(a, b);  }
+static inline s32x2 operator/(s32x2 a, s32   b)                 { return s32x2_div_s32(a, b);  }
 static inline bool  operator==(s32x2 a, s32x2 b)                { return s32x2_equal(a, b);     }
 static inline bool  operator!=(s32x2 a, s32x2 b)                { return s32x2_nequal(a, b);    }
 
 static inline f32x2 operator+(f32x2 a, f32x2 b)                 { return f32x2_add(a, b);       }
-static inline f32x2 operator+(f32   a, f32x2 b)                 { return f32x2_addl_f32(a, b);  }
-static inline f32x2 operator+(f32x2 a, f32   b)                 { return f32x2_addr_f32(a, b);  }
+static inline f32x2 operator+(f32   a, f32x2 b)                 { return f32_add_f32x2(a, b);  }
+static inline f32x2 operator+(f32x2 a, f32   b)                 { return f32x2_add_f32(a, b);  }
 static inline f32x2 operator-(f32x2 a, f32x2 b)                 { return f32x2_sub(a, b);       }
-static inline f32x2 operator-(f32   a, f32x2 b)                 { return f32x2_subl_f32(a, b);  }
-static inline f32x2 operator-(f32x2 a, f32   b)                 { return f32x2_subr_f32(a, b);  }
+static inline f32x2 operator-(f32   a, f32x2 b)                 { return f32_sub_f32x2(a, b);  }
+static inline f32x2 operator-(f32x2 a, f32   b)                 { return f32x2_sub_f32(a, b);  }
 static inline f32x2 operator-(f32x2 a)                          { return f32x2_subu(a);         }
 static inline f32x2 operator*(f32x2 a, f32x2 b)                 { return f32x2_mul(a, b);       }
-static inline f32x2 operator*(f32   a, f32x2 b)                 { return f32x2_mull_f32(a, b);  }
-static inline f32x2 operator*(f32x2 a, f32   b)                 { return f32x2_mulr_f32(a, b);  }
+static inline f32x2 operator*(f32   a, f32x2 b)                 { return f32_mul_f32x2(a, b);  }
+static inline f32x2 operator*(f32x2 a, f32   b)                 { return f32x2_mul_f32(a, b);  }
 static inline f32x2 operator/(f32x2 a, f32x2 b)                 { return f32x2_div(a, b);       }
-static inline f32x2 operator/(f32   a, f32x2 b)                 { return f32x2_divl_f32(a, b);  }
-static inline f32x2 operator/(f32x2 a, f32   b)                 { return f32x2_divr_f32(a, b);  }
+static inline f32x2 operator/(f32   a, f32x2 b)                 { return f32_div_f32x2(a, b);  }
+static inline f32x2 operator/(f32x2 a, f32   b)                 { return f32x2_div_f32(a, b);  }
 static inline bool  operator==(f32x2 a, f32x2 b)                { return f32x2_equal(a, b);     }
-static inline bool  operator!=(f32x2 a, f32x2 b)                { return f32x2_nequal(a, b);    }
+static inline bool  operator!=(f32x2 a, f32x2 b)                { return f32x2_neqal(a, b);    }
 
 static inline f32x3 operator+(f32x3 a, f32x3 b)                 { return f32x3_add(a, b);       }
-static inline f32x3 operator+(f32   a, f32x3 b)                 { return f32x3_addl_f32(a, b);  }
-static inline f32x3 operator+(f32x3 a, f32   b)                 { return f32x3_addr_f32(a, b);  }
+static inline f32x3 operator+(f32   a, f32x3 b)                 { return f32_add_f32x3(a, b);  }
+static inline f32x3 operator+(f32x3 a, f32   b)                 { return f32x3_add_f32(a, b);  }
 static inline f32x3 operator-(f32x3 a, f32x3 b)                 { return f32x3_sub(a, b);       }
-static inline f32x3 operator-(f32   a, f32x3 b)                 { return f32x3_subl_f32(a, b);  }
-static inline f32x3 operator-(f32x3 a, f32   b)                 { return f32x3_subr_f32(a, b);  }
+static inline f32x3 operator-(f32   a, f32x3 b)                 { return f32_sub_f32x3(a, b);  }
+static inline f32x3 operator-(f32x3 a, f32   b)                 { return f32x3_sub_f32(a, b);  }
 static inline f32x3 operator-(f32x3 a)                          { return f32x3_subu(a);         }
 static inline f32x3 operator*(f32x3 a, f32x3 b)                 { return f32x3_mul(a, b);       }
-static inline f32x3 operator*(f32   a, f32x3 b)                 { return f32x3_mull_f32(a, b);  }
-static inline f32x3 operator*(f32x3 a, f32   b)                 { return f32x3_mulr_f32(a, b);  }
+static inline f32x3 operator*(f32   a, f32x3 b)                 { return f32_mul_f32x3(a, b);  }
+static inline f32x3 operator*(f32x3 a, f32   b)                 { return f32x3_mul_f32(a, b);  }
 static inline f32x3 operator/(f32x3 a, f32x3 b)                 { return f32x3_div(a, b);       }
-static inline f32x3 operator/(f32   a, f32x3 b)                 { return f32x3_divl_f32(a, b);  }
-static inline f32x3 operator/(f32x3 a, f32   b)                 { return f32x3_divr_f32(a, b);  }
+static inline f32x3 operator/(f32   a, f32x3 b)                 { return f32_div_f32x3(a, b);  }
+static inline f32x3 operator/(f32x3 a, f32   b)                 { return f32x3_div_f32(a, b);  }
 static inline bool  operator==(f32x3 a, f32x3 b)                { return f32x3_equal(a, b);     }
 static inline bool  operator!=(f32x3 a, f32x3 b)                { return f32x3_nequal(a, b);    }
 
 static inline f32x4 operator+(f32x4 a, f32x4 b)                 { return f32x4_add(a, b);       }
-static inline f32x4 operator+(f32   a, f32x4 b)                 { return f32x4_addl_f32(a, b);  }
-static inline f32x4 operator+(f32x4 a, f32   b)                 { return f32x4_addr_f32(a, b);  }
+static inline f32x4 operator+(f32   a, f32x4 b)                 { return f32_add_f32x4(a, b);  }
+static inline f32x4 operator+(f32x4 a, f32   b)                 { return f32x4_add_f32(a, b);  }
 static inline f32x4 operator-(f32x4 a, f32x4 b)                 { return f32x4_sub(a, b);       }
-static inline f32x4 operator-(f32   a, f32x4 b)                 { return f32x4_subl_f32(a, b);  }
-static inline f32x4 operator-(f32x4 a, f32   b)                 { return f32x4_subr_f32(a, b);  }
+static inline f32x4 operator-(f32   a, f32x4 b)                 { return f32_sub_f32x4(a, b);  }
+static inline f32x4 operator-(f32x4 a, f32   b)                 { return f32x4_sub_f32(a, b);  }
 static inline f32x4 operator-(f32x4 a)                          { return f32x4_subu(a);         }
 static inline f32x4 operator*(f32x4 a, f32x4 b)                 { return f32x4_mul(a, b);       }
-static inline f32x4 operator*(f32   a, f32x4 b)                 { return f32x4_mull_f32(a, b);  }
-static inline f32x4 operator*(f32x4 a, f32   b)                 { return f32x4_mulr_f32(a, b);  }
+static inline f32x4 operator*(f32   a, f32x4 b)                 { return f32_mul_f32x4(a, b);  }
+static inline f32x4 operator*(f32x4 a, f32   b)                 { return f32x4_mul_f32(a, b);  }
 static inline f32x4 operator/(f32x4 a, f32x4 b)                 { return f32x4_div(a, b);       }
-static inline f32x4 operator/(f32   a, f32x4 b)                 { return f32x4_divl_f32(a, b);  }
-static inline f32x4 operator/(f32x4 a, f32   b)                 { return f32x4_divr_f32(a, b);  }
+static inline f32x4 operator/(f32   a, f32x4 b)                 { return f32_div_f32x4(a, b);  }
+static inline f32x4 operator/(f32x4 a, f32   b)                 { return f32x4_div_f32(a, b);  }
 static inline bool  operator==(f32x4 a, f32x4 b)                { return f32x4_equal(a, b);     }
 static inline bool  operator!=(f32x4 a, f32x4 b)                { return f32x4_nequal(a, b);    }
 
@@ -515,8 +510,8 @@ static inline f32x4   operator*(const f32x4x4& a, f32x4   b)            { return
 static inline Quaternion operator+(Quaternion a, Quaternion b)          { return quat_add(a, b); }
 static inline Quaternion operator-(Quaternion a, Quaternion b)          { return quat_sub(a, b); }
 static inline Quaternion operator*(Quaternion a, Quaternion b)          { return quat_mul(a, b); }
-static inline Quaternion operator*(f32        a, Quaternion b)          { return quat_mull_f32(a, b); }
-static inline Quaternion operator*(Quaternion a, f32        b)          { return quat_mulr_f32(a, b); }
+static inline Quaternion operator*(f32        a, Quaternion b)          { return f32_mul_quat(a, b); }
+static inline Quaternion operator*(Quaternion a, f32        b)          { return quat_mul_f32(a, b); }
 
 #endif
 

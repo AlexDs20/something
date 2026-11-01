@@ -89,16 +89,16 @@ void camera_move(Camera* camera, MotionDirection direction, f32 delta_time) {
     if (camera->camera_type == ADS_CAMERA_FREE_FLIGHT) {
         switch (direction) {
             case ADS_MOTION_DIRECTION_FORWARD: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(amount, camera->direction));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(amount, camera->direction));
             } break;
             case ADS_MOTION_DIRECTION_BACKWARD: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(-amount, camera->direction));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(-amount, camera->direction));
             } break;
             case ADS_MOTION_DIRECTION_RIGHT: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(amount, camera->right));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(amount, camera->right));
             } break;
             case ADS_MOTION_DIRECTION_LEFT: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(-amount, camera->right));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(-amount, camera->right));
             } break;
             default: {
                 ASSERT(false);
@@ -109,16 +109,16 @@ void camera_move(Camera* camera, MotionDirection direction, f32 delta_time) {
         f32x3 horizontal_forward = f32x3_make(f32_sin(camera->yaw), 0.0f, f32_cos(camera->yaw));
         switch (direction) {
             case ADS_MOTION_DIRECTION_FORWARD: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(amount, horizontal_forward));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(amount, horizontal_forward));
             } break;
             case ADS_MOTION_DIRECTION_BACKWARD: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(-amount, horizontal_forward));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(-amount, horizontal_forward));
             } break;
             case ADS_MOTION_DIRECTION_RIGHT: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(amount, camera->right));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(amount, camera->right));
             } break;
             case ADS_MOTION_DIRECTION_LEFT: {
-                camera->position = f32x3_add(camera->position, f32x3_mull_f32(-amount, camera->right));
+                camera->position = f32x3_add(camera->position, f32_mul_f32x3(-amount, camera->right));
             } break;
             default: {
                 ASSERT(false);

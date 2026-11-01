@@ -262,7 +262,7 @@ void shader_frag_color(
         f32 /*w0*/, f32 /*w1*/, f32 /*w2*/
         ) {
 
-    f32x3 n = f32x3_mull_f32(255.0f, mat->Kd);
+    f32x3 n = f32_mul_f32x3(255.0f, mat->Kd);
     u32 r = (uint32_t)n.x << 0;
     u32 g = (uint32_t)n.y << 8;
     u32 b = (uint32_t)n.z << 16;
@@ -680,30 +680,6 @@ struct Transformation {
 };
 */
 
-/*
-static s32
-clip_triangle(const f32x4* a, const f32x4* b, const f32x4* c, f32x4* out_coordinates) {
-    // f32x4_debug_print(*a);
-    // f32x4_debug_print(*b);
-    // f32x4_debug_print(*c);
-    // f32x4_debug_print(out_coordinates[0]);
-    out_coordinates[0].x = 0.0f;
-
-    // printf("W: (%.3f,%.3f,%.3f)\n", a->w, b->w, c->w);
-
-    if (f32_abs(a->x) > a->w || f32_abs(a->y) > a->w || a->z > 0.0f || a->z < -a->w) {
-        return -1;
-    }
-    if (f32_abs(b->x) > b->w || f32_abs(b->y) > b->w || b->z > 0.0f || b->z < -b->w) {
-        return -1;
-    }
-    if (f32_abs(c->x) > c->w || f32_abs(c->y) > c->w || c->z > 0.0f || c->z < -c->w) {
-        return -1;
-    }
-
-    return 3;
-}
-*/
 
 static const u8 MAX_CLIPPED_VERTICES = 9;
 static u32
@@ -774,9 +750,9 @@ clip_triangle(ClipSpaceVertex* in_3, ClipSpaceVertex* out) {
                 f32 t = dp / (dp - dn);
 
                 ClipSpaceVertex intersection;
-                intersection.position = f32x4_add(p->position, f32x4_mull_f32(t, vp));      // p + t*v_position
-                intersection.texcoords = f32x3_add(p->texcoords, f32x3_mull_f32(t, vt));    // p + t*v_texture
-                intersection.normals = f32x3_add(p->normals, f32x3_mull_f32(t, vn));        // p + t*v_normal
+                intersection.position = f32x4_add(p->position, f32_mul_f32x4(t, vp));      // p + t*v_position
+                intersection.texcoords = f32x3_add(p->texcoords, f32_mul_f32x3(t, vt));    // p + t*v_texture
+                intersection.normals = f32x3_add(p->normals, f32_mul_f32x3(t, vn));        // p + t*v_normal
 
                 // If previous inside and current outside => add intersection
                 // If previous outside and current inside => add intersection then add current
