@@ -43,41 +43,6 @@ void draw_line(u32* framebuffer, u32 w, u32 h, f32x3* a, f32x3* b, u32 c) {
     }
 }
 
-/*
- // Supposedly fast from https://haqr.eu/tinyrenderer/bresenham/
- // Need to compare perfs
-#include <algorithm>
-#include <cmath>
-void line(u32* framebuffer, u32 w, u32 h, int ax, int ay, int bx, int by) {
-    bool steep = std::abs(ax-bx) < std::abs(ay-by);
-    if (steep) { // if the line is steep, we transpose the image
-        std::swap(ax, ay);
-        std::swap(bx, by);
-    }
-    if (ax>bx) { // make it left−to−right
-        std::swap(ax, bx);
-        std::swap(ay, by);
-    }
-    int y = ay;
-    int ierror = 0;
-    for (int x=ax; x<=bx; x++) {
-        if (steep) { // if transposed, de−transpose
-            u32 linear = x*w + y;
-            u32* pixel = framebuffer + linear;
-            *pixel = 0xFFA500;
-        } else {
-            u32 linear = y*w + x;
-            u32* pixel = framebuffer + linear;
-            *pixel = 0xFFA500;
-        }
-        ierror += 2 * std::abs(by-ay);
-        y += (by > ay ? 1 : -1) * (ierror > bx - ax);
-        ierror -= 2 * (bx-ax)   * (ierror > bx - ax);
-    }
-}
-*/
-
-
 void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
     for (u64 i=0; i<model->n_faces; ++i) {
         ObjFace f = model->faces[i];
@@ -105,153 +70,6 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
         // line(framebuffer, w, h, c.x, c.y, a.x, a.y );
     }
 }
-
-void swap_f32x3(f32x3* a, f32x3* b) {
-    f32x3 tmp = *b;
-    *b = *a;
-    *a = tmp;
-}
-
-void fill_triangle_line_sweep_reference(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
-    if (a->y==b->y && a->y==c->y) return; // i dont care about degenerate triangles
-    if (a->y>b->y) swap_f32x3(a, b);
-    if (a->y>c->y) swap_f32x3(a, c);
-    if (b->y>c->y) swap_f32x3(b, c);
-
-
-    f32 zmid = (a->z + b->z + c->z) / 3;
-
-    s32 ax = (s32)a->x;
-    s32 ay = (s32)a->y;
-    s32 bx = (s32)b->x;
-    s32 by = (s32)b->y;
-    s32 cx = (s32)c->x;
-    s32 cy = (s32)c->y;
-
-    // static int miny = 100000;
-    // static int maxy = -100000;
-
-    int total_height = cy-ay;
-    for (int i=0; i<total_height; i++) {
-        bool second_half = i>by-ay || by==ay;
-        int segment_height = second_half ? cy-by : by-ay;
-        float alpha = (float)i/total_height;
-        float beta  = (float)(i-(second_half ? by-ay : 0))/segment_height; // be careful: with above conditions no division by zero here
-        s32 Ax = ax + (cx-ax)*alpha;
-        s32 Ay = ay + (cy-ay)*alpha;
-        s32 Bx = second_half ? bx + (cx-bx)*beta : ax + (bx-ax)*beta;
-        s32 By = second_half ? by + (cy-by)*beta : ay + (by-ay)*beta;
-        if (Ax>Bx) {
-            u32 tmp = Ax;
-            Ax = Bx;
-            Bx = tmp;
-            tmp = Ay;
-            Ay = By;
-            By = tmp;
-        }
-        for (int j=Ax; j<=Bx; j++) {
-            if (ay+i<0 || ay+i>=(s32)h || j<0 || j>=(s32)w) continue;
-            // miny = miny < h-(ay+i) ? miny : h-(ay+i);
-            // maxy = maxy > h-(ay+i) ? maxy : h-(ay+i);
-            u32 linear = w*(h-(ay+i)) + j;
-
-            f32* zpix = zbuffer + linear;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-
-                u32* pixel = framebuffer + linear;
-                *pixel = color;
-            }
-        }
-    }
-
-    // printf("[%d,%d]\n", miny, maxy);
-}
-
-f32x3 barycentric_coordinate(f32x2 P, f32x3* A, f32x3* B, f32x3* C) {
-    f32x3 v1 = f32x3_make(C->x-A->x, B->x-A->x, A->x-P.x);
-    f32x3 v2 = f32x3_make(C->y-A->y, B->y-A->y, A->y-P.y);
-    f32x3 u = f32x3_cross(v1, v2);
-
-    if (f32_abs(u.z) <= F32_EPSILON) {
-        return f32x3_make(-1, -1, -1);
-    }
-    return f32x3_make(u.x/u.z, u.y/u.z, 1);
-}
-
-typedef union {
-    struct {
-        f32 left;
-        f32 top;
-        f32 right;
-        f32 bottom;
-    } edge;
-    f32 data[4];
-} Bboxf32;
-
-void fill_triangle_bbox_triangle_check(u32* framebuffer, f32* zbuffer, u32 w, u32 h, f32x3* a, f32x3* b, f32x3* c, u32 color) {
-    Bboxf32 bbox = {
-        .edge = {
-            .left = f32_min(a->x, f32_min(b->x, c->x)),
-            .right = f32_max(a->x, f32_max(b->x, c->x)),
-            .bottom = f32_min(a->y, f32_min(b->y, c->y)),
-            .top = f32_max(a->y, f32_max(b->y, c->y))
-        }
-    };
-    // bbox.edge.left    = f32_min(a->x, f32_min(b->x, c->x));
-    // bbox.edge.right   = f32_max(a->x, f32_max(b->x, c->x));
-    // bbox.edge.bottom  = f32_min(a->y, f32_min(b->y, c->y));
-    // bbox.edge.top     = f32_max(a->y, f32_max(b->y, c->y));
-
-    s32 minx = (s32)f32_max(0.0f, f32_floor(bbox.edge.left));
-    s32 maxx = (s32)f32_min(w,    f32_ceil(bbox.edge.right));
-    s32 miny = (s32)f32_max(0.0f, f32_floor(bbox.edge.bottom));
-    s32 maxy = (s32)f32_min(h,    f32_ceil(bbox.edge.top));
-
-    f32 zmid = (a->z + b->z + c->z) / 3;
-
-    for (s32 j=miny; j<maxy; j++) {
-        for (s32 i=minx; i<maxx; i++) {
-            f32x2 P = f32x2_make((f32)i, (f32)j);
-            f32x3 bary = barycentric_coordinate(P, (f32x3*)a, (f32x3*)b, (f32x3*)c);
-            if (bary.x<0 || bary.y<0 || bary.x+bary.y>1) {
-                // printf("(%.4f,%.4f,%.4f)\n", bary.x, bary.y, bary.z);
-                continue;
-            }
-            f32* zpix = zbuffer + w*(h-j) + i;
-            if (*zpix < zmid) {
-                *zpix = zmid;
-
-                u32* pixel = framebuffer + w*(h-j) + i;
-                *pixel = color;
-            }
-        }
-    }
-}
-
-#if 0
-void shader_frag_color(
-        void* shader_ctx,
-        f32x3* /*a*/,        f32x3* /*b*/,       f32x3* /*c*/,
-        VertexAttrs* /*va*/,  VertexAttrs* /*vb*/, VertexAttrs* /*vc*/,
-        f32 /*w0*/,           f32 /*w1*/,          f32 /*w2*/,
-        u32 x,            u32 y,           u32 w,           u32 /*h*/,
-        f32* /*zbuffer*/,     u32* framebuffer) {
-    framebuffer[y*w+x] = ((ColorContext*)shader_ctx)->color;
-}
-
-void shader_frag_depth(
-        void* /*shader_ctx*/,
-        f32x3* a, f32x3* b, f32x3*c,
-        VertexAttrs* /*va*/, VertexAttrs* /*vb*/, VertexAttrs* /*vc*/,
-        f32 w0, f32 w1, f32 w2,
-        u32 x, u32 y, u32 w, u32 /*h*/,
-        f32* /*zbuffer*/, u32* framebuffer) {
-
-    f32 depth = w0*a->z + w1*b->z + w2*c->z;
-    framebuffer[y*w+x] = (u32)(depth*128);
-}
-#endif
 
 void shader_frag_color(
         u32* framebuffer , f32* /*zbuffer*/,
@@ -620,15 +438,6 @@ static f32x4 f32x3_transform_point(const f32x4x4* m, f32x3 p) {
 // TODO:
 // static inline f32x3 f32x3_transform_vector(const f32x4x4* m, f32x3 p);
 
-/*
-static void clip_triangle(ClipSpaceVertex* a,ClipSpaceVertex* b, ClipSpaceVertex* c){
-    // Do the clipping here
-    return;
-}
-*/
-
-
-
 static void screen_space_from_clip(const ClipSpaceVertex* in, u32 width, u32 height, RasterVertex* out) {
     f32 inv_w = 1.0f / in->position.w;
 
@@ -696,6 +505,7 @@ clip_triangle(ClipSpaceVertex* in_3, ClipSpaceVertex* out) {
     // For x left: x > -w
     u32 n_in = 3;
     u32 n_out = 0;
+
     for (u8 side=0; side < 6; side++) {
         for (u32 i=0; i<n_in; i++) {
             ClipSpaceVertex* n = &buffer_in[i];
@@ -766,6 +576,7 @@ clip_triangle(ClipSpaceVertex* in_3, ClipSpaceVertex* out) {
                 buffer_out[n_out++] = *n;
             }
         }
+
         ClipSpaceVertex* tmp = buffer_in;
         buffer_in = buffer_out;
         buffer_out = tmp;
@@ -812,6 +623,7 @@ void draw_submesh(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, f
         if (n < 3) continue;
         if (n == (u32)-1) continue;
 
+        // Fan triangulate
         v[0] = clipped_triangles[0];
         v[2] = clipped_triangles[1];
         for (u32 j=2; j<n; j++) {
