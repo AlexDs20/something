@@ -71,7 +71,7 @@ void draw_model_wireframe(ObjModel* model, u32 w, u32 h, u32* framebuffer) {
     }
 }
 
-void shader_frag_color(
+void shader_fragment_color(
         u32* framebuffer , f32* /*zbuffer*/,
         u32 width, u32 /*height*/,
         Material* mat,
@@ -90,7 +90,13 @@ void shader_frag_color(
     return;
 }
 
-void shader_frag_texture(
+static inline f32
+interpolate_value_screen_space(f32 a, f32 b, f32 c, f32 w0, f32 w1, f32 w2, f32 inv_wa, f32 inv_wb, f32 inv_wc) {
+    // Interpolate the value
+    return (w0 * a * inv_wa + w1 * b * inv_wb + w2 * c * inv_wc) / (w0 * inv_wa + w1 * inv_wb + w2 * inv_wc);
+}
+
+void shader_fragment_texture(
         u32* framebuffer , f32* /*zbuffer*/,
         u32 width, u32 /*height*/,
         Material* mat,
@@ -101,14 +107,20 @@ void shader_frag_texture(
     // va->u,v,w => are the texture coordinates
     // w0, w1, w2 => barycentric coords
 
+    // TODO: Add an "interpolate method" that then takes into account the w from the perspective divide
+    // a = (\Sigma_i (lambda_i * a_i / w_i)) / (\Sigma_i lambda_i/ w_i)
+
     Texture* texture = mat->map_Kd;
     f32x3* at = &a->texcoords;
     f32x3* bt = &b->texcoords;
     f32x3* ct = &c->texcoords;
 
-    f32 u = w0*at->x + w1*bt->x + w2*ct->x;
-    f32 v = w0*at->y + w1*bt->y + w2*ct->y;
+    // f32 u = w0*at->x + w1*bt->x + w2*ct->x;
+    // f32 v = w0*at->y + w1*bt->y + w2*ct->y;
     // f32 w = w0*va->w + w1*vb->w + w2*vc->w;
+
+    f32 u = interpolate_value_screen_space(at->x, bt->x, ct->x, w0, w1, w2, a->inv_w, b->inv_w, c->inv_w);
+    f32 v = interpolate_value_screen_space(at->y, bt->y, ct->y, w0, w1, w2, a->inv_w, b->inv_w, c->inv_w);
 
     u = u - f32_floor(u);
     v = v - f32_floor(v);
@@ -124,7 +136,6 @@ void shader_frag_texture(
 inline static f32 compute_triangle_area(f32 ax, f32 ay, f32 bx, f32 by, f32 cx, f32 cy) {
     return 0.5f * ( (by-ay) * (bx+ax) + (cy-by) * (cx+bx) + (ay-cy) * (ax+cx) );
 }
-
 
 void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Material* mat, RasterVertex* v1, RasterVertex* v2, RasterVertex* v3) {
     /*
@@ -194,10 +205,10 @@ void fill_flat_top_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // TODO: Fix and use proper function pointer as I once did.
                 if (mat == NULL || mat->map_Kd == NULL) {
-                    shader_frag_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                    shader_fragment_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
                 }
                 else {
-                    shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                    shader_fragment_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
                 }
             }
             z += z_scanline_slope;
@@ -283,10 +294,10 @@ void fill_flat_bottom_triangle(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Mat
                 f32 gamma = compute_triangle_area(x, y, bx, by, ax, ay) / triangle_area;
                 // TODO: Fix and use proper function pointer as I once did.
                 if (mat == NULL || mat->map_Kd == NULL) {
-                    shader_frag_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                    shader_fragment_color(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
                 }
                 else {
-                    shader_frag_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
+                    shader_fragment_texture(framebuffer, zbuffer, w, h, mat, x, y, v1, v2, v3, alpha, beta, gamma);
                 }
             }
             z += z_scanline_slope;
@@ -369,8 +380,13 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
     if (xmax < 0) return;
     if (xmin >= w) return;
 
+    // printf("==============================\n");
+    // printf("a: (%.3f,%.3f,%.3f)\n", a->x, a->y, a->z);
+    // printf("b: (%.3f,%.3f,%.3f)\n", b->x, b->y, b->z);
+    // printf("c: (%.3f,%.3f,%.3f)\n", c->x, c->y, c->z);
+
     // Lower half triangle
-    if (b->y == c->y) {
+    if (f32_approx_equal(b->y, c->y)) {
         if (b->x <= c->x) {
             fill_flat_top_triangle(framebuffer, zbuffer, w, h, mat , v1, v2, v3);
         } else {
@@ -378,7 +394,7 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
         }
     }
     // Upper half triangle
-    else if (a->y == b->y) {
+    else if (f32_approx_equal(a->y, b->y)) {
         if (a->x <= b->x) {
             fill_flat_bottom_triangle(framebuffer, zbuffer, w, h, mat, v1, v2, v3);
         } else {
@@ -388,26 +404,45 @@ void fill_triangle_scanline(u32* framebuffer, f32* zbuffer, u32 w, u32 h, Materi
     else {
         f32 ac_inv_slope = (c->x - a->x) / (c->y - a->y);
         f32 ac_z_inv_slope = (c->z - a->z) / (c->y - a->y);
-        f32 extra_x = a->x + (b->y - a->y) * ac_inv_slope;
-        f32 extra_z = a->z + (b->y - a->y) * ac_z_inv_slope;
+
+        f32 dy = b->y - a->y;
+
+        // interp parameter along AC.
+        f32 t = dy / (c->y - a->y);
 
         RasterVertex extra;
-        extra.position.x = extra_x;
+
+        extra.position.x = a->x + dy * ac_inv_slope;
         extra.position.y = b->y;
-        extra.position.z = extra_z;
+        extra.position.z = a->z + dy * ac_z_inv_slope;
 
-        // Handling of the other vertex attributes...
-        f32 ac_u_inv_slope = (v3->texcoords.x - v1->texcoords.x) / (v3->position.y - v1->position.y);
-        f32 ac_v_inv_slope = (v3->texcoords.y - v1->texcoords.y) / (v3->position.y - v1->position.y);
-        f32 ac_w_inv_slope = (v3->texcoords.z - v1->texcoords.z) / (v3->position.y - v1->position.y);
-        f32 extra_u = v1->texcoords.x + (v2->position.y - v1->position.y) * ac_u_inv_slope;
-        f32 extra_v = v1->texcoords.y + (v2->position.y - v1->position.y) * ac_v_inv_slope;
-        f32 extra_w = v1->texcoords.z + (v2->position.y - v1->position.y) * ac_w_inv_slope;
+        extra.inv_w = v1->inv_w + t * (v3->inv_w - v1->inv_w);
 
-        // TODO: Interpolate the normal as well
-        extra.texcoords.x = extra_u;
-        extra.texcoords.y = extra_v;
-        extra.texcoords.z = extra_w;
+        // Interp texture coordinates and handle perspective: interp (u/w, v/w, q/w), then /(1/w).
+        extra.texcoords.x = (v1->texcoords.x * v1->inv_w +
+            t * (v3->texcoords.x * v3->inv_w - v1->texcoords.x * v1->inv_w)
+        ) / extra.inv_w;
+
+        extra.texcoords.y = (v1->texcoords.y * v1->inv_w +
+            t * (v3->texcoords.y * v3->inv_w - v1->texcoords.y * v1->inv_w)
+        ) / extra.inv_w;
+
+        extra.texcoords.z = (v1->texcoords.z * v1->inv_w +
+            t * (v3->texcoords.z * v3->inv_w - v1->texcoords.z * v1->inv_w)
+        ) / extra.inv_w;
+
+        // Interp normals
+        extra.normals.x = (v1->normals.x * v1->inv_w +
+            t * (v3->normals.x * v3->inv_w - v1->normals.x * v1->inv_w)
+        ) / extra.inv_w;
+
+        extra.normals.y = (v1->normals.y * v1->inv_w +
+            t * (v3->normals.y * v3->inv_w - v1->normals.y * v1->inv_w)
+        ) / extra.inv_w;
+
+        extra.normals.z = (v1->normals.z * v1->inv_w +
+            t * (v3->normals.z * v3->inv_w - v1->normals.z * v1->inv_w)
+        ) / extra.inv_w;
 
         if (b->y > 0) {
             if (b->x <= extra.position.x) {
@@ -457,38 +492,6 @@ static void screen_space_from_clip(const ClipSpaceVertex* in, u32 width, u32 hei
 
     return;
 }
-
-/*
- * TODO: Do this at some point so we don't have to compute any inverse etc
-typedef enum {
-    TRANSFORMATION_NONE,
-    TRANSFORMATION_TRANSLATION,
-    TRANSFORMATION_ROTATION,
-    TRANSFORMATION_SCALE,
-    TRANSFORMATION_COMPOSITION,
-    TRANSFORMATION_COUNT
-} TransformationType;
-
-typedef struct Transformation Transformation;
-struct Transformation {
-    TransformationType type;
-    Transformation* next;
-    f32x4x4 mat;
-
-    // inverse_transpose used to transform covectors (normals)
-    // (M^-1)^T = ((TRS)^-1)^T 
-    //          = ((S)^-1 (R)^-1 (T)^-1)^T
-    //          = (T^-1)^T (R^-1)^T (S^-1)^T
-    //          = (T^-1)^T (R^T)^T (S^-1)^T
-    //          = (T^-1)^T R (S^-1)^T
-    //          = (T^-1)^T R (diag(1/sx,1/sy,1/sz))         // only use 3x3 mat, not 4x4
-    //    The translation should not affect the normal!
-    //          = R (diag(1/sx,1/sy,1/sz))
-    f32x4x4 inv_transpose;
-    bool computed;
-};
-*/
-
 
 static const u8 MAX_CLIPPED_VERTICES = 9;
 static u32
