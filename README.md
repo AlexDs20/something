@@ -11,13 +11,16 @@
 - *ADS_LOCAL_ARENA_CAPACITY*:
 
 # TODO
-- Change coordinate system
-    - I currently made it so that x is right, y is up on the screen and z is out towards the viewer
-    - I should make it: x->right, z up on screen and y into the screen
-- Math:
-    - only one varient: f32x2_add_f32() no left and right
-    - check there is f32xX_gt greater than osv
-    - check that f32X_equal f32X_nequal returns boolX not bool
+- Rendering:
+    - Change coordinate system
+        - I currently made it so that x is right, y is up on the screen and z is out towards the viewer
+        - I should make it: x->right, z up on screen and y into the screen
+    - Probably only clip the near plane / far plane
+        - Leave the rest of the triangles
+        - Using bound box rasterizing
+        - Clip the bounding box to the view frostum so that it automagically clips the triangles outside of the frostum
+            - This should also be "trivial" to SIMD
+    - Looking at performance here because it's not great...
 
 - JPEG:
     - [x] Check / make restart marker work even if not a multiple of the total number of pixels
@@ -46,7 +49,7 @@
         - [x] Mouse
         - [ ] Controller
     - [X] Math
-        - [ ] USE SSE / AVX2
+        - [ ] USE SSE / AVX2 / AVX512
     - [ ] NO LIBC
     - [ ] IMGUI
     - [ ] Audio
